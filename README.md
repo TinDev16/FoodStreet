@@ -1,4 +1,4 @@
-# Lap123
+# FoodStreet
 ## Overview
 
 FoodStreet is a multilingual food street tour system designed to help tourists explore culinary areas through a mobile application with GPS, geofencing, and audio narration, along with a web-based management system for shop owners and administrators.
