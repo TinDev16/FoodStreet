@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "E:\\Study_project\\C#\\FoodStreet\\FoodStreetMobile\\FoodStreetMobile.csproj": {}
+    "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetMobile\\FoodStreetMobile.csproj": {}
   },
   "projects": {
-    "E:\\Study_project\\C#\\FoodStreet\\FoodStreetMobile\\FoodStreetMobile.csproj": {
+    "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetMobile\\FoodStreetMobile.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "E:\\Study_project\\C#\\FoodStreet\\FoodStreetMobile\\FoodStreetMobile.csproj",
+        "projectUniqueName": "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetMobile\\FoodStreetMobile.csproj",
         "projectName": "FoodStreetMobile",
-        "projectPath": "E:\\Study_project\\C#\\FoodStreet\\FoodStreetMobile\\FoodStreetMobile.csproj",
+        "projectPath": "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetMobile\\FoodStreetMobile.csproj",
         "packagesPath": "C:\\Users\\lenovo\\.nuget\\packages\\",
-        "outputPath": "E:\\Study_project\\C#\\FoodStreet\\FoodStreetMobile\\obj\\",
+        "outputPath": "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetMobile\\obj\\",
         "projectStyle": "PackageReference",
         "crossTargeting": true,
         "configFilePaths": [

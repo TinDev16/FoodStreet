@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "EOsBNgRJgHs=",
+  "dgSpecHash": "pwuYCox8+Qg=",
   "success": true,
-  "projectFilePath": "E:\\Study_project\\C#\\FoodStreet\\FoodStreetMobile\\FoodStreetMobile.csproj",
+  "projectFilePath": "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetMobile\\FoodStreetMobile.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\lenovo\\.nuget\\packages\\googlegson\\2.13.1.1\\googlegson.2.13.1.1.nupkg.sha512",
     "C:\\Users\\lenovo\\.nuget\\packages\\microsoft.extensions.configuration\\10.0.0\\microsoft.extensions.configuration.10.0.0.nupkg.sha512",
