@@ -25,79 +25,24 @@
   <div id="map"></div>
 
   <script>
-    // Initialize the map without a fixed view; we'll fit to geocoded bounds
+    // 1️⃣ Khởi tạo map
     var map = L.map('map');
 
-    // OSM standard tiles
+    // 2️⃣ Tile layer
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    // Query Nominatim for "Phố ẩm thực Vĩnh Khánh, Quận 4, Hồ Chí Minh"
-    var query = 'Phố ẩm thực Vĩnh Khánh, Quận 4, Hồ Chí Minh, Việt Nam';
-    var url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(query);
+    // 3️⃣ Mặc định hiển thị PHỐ ẨM THỰC VĨNH KHÁNH
+    var foodStreet = [10.764140, 106.702035];
+    map.setView(foodStreet, 22);
 
-    fetch(url, { headers: { 'Accept': 'application/json' } })
-      .then(function(r) { return r.json(); })
-      .then(function(results) {
-        if (results && results.length > 0) {
-          var item = results[0];
-          var lat = parseFloat(item.lat);
-          var lon = parseFloat(item.lon);
-          // Fit to bounding box when available
-          if (item.boundingbox && item.boundingbox.length === 4) {
-            var south = parseFloat(item.boundingbox[0]);
-            var north = parseFloat(item.boundingbox[1]);
-            var west  = parseFloat(item.boundingbox[2]);
-            var east  = parseFloat(item.boundingbox[3]);
-            var bounds = L.latLngBounds([[south, west], [north, east]]);
-            map.fitBounds(bounds, { padding: [20, 20] });
-          } else {
-            map.setView([lat, lon], 17);
-          }
-
-          L.marker([lat, lon])
-            .addTo(map)
-            .bindPopup('Phố ẩm thực Vĩnh Khánh');
-        } else {
-          // Fallback approximate center (Quận 4 near Vĩnh Khánh)
-          var fallback = [10.7578, 106.7053];
-          map.setView(fallback, 17);
-          L.marker(fallback).addTo(map).bindPopup('Phố ẩm thực Vĩnh Khánh (ước lượng)');
-        }
-      })
-      .catch(function() {
-        // Network or parsing error fallback
-        var fallback = [10.7578, 106.7053];
-        map.setView(fallback, 17);
-        L.marker(fallback).addTo(map).bindPopup('Phố ẩm thực Vĩnh Khánh (ước lượng)');
-      });
+    L.marker(foodStreet)
+      .addTo(map)
+      .bindPopup('🍜 Phố ẩm thực Vĩnh Khánh')
+      .openPopup();
   </script>
 
-<script>
-    var map = L.map('map').setView([10.776889, 106.700806], 15);
-  
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap'
-    }).addTo(map);
-  
-    var userMarker = null;
-  
-    // HÀM MAUI GỌI
-    function showUserLocation(lat, lng) {
-      if (userMarker) {
-        map.removeLayer(userMarker);
-      }
-  
-      userMarker = L.marker([lat, lng])
-        .addTo(map)
-        .bindPopup("📍 Vị trí của bạn")
-        .openPopup();
-  
-      map.setView([lat, lng], 16);
-    }
-  </script>
-  
 </body>
 </html>
