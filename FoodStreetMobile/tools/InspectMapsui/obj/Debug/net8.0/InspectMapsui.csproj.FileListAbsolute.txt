@@ -1,0 +1,14 @@
+E:\Study_project\C#\New folder\FoodStreetMobile\tools\InspectMapsui\bin\Debug\net8.0\InspectMapsui.exe
+E:\Study_project\C#\New folder\FoodStreetMobile\tools\InspectMapsui\bin\Debug\net8.0\InspectMapsui.deps.json
+E:\Study_project\C#\New folder\FoodStreetMobile\tools\InspectMapsui\bin\Debug\net8.0\InspectMapsui.runtimeconfig.json
+E:\Study_project\C#\New folder\FoodStreetMobile\tools\InspectMapsui\bin\Debug\net8.0\InspectMapsui.dll
+E:\Study_project\C#\New folder\FoodStreetMobile\tools\InspectMapsui\bin\Debug\net8.0\InspectMapsui.pdb
+E:\Study_project\C#\New folder\FoodStreetMobile\tools\InspectMapsui\obj\Debug\net8.0\InspectMapsui.GeneratedMSBuildEditorConfig.editorconfig
+E:\Study_project\C#\New folder\FoodStreetMobile\tools\InspectMapsui\obj\Debug\net8.0\InspectMapsui.AssemblyInfoInputs.cache
+E:\Study_project\C#\New folder\FoodStreetMobile\tools\InspectMapsui\obj\Debug\net8.0\InspectMapsui.AssemblyInfo.cs
+E:\Study_project\C#\New folder\FoodStreetMobile\tools\InspectMapsui\obj\Debug\net8.0\InspectMapsui.csproj.CoreCompileInputs.cache
+E:\Study_project\C#\New folder\FoodStreetMobile\tools\InspectMapsui\obj\Debug\net8.0\InspectMapsui.dll
+E:\Study_project\C#\New folder\FoodStreetMobile\tools\InspectMapsui\obj\Debug\net8.0\refint\InspectMapsui.dll
+E:\Study_project\C#\New folder\FoodStreetMobile\tools\InspectMapsui\obj\Debug\net8.0\InspectMapsui.pdb
+E:\Study_project\C#\New folder\FoodStreetMobile\tools\InspectMapsui\obj\Debug\net8.0\InspectMapsui.genruntimeconfig.cache
+E:\Study_project\C#\New folder\FoodStreetMobile\tools\InspectMapsui\obj\Debug\net8.0\ref\InspectMapsui.dll

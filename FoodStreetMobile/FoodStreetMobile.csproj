@@ -58,8 +58,13 @@
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+		<PackageReference Include="Mapsui.Maui" Version="4.*" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
-		<PackageReference Include="Microsoft.Maui.Controls.Maps" Version="10.0.30" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Compile Remove="tools\**\*.cs" />
+		<None Remove="tools\**\*" />
 	</ItemGroup>
 
 </Project>
