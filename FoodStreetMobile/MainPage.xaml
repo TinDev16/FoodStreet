@@ -3,51 +3,87 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:mapsui="clr-namespace:Mapsui.UI.Maui;assembly=Mapsui.UI.Maui"
              x:Class="FoodStreetMobile.MainPage"
-             Title="Vinh Khanh Food Street">
+             Title="Vinh Khanh Food Street"
+             BackgroundColor="#FDF8F5">
 
     <Grid RowDefinitions="*,Auto" RowSpacing="0">
-        <mapsui:MapView x:Name="PoiMap" />
+        <Grid>
+            <mapsui:MapView x:Name="PoiMap" />
+
+            <Border Margin="16,18"
+                    Padding="12,8"
+                    BackgroundColor="#FFF7ED"
+                    Stroke="#F2E8E0"
+                    StrokeShape="RoundRectangle 16"
+                    VerticalOptions="Start"
+                    HorizontalOptions="Start">
+                <Border.Shadow>
+                    <Shadow Brush="#1F1B16"
+                            Opacity="0.08"
+                            Radius="10"
+                            Offset="0,4" />
+                </Border.Shadow>
+                <VerticalStackLayout Spacing="2">
+                    <Label Text="Phố ẩm thực Vĩnh Khánh"
+                           FontSize="16"
+                           FontAttributes="Bold"
+                           TextColor="#7C2D12" />
+                    <Label Text="Khám phá hương vị mềm mại bên sông"
+                           FontSize="12"
+                           TextColor="#9A6B4F" />
+                </VerticalStackLayout>
+            </Border>
+        </Grid>
 
         <Border Grid.Row="1"
-                Stroke="#E5E7EB"
-                BackgroundColor="#FFFFFF"
-                Padding="12"
-                StrokeShape="RoundRectangle 14">
-            <VerticalStackLayout Spacing="10">
+                Stroke="#F2E8E0"
+                BackgroundColor="#FFFBF7"
+                Padding="16"
+                StrokeShape="RoundRectangle 22">
+            <Border.Shadow>
+                <Shadow Brush="#1F1B16"
+                        Opacity="0.06"
+                        Radius="12"
+                        Offset="0,-4" />
+            </Border.Shadow>
+            <VerticalStackLayout Spacing="12">
                 <Label Text="{Binding StatusText}"
-                       FontSize="14"
-                       TextColor="#374151" />
+                       FontSize="13"
+                       TextColor="#9A6B4F" />
 
                 <CollectionView ItemsSource="{Binding Pois}"
-                                HeightRequest="240">
+                                HeightRequest="240"
+                                SelectionMode="None">
                     <CollectionView.ItemTemplate>
                         <DataTemplate>
-                            <Border Padding="10"
-                                    Stroke="#E5E7EB"
-                                    BackgroundColor="#F9FAFB"
-                                    StrokeShape="RoundRectangle 10"
+                            <Border Padding="12"
+                                    Stroke="#F2E8E0"
+                                    BackgroundColor="#FFFFFF"
+                                    StrokeShape="RoundRectangle 16"
                                     Margin="0,6">
                                 <Border.Triggers>
                                     <DataTrigger TargetType="Border"
                                                  Binding="{Binding IsActive}"
                                                  Value="True">
-                                        <Setter Property="BackgroundColor" Value="#FFF3C4" />
-                                        <Setter Property="Stroke" Value="#D97706" />
+                                        <Setter Property="BackgroundColor" Value="#FFEEDB" />
+                                        <Setter Property="Stroke" Value="#E8C6A4" />
                                     </DataTrigger>
                                 </Border.Triggers>
 
-                                <VerticalStackLayout Spacing="4">
+                                <VerticalStackLayout Spacing="6">
                                     <Grid ColumnDefinitions="*,Auto">
                                         <Label Text="{Binding Name}"
                                                FontAttributes="Bold"
-                                               TextColor="#111827" />
+                                               TextColor="#5A2A0C"
+                                               FontSize="14" />
                                         <Label Grid.Column="1"
                                                Text="{Binding DistanceText}"
-                                               TextColor="#6B7280" />
+                                               TextColor="#A0765A"
+                                               FontSize="12" />
                                     </Grid>
                                     <Label Text="{Binding NarrationPreview}"
                                            FontSize="12"
-                                           TextColor="#6B7280" />
+                                           TextColor="#9A6B4F" />
                                 </VerticalStackLayout>
                             </Border>
                         </DataTemplate>
@@ -56,8 +92,10 @@
 
                 <Button Text="{Binding TrackingButtonText}"
                         Command="{Binding ToggleTrackingCommand}"
-                        BackgroundColor="#111827"
-                        TextColor="#FFFFFF" />
+                        BackgroundColor="#E07A5F"
+                        TextColor="#FFFDF9"
+                        CornerRadius="16"
+                        Padding="14,12" />
             </VerticalStackLayout>
         </Border>
     </Grid>
