@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetMobile\\FoodStreetMobile.csproj": {}
+    "E:\\Study_project\\C#\\New folder\\FoodStreetMobile\\FoodStreetMobile.csproj": {}
   },
   "projects": {
-    "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetMobile\\FoodStreetMobile.csproj": {
+    "E:\\Study_project\\C#\\New folder\\FoodStreetMobile\\FoodStreetMobile.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetMobile\\FoodStreetMobile.csproj",
+        "projectUniqueName": "E:\\Study_project\\C#\\New folder\\FoodStreetMobile\\FoodStreetMobile.csproj",
         "projectName": "FoodStreetMobile",
-        "projectPath": "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetMobile\\FoodStreetMobile.csproj",
+        "projectPath": "E:\\Study_project\\C#\\New folder\\FoodStreetMobile\\FoodStreetMobile.csproj",
         "packagesPath": "C:\\Users\\lenovo\\.nuget\\packages\\",
-        "outputPath": "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetMobile\\obj\\",
+        "outputPath": "E:\\Study_project\\C#\\New folder\\FoodStreetMobile\\obj\\",
         "projectStyle": "PackageReference",
         "crossTargeting": true,
         "configFilePaths": [
@@ -61,6 +61,10 @@
         "net10.0-android36.0": {
           "targetAlias": "net10.0-android",
           "dependencies": {
+            "Mapsui.Maui": {
+              "target": "Package",
+              "version": "[4.*, )"
+            },
             "Microsoft.Extensions.Logging.Debug": {
               "target": "Package",
               "version": "[10.0.0, )"
@@ -68,10 +72,6 @@
             "Microsoft.Maui.Controls": {
               "target": "Package",
               "version": "[10.0.1, )"
-            },
-            "Microsoft.Maui.Controls.Maps": {
-              "target": "Package",
-              "version": "[10.0.30, )"
             },
             "Microsoft.NET.ILLink.Tasks": {
               "suppressParent": "All",
@@ -381,6 +381,10 @@
         "net10.0-ios26.2": {
           "targetAlias": "net10.0-ios",
           "dependencies": {
+            "Mapsui.Maui": {
+              "target": "Package",
+              "version": "[4.*, )"
+            },
             "Microsoft.Extensions.Logging.Debug": {
               "target": "Package",
               "version": "[10.0.0, )"
@@ -388,10 +392,6 @@
             "Microsoft.Maui.Controls": {
               "target": "Package",
               "version": "[10.0.1, )"
-            },
-            "Microsoft.Maui.Controls.Maps": {
-              "target": "Package",
-              "version": "[10.0.30, )"
             },
             "Microsoft.NET.ILLink.Tasks": {
               "suppressParent": "All",
@@ -701,6 +701,10 @@
         "net10.0-maccatalyst26.2": {
           "targetAlias": "net10.0-maccatalyst",
           "dependencies": {
+            "Mapsui.Maui": {
+              "target": "Package",
+              "version": "[4.*, )"
+            },
             "Microsoft.Extensions.Logging.Debug": {
               "target": "Package",
               "version": "[10.0.0, )"
@@ -708,10 +712,6 @@
             "Microsoft.Maui.Controls": {
               "target": "Package",
               "version": "[10.0.1, )"
-            },
-            "Microsoft.Maui.Controls.Maps": {
-              "target": "Package",
-              "version": "[10.0.30, )"
             },
             "Microsoft.NET.ILLink.Tasks": {
               "suppressParent": "All",
@@ -1022,6 +1022,10 @@
         "net10.0-windows10.0.19041": {
           "targetAlias": "net10.0-windows10.0.19041.0",
           "dependencies": {
+            "Mapsui.Maui": {
+              "target": "Package",
+              "version": "[4.*, )"
+            },
             "Microsoft.Extensions.Logging.Debug": {
               "target": "Package",
               "version": "[10.0.0, )"
@@ -1029,10 +1033,6 @@
             "Microsoft.Maui.Controls": {
               "target": "Package",
               "version": "[10.0.1, )"
-            },
-            "Microsoft.Maui.Controls.Maps": {
-              "target": "Package",
-              "version": "[10.0.30, )"
             }
           },
           "imports": [

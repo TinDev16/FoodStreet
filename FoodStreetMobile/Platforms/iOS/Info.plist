@@ -28,5 +28,9 @@
 	</array>
 	<key>XSAppIconAssets</key>
 	<string>Assets.xcassets/appicon.appiconset</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Can truy cap vi tri de gioi thieu gian hang gan ban.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Can truy cap vi tri nen de tu dong phat audio gian hang.</string>
 </dict>
 </plist>

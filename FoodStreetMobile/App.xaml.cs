@@ -1,16 +1,17 @@
-﻿using FoodStreetMobile.Views;
-
 namespace FoodStreetMobile;
 
 public partial class App : Application
 {
-    public App()
+    private readonly AppShell _appShell;
+
+    public App(AppShell appShell)
     {
         InitializeComponent();
+        _appShell = appShell;
     }
 
     protected override Window CreateWindow(IActivationState? activationState)
     {
-        return new Window(new MainPage());
+        return new Window(_appShell);
     }
 }
