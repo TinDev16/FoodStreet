@@ -13,11 +13,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "E:\\Study_project\\C#\\New folder\\FoodStreetMobile\\tools\\InspectMapsui\\InspectMapsui.csproj",
+      "projectUniqueName": "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetMobile\\tools\\InspectMapsui\\InspectMapsui.csproj",
       "projectName": "InspectMapsui",
-      "projectPath": "E:\\Study_project\\C#\\New folder\\FoodStreetMobile\\tools\\InspectMapsui\\InspectMapsui.csproj",
+      "projectPath": "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetMobile\\tools\\InspectMapsui\\InspectMapsui.csproj",
       "packagesPath": "C:\\Users\\lenovo\\.nuget\\packages\\",
-      "outputPath": "E:\\Study_project\\C#\\New folder\\FoodStreetMobile\\tools\\InspectMapsui\\obj\\",
+      "outputPath": "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetMobile\\tools\\InspectMapsui\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\lenovo\\AppData\\Roaming\\NuGet\\NuGet.Config"

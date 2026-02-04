@@ -40366,11 +40366,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "E:\\Study_project\\C#\\New folder\\FoodStreetMobile\\FoodStreetMobile.csproj",
+      "projectUniqueName": "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetMobile\\FoodStreetMobile.csproj",
       "projectName": "FoodStreetMobile",
-      "projectPath": "E:\\Study_project\\C#\\New folder\\FoodStreetMobile\\FoodStreetMobile.csproj",
+      "projectPath": "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetMobile\\FoodStreetMobile.csproj",
       "packagesPath": "C:\\Users\\lenovo\\.nuget\\packages\\",
-      "outputPath": "E:\\Study_project\\C#\\New folder\\FoodStreetMobile\\obj\\",
+      "outputPath": "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetMobile\\obj\\",
       "projectStyle": "PackageReference",
       "crossTargeting": true,
       "configFilePaths": [
