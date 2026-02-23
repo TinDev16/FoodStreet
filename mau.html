@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Khu Phố Ẩm Thực Vĩnh Khánh</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #FF6B35;
+            --primary-light: #FF8F6B;
+            --secondary: #FFA07A;
+            --accent: #FFD700;
+            --bg-cream: #FFF8F0;
+            --bg-white: #FFFFFF;
+            --text-dark: #2C1810;
+            --text-medium: #6B4423;
+            --text-light: #A67C52;
+            --shadow: rgba(255, 107, 53, 0.15);
+            --shadow-strong: rgba(255, 107, 53, 0.25);
+        }
+
+        body {
+            font-family: 'Quicksand', sans-serif;
+            background: linear-gradient(135deg, var(--bg-cream) 0%, #FFE5D9 100%);
+            color: var(--text-dark);
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        /* Decorative background elements */
+        .bg-decoration {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .bg-decoration::before {
+            content: '';
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(255, 107, 53, 0.08) 0%, transparent 70%);
+            top: -200px;
+            right: -200px;
+            border-radius: 50%;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .bg-decoration::after {
+            content: '';
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(255, 215, 0, 0.06) 0%, transparent 70%);
+            bottom: -100px;
+            left: -100px;
+            border-radius: 50%;
+            animation: float 15s ease-in-out infinite reverse;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            33% { transform: translate(30px, -30px) rotate(5deg); }
+            66% { transform: translate(-20px, 20px) rotate(-5deg); }
+        }
+
+        .container {
+            max-width: 420px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+            background: var(--bg-white);
+            box-shadow: 0 0 60px rgba(0, 0, 0, 0.08);
+        }
+
+        /* Header */
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            padding: 60px 24px 40px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        header::before {
+            content: '🍜';
+            position: absolute;
+            font-size: 120px;
+            top: -20px;
+            right: -20px;
+            opacity: 0.1;
+            transform: rotate(15deg);
+        }
+
+        header::after {
+            content: '🥢';
+            position: absolute;
+            font-size: 80px;
+            bottom: -10px;
+            left: -10px;
+            opacity: 0.1;
+            transform: rotate(-20deg);
+        }
+
+        .header-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 36px;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+            animation: slideDown 0.8s ease-out;
+        }
+
+        .subtitle {
+            color: rgba(255, 255, 255, 0.95);
+            font-size: 16px;
+            font-weight: 400;
+            animation: slideDown 0.8s ease-out 0.1s backwards;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Search Bar */
+        .search-section {
+            padding: 24px;
+            background: var(--bg-white);
+            margin-top: -20px;
+            position: relative;
+            z-index: 2;
+            animation: slideUp 0.6s ease-out 0.3s backwards;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .search-box {
+            position: relative;
+            width: 100%;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 16px 50px 16px 20px;
+            border: 2px solid transparent;
+            border-radius: 25px;
+            font-family: 'Quicksand', sans-serif;
+            font-size: 15px;
+            background: var(--bg-cream);
+            color: var(--text-dark);
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 6px 20px var(--shadow);
+            transform: translateY(-2px);
+        }
+
+        .search-box::after {
+            content: '🔍';
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 20px;
+        }
+
+        /* Categories */
+        .categories {
+            padding: 0 24px 24px;
+            animation: fadeIn 0.8s ease-out 0.5s backwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .categories h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 16px;
+        }
+
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        .category-card {
+            background: var(--bg-white);
+            border-radius: 20px;
+            padding: 20px 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 2px solid var(--bg-cream);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .category-card:hover {
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 8px 24px var(--shadow);
+            border-color: var(--primary);
+        }
+
+        .category-card:active {
+            transform: translateY(-2px) scale(1.01);
+        }
+
+        .category-icon {
+            font-size: 36px;
+            margin-bottom: 8px;
+            display: block;
+            animation: bounce 2s ease-in-out infinite;
+        }
+
+        .category-card:nth-child(1) .category-icon { animation-delay: 0s; }
+        .category-card:nth-child(2) .category-icon { animation-delay: 0.2s; }
+        .category-card:nth-child(3) .category-icon { animation-delay: 0.4s; }
+        .category-card:nth-child(4) .category-icon { animation-delay: 0.6s; }
+        .category-card:nth-child(5) .category-icon { animation-delay: 0.8s; }
+        .category-card:nth-child(6) .category-icon { animation-delay: 1s; }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+
+        .category-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-medium);
+        }
+
+        /* Featured Restaurants */
+        .featured {
+            padding: 24px;
+            animation: fadeIn 0.8s ease-out 0.7s backwards;
+        }
+
+        .featured h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .featured h2::before {
+            content: '⭐';
+            font-size: 24px;
+        }
+
+        .restaurant-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .restaurant-card {
+            background: var(--bg-white);
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+
+        .restaurant-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 12px 32px var(--shadow-strong);
+            border-color: var(--primary-light);
+        }
+
+        .restaurant-image {
+            height: 180px;
+            background: linear-gradient(135deg, var(--secondary) 0%, var(--primary-light) 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .restaurant-image::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.3) 100%);
+        }
+
+        .restaurant-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 64px;
+        }
+
+        .restaurant-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--primary);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .restaurant-info {
+            padding: 20px;
+        }
+
+        .restaurant-name {
+            font-family: 'Playfair Display', serif;
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 8px;
+        }
+
+        .restaurant-desc {
+            font-size: 14px;
+            color: var(--text-light);
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+
+        .restaurant-meta {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 13px;
+            color: var(--text-medium);
+        }
+
+        .rating {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        /* Bottom Navigation */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            max-width: 420px;
+            width: 100%;
+            background: var(--bg-white);
+            padding: 12px 24px 20px;
+            box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.08);
+            border-top: 1px solid var(--bg-cream);
+            z-index: 100;
+            animation: slideUpNav 0.6s ease-out 0.9s backwards;
+        }
+
+        @keyframes slideUpNav {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(100%);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+
+        .nav-items {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            padding: 8px 16px;
+            border-radius: 16px;
+        }
+
+        .nav-item:hover {
+            background: var(--bg-cream);
+            transform: translateY(-2px);
+        }
+
+        .nav-item.active {
+            color: var(--primary);
+        }
+
+        .nav-item.active .nav-icon {
+            transform: scale(1.1);
+        }
+
+        .nav-icon {
+            font-size: 24px;
+            transition: transform 0.3s ease;
+        }
+
+        .nav-label {
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        /* Spacing for bottom nav */
+        .content-spacer {
+            height: 80px;
+        }
+
+        /* Responsive */
+        @media (max-width: 420px) {
+            .container {
+                max-width: 100%;
+            }
+
+            h1 {
+                font-size: 32px;
+            }
+
+            .category-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-decoration"></div>
+    
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <h1>Vĩnh Khánh</h1>
+                <p class="subtitle">Thiên đường ẩm thực Sài Gòn</p>
+            </div>
+        </header>
+
+        <div class="search-section">
+            <div class="search-box">
+                <input type="text" placeholder="Tìm món ăn, quán ăn...">
+            </div>
+        </div>
+
+        <div class="categories">
+            <h2>Danh Mục</h2>
+            <div class="category-grid">
+                <div class="category-card">
+                    <span class="category-icon">🍜</span>
+                    <div class="category-name">Phở & Bún</div>
+                </div>
+                <div class="category-card">
+                    <span class="category-icon">🥖</span>
+                    <div class="category-name">Bánh Mì</div>
+                </div>
+                <div class="category-card">
+                    <span class="category-icon">🍚</span>
+                    <div class="category-name">Cơm</div>
+                </div>
+                <div class="category-card">
+                    <span class="category-icon">☕</span>
+                    <div class="category-name">Cà Phê</div>
+                </div>
+                <div class="category-card">
+                    <span class="category-icon">🍰</span>
+                    <div class="category-name">Tráng Miệng</div>
+                </div>
+                <div class="category-card">
+                    <span class="category-icon">🍹</span>
+                    <div class="category-name">Giải Khát</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="featured">
+            <h2>Nổi Bật Hôm Nay</h2>
+            <div class="restaurant-list">
+                <div class="restaurant-card">
+                    <div class="restaurant-image">
+                        <div class="restaurant-placeholder">🍲</div>
+                        <div class="restaurant-badge">Ưu đãi 20%</div>
+                    </div>
+                    <div class="restaurant-info">
+                        <h3 class="restaurant-name">Phở Hòa Pasteur</h3>
+                        <p class="restaurant-desc">Phở truyền thống với nước dùng ninh từ xương 12 tiếng</p>
+                        <div class="restaurant-meta">
+                            <div class="meta-item rating">
+                                ⭐ 4.8
+                            </div>
+                            <div class="meta-item">
+                                🕐 7:00 - 22:00
+                            </div>
+                            <div class="meta-item">
+                                📍 350m
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="restaurant-card">
+                    <div class="restaurant-image">
+                        <div class="restaurant-placeholder">🥖</div>
+                        <div class="restaurant-badge">Mới mở</div>
+                    </div>
+                    <div class="restaurant-info">
+                        <h3 class="restaurant-name">Bánh Mì Huỳnh Hoa</h3>
+                        <p class="restaurant-desc">Bánh mì thập cẩm đầy đặn, giá cả phải chăng</p>
+                        <div class="restaurant-meta">
+                            <div class="meta-item rating">
+                                ⭐ 4.9
+                            </div>
+                            <div class="meta-item">
+                                🕐 6:00 - 23:00
+                            </div>
+                            <div class="meta-item">
+                                📍 520m
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="restaurant-card">
+                    <div class="restaurant-image">
+                        <div class="restaurant-placeholder">☕</div>
+                        <div class="restaurant-badge">Phổ biến</div>
+                    </div>
+                    <div class="restaurant-info">
+                        <h3 class="restaurant-name">Cà Phê Vỉa Hè</h3>
+                        <p class="restaurant-desc">Cà phê sữa đá đậm đà, không gian thoáng mát</p>
+                        <div class="restaurant-meta">
+                            <div class="meta-item rating">
+                                ⭐ 4.7
+                            </div>
+                            <div class="meta-item">
+                                🕐 5:30 - 22:30
+                            </div>
+                            <div class="meta-item">
+                                📍 180m
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content-spacer"></div>
+
+        <nav class="bottom-nav">
+            <div class="nav-items">
+                <div class="nav-item active">
+                    <span class="nav-icon">🏠</span>
+                    <span class="nav-label">Trang chủ</span>
+                </div>
+                <div class="nav-item">
+                    <span class="nav-icon">🔍</span>
+                    <span class="nav-label">Khám phá</span>
+                </div>
+                <div class="nav-item">
+                    <span class="nav-icon">❤️</span>
+                    <span class="nav-label">Yêu thích</span>
+                </div>
+                <div class="nav-item">
+                    <span class="nav-icon">👤</span>
+                    <span class="nav-label">Cá nhân</span>
+                </div>
+            </div>
+        </nav>
+    </div>
+
+    <script>
+        // Add interactive behaviors
+        document.querySelectorAll('.restaurant-card').forEach(card => {
+            card.addEventListener('click', function() {
+                this.style.animation = 'pulse 0.3s ease-in-out';
+                setTimeout(() => {
+                    this.style.animation = '';
+                }, 300);
+            });
+        });
+
+        document.querySelectorAll('.category-card').forEach(card => {
+            card.addEventListener('click', function() {
+                this.style.animation = 'pulse 0.3s ease-in-out';
+                setTimeout(() => {
+                    this.style.animation = '';
+                }, 300);
+            });
+        });
+
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', function() {
+                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+
+        // Add pulse animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes pulse {
+                0%, 100% { transform: scale(1); }
+                50% { transform: scale(0.98); }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>

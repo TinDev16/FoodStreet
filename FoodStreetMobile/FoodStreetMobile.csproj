@@ -14,6 +14,7 @@
 		<OutputType>Exe</OutputType>
 		<RootNamespace>FoodStreetMobile</RootNamespace>
 		<UseMaui>true</UseMaui>
+		<UseMauiMaps>true</UseMauiMaps>
 		<SingleProject>true</SingleProject>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
@@ -58,7 +59,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
-		<PackageReference Include="Mapsui.Maui" Version="4.*" />
+		<PackageReference Include="Microsoft.Maui.Controls.Maps" Version="$(MauiVersion)" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
 	</ItemGroup>
 

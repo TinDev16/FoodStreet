@@ -15,7 +15,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private readonly LocationTracker _locationTracker;
 
     private bool _isTracking;
-    private string _statusText = "San sang kham pha Vinh Khanh.";
+    private string _statusText = "San sang.";
     private PoiViewModel? _activePoi;
     private CancellationTokenSource? _narrationCts;
     private bool _initialized;
