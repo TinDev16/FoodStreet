@@ -61,15 +61,15 @@
         "net10.0-android36.0": {
           "targetAlias": "net10.0-android",
           "dependencies": {
-            "Mapsui.Maui": {
-              "target": "Package",
-              "version": "[4.*, )"
-            },
             "Microsoft.Extensions.Logging.Debug": {
               "target": "Package",
               "version": "[10.0.0, )"
             },
             "Microsoft.Maui.Controls": {
+              "target": "Package",
+              "version": "[10.0.1, )"
+            },
+            "Microsoft.Maui.Controls.Maps": {
               "target": "Package",
               "version": "[10.0.1, )"
             },
@@ -381,15 +381,15 @@
         "net10.0-ios26.2": {
           "targetAlias": "net10.0-ios",
           "dependencies": {
-            "Mapsui.Maui": {
-              "target": "Package",
-              "version": "[4.*, )"
-            },
             "Microsoft.Extensions.Logging.Debug": {
               "target": "Package",
               "version": "[10.0.0, )"
             },
             "Microsoft.Maui.Controls": {
+              "target": "Package",
+              "version": "[10.0.1, )"
+            },
+            "Microsoft.Maui.Controls.Maps": {
               "target": "Package",
               "version": "[10.0.1, )"
             },
@@ -701,15 +701,15 @@
         "net10.0-maccatalyst26.2": {
           "targetAlias": "net10.0-maccatalyst",
           "dependencies": {
-            "Mapsui.Maui": {
-              "target": "Package",
-              "version": "[4.*, )"
-            },
             "Microsoft.Extensions.Logging.Debug": {
               "target": "Package",
               "version": "[10.0.0, )"
             },
             "Microsoft.Maui.Controls": {
+              "target": "Package",
+              "version": "[10.0.1, )"
+            },
+            "Microsoft.Maui.Controls.Maps": {
               "target": "Package",
               "version": "[10.0.1, )"
             },
@@ -1022,15 +1022,15 @@
         "net10.0-windows10.0.19041": {
           "targetAlias": "net10.0-windows10.0.19041.0",
           "dependencies": {
-            "Mapsui.Maui": {
-              "target": "Package",
-              "version": "[4.*, )"
-            },
             "Microsoft.Extensions.Logging.Debug": {
               "target": "Package",
               "version": "[10.0.0, )"
             },
             "Microsoft.Maui.Controls": {
+              "target": "Package",
+              "version": "[10.0.1, )"
+            },
+            "Microsoft.Maui.Controls.Maps": {
               "target": "Package",
               "version": "[10.0.1, )"
             }

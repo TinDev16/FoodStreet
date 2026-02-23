@@ -16,8 +16,14 @@
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
   <permission android:name="com.companyname.foodstreetmobile.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" android:protectionLevel="signature" />
   <uses-permission android:name="com.companyname.foodstreetmobile.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+  <uses-feature android:glEsVersion="0x00020000" android:required="true" />
+  <queries>
+    <!-- Needs to be explicitly declared on Android R+ -->
+    <package android:name="com.google.android.apps.maps" />
+  </queries>
   <application android:name="crc6401ccf95c271ec7e8.MainApplication" android:allowBackup="true" android:appComponentFactory="androidx.core.app.CoreComponentFactory" android:debuggable="true" android:extractNativeLibs="true" android:icon="@mipmap/appicon" android:label="FoodStreetMobile" android:roundIcon="@mipmap/appicon_round" android:supportsRtl="true">
-    <meta-data android:name="com.google.android.geo.API_KEY" android:value="AQ.Ab8RN6IlpXsxhy2OkFuMjr9O_kC95I0IHK8YUDzl0xJIWCUvrw" />
+    <meta-data android:name="com.google.android.geo.API_KEY" android:value="AIzaSyAg9cHLgybrf3Edkl8ZK9nuRuQpF9nzCNY" />
+    <uses-library android:name="org.apache.http.legacy" android:required="false" />
     <activity android:name="crc6401ccf95c271ec7e8.MainActivity" android:configChanges="density|orientation|smallestScreenSize|screenLayout|screenSize|uiMode" android:exported="true" android:launchMode="singleTop" android:theme="@style/Maui.SplashTheme">
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />
@@ -55,5 +61,7 @@
     </receiver>
     <uses-library android:name="androidx.window.extensions" android:required="false" />
     <uses-library android:name="androidx.window.sidecar" android:required="false" />
+    <activity android:name="com.google.android.gms.common.api.GoogleApiActivity" android:exported="false" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+    <meta-data android:name="com.google.android.gms.version" android:value="@integer/google_play_services_version" />
   </application>
 </manifest>

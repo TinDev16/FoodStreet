@@ -1,103 +1,161 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:mapsui="clr-namespace:Mapsui.UI.Maui;assembly=Mapsui.UI.Maui"
+             xmlns:maps="http://schemas.microsoft.com/dotnet/2021/maui/maps"
              x:Class="FoodStreetMobile.MainPage"
-             Title="Vinh Khanh Food Street"
              BackgroundColor="#FDF8F5">
 
-    <Grid RowDefinitions="*,Auto" RowSpacing="0">
+    <Grid RowDefinitions="*" RowSpacing="0">
         <Grid>
-            <mapsui:MapView x:Name="PoiMap" />
+            <maps:Map x:Name="PoiMap"
+                      IsShowingUser="True" />
 
-            <Border Margin="16,18"
-                    Padding="12,8"
-                    BackgroundColor="#FFF7ED"
-                    Stroke="#F2E8E0"
-                    StrokeShape="RoundRectangle 16"
-                    VerticalOptions="Start"
-                    HorizontalOptions="Start">
-                <Border.Shadow>
-                    <Shadow Brush="#1F1B16"
-                            Opacity="0.08"
+            <ImageButton x:Name="LocateMeButton"
+                         Source="ic_my_location.svg"
+                         WidthRequest="46"
+                         HeightRequest="46"
+                         Padding="11"
+                         Margin="0,0,16,140"
+                         VerticalOptions="End"
+                         HorizontalOptions="End"
+                         BackgroundColor="White"
+                         BorderColor="#D1D5DB"
+                         BorderWidth="1"
+                         CornerRadius="23"
+                         Clicked="OnLocateMeClicked">
+                <ImageButton.Shadow>
+                    <Shadow Opacity="0.18"
                             Radius="10"
-                            Offset="0,4" />
+                            Offset="0,3" />
+                </ImageButton.Shadow>
+            </ImageButton>
+
+            <Border Margin="16,20"
+                    Padding="6"
+                    BackgroundColor="White"
+                    Stroke="#E5E7EB"
+                    StrokeShape="RoundRectangle 22"
+                    VerticalOptions="Start"
+                    HorizontalOptions="Fill">
+                <Border.Shadow>
+                    <Shadow Opacity="0.1"
+                            Radius="15"
+                            Offset="0,6" />
                 </Border.Shadow>
-                <VerticalStackLayout Spacing="2">
-                    <Label Text="Phố ẩm thực Vĩnh Khánh"
-                           FontSize="16"
-                           FontAttributes="Bold"
-                           TextColor="#7C2D12" />
-                    <Label Text="Khám phá hương vị mềm mại bên sông"
-                           FontSize="12"
-                           TextColor="#9A6B4F" />
-                </VerticalStackLayout>
+
+                <Grid RowDefinitions="Auto,Auto">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Entry x:Name="PlaceSearchEntry"
+                               Placeholder="Tim dia diem..."
+                               BackgroundColor="Transparent"
+                               Keyboard="Text"
+                               Margin="12,6"
+                               ReturnType="Search"
+                               TextChanged="OnPlaceSearchTextChanged"
+                               Completed="OnPlaceSearchCompleted" />
+
+                        <Button Grid.Column="1"
+                                Text="Tim"
+                                WidthRequest="56"
+                                HeightRequest="40"
+                                BackgroundColor="#E07A5F"
+                                TextColor="White"
+                                CornerRadius="20"
+                                Clicked="OnSearchPlaceClicked" />
+                    </Grid>
+
+                    <CollectionView x:Name="SearchResultsView"
+                                    Grid.Row="1"
+                                    Margin="6,4,6,6"
+                                    IsVisible="False"
+                                    HeightRequest="220"
+                                    SelectionMode="Single"
+                                    SelectionChanged="OnSearchResultSelectionChanged">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="10"
+                                        Stroke="#EFE7DF"
+                                        StrokeShape="RoundRectangle 12"
+                                        Margin="0,3"
+                                        BackgroundColor="White">
+                                    <VerticalStackLayout Spacing="2">
+                                        <Label Text="{Binding Name}"
+                                               FontSize="14"
+                                               TextColor="#2F1A0F"
+                                               FontAttributes="Bold" />
+                                        <Label Text="{Binding Address}"
+                                               FontSize="12"
+                                               TextColor="#8A6A58"
+                                               LineBreakMode="TailTruncation" />
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </Grid>
+            </Border>
+
+            <Border x:Name="SearchBottomSheet"
+                    VerticalOptions="End"
+                    Stroke="#F2E8E0"
+                    BackgroundColor="#FFFBF7"
+                    Padding="16,10,16,18"
+                    StrokeShape="RoundRectangle 20,20,0,0"
+                    TranslationY="1000">
+                <Border.GestureRecognizers>
+                    <PanGestureRecognizer PanUpdated="OnBottomSheetPanUpdated" />
+                </Border.GestureRecognizers>
+                <Grid RowDefinitions="Auto,*" RowSpacing="10">
+                    <Grid>
+                        <BoxView WidthRequest="52"
+                                 HeightRequest="5"
+                                 Color="#DCCFC4"
+                                 CornerRadius="3"
+                                 HorizontalOptions="Center" />
+                    </Grid>
+
+                    <ScrollView Grid.Row="1">
+                        <VerticalStackLayout Spacing="10">
+                            <Image x:Name="SheetImage"
+                                   HeightRequest="138"
+                                   Aspect="AspectFill"
+                                   Source="dotnet_bot.png" />
+
+                            <Label x:Name="SheetTitleLabel"
+                                   Text="Chua chon dia diem"
+                                   FontSize="18"
+                                   FontAttributes="Bold"
+                                   TextColor="#5A2A0C" />
+
+                            <Label x:Name="SheetAddressLabel"
+                                   Text="Nhap tu khoa va chon dia diem de xem thong tin."
+                                   FontSize="13"
+                                   TextColor="#8B5E42" />
+
+                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+                                <Button Text="Chi duong"
+                                        BackgroundColor="#E07A5F"
+                                        TextColor="White"
+                                        CornerRadius="14"
+                                        Clicked="OnDirectionsClicked" />
+                                <Button Grid.Column="1"
+                                        Text="Luu"
+                                        BackgroundColor="#F4E7DC"
+                                        TextColor="#5A2A0C"
+                                        CornerRadius="14"
+                                        Clicked="OnSaveClicked" />
+                                <Button Grid.Column="2"
+                                        Text="Chia se"
+                                        BackgroundColor="#F4E7DC"
+                                        TextColor="#5A2A0C"
+                                        CornerRadius="14"
+                                        Clicked="OnShareClicked" />
+                            </Grid>
+                        </VerticalStackLayout>
+                    </ScrollView>
+                </Grid>
             </Border>
         </Grid>
-
-        <Border Grid.Row="1"
-                Stroke="#F2E8E0"
-                BackgroundColor="#FFFBF7"
-                Padding="16"
-                StrokeShape="RoundRectangle 22">
-            <Border.Shadow>
-                <Shadow Brush="#1F1B16"
-                        Opacity="0.06"
-                        Radius="12"
-                        Offset="0,-4" />
-            </Border.Shadow>
-            <VerticalStackLayout Spacing="12">
-                <Label Text="{Binding StatusText}"
-                       FontSize="13"
-                       TextColor="#9A6B4F" />
-
-                <CollectionView ItemsSource="{Binding Pois}"
-                                HeightRequest="240"
-                                SelectionMode="None">
-                    <CollectionView.ItemTemplate>
-                        <DataTemplate>
-                            <Border Padding="12"
-                                    Stroke="#F2E8E0"
-                                    BackgroundColor="#FFFFFF"
-                                    StrokeShape="RoundRectangle 16"
-                                    Margin="0,6">
-                                <Border.Triggers>
-                                    <DataTrigger TargetType="Border"
-                                                 Binding="{Binding IsActive}"
-                                                 Value="True">
-                                        <Setter Property="BackgroundColor" Value="#FFEEDB" />
-                                        <Setter Property="Stroke" Value="#E8C6A4" />
-                                    </DataTrigger>
-                                </Border.Triggers>
-
-                                <VerticalStackLayout Spacing="6">
-                                    <Grid ColumnDefinitions="*,Auto">
-                                        <Label Text="{Binding Name}"
-                                               FontAttributes="Bold"
-                                               TextColor="#5A2A0C"
-                                               FontSize="14" />
-                                        <Label Grid.Column="1"
-                                               Text="{Binding DistanceText}"
-                                               TextColor="#A0765A"
-                                               FontSize="12" />
-                                    </Grid>
-                                    <Label Text="{Binding NarrationPreview}"
-                                           FontSize="12"
-                                           TextColor="#9A6B4F" />
-                                </VerticalStackLayout>
-                            </Border>
-                        </DataTemplate>
-                    </CollectionView.ItemTemplate>
-                </CollectionView>
-
-                <Button Text="{Binding TrackingButtonText}"
-                        Command="{Binding ToggleTrackingCommand}"
-                        BackgroundColor="#E07A5F"
-                        TextColor="#FFFDF9"
-                        CornerRadius="16"
-                        Padding="14,12" />
-            </VerticalStackLayout>
-        </Border>
     </Grid>
 
 </ContentPage>

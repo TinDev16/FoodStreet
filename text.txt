@@ -1,0 +1,3 @@
+- Phố ẩm thực Vĩnh Khánh openstreet map: 10.762675, 106.703022
+- tạo file gpx : https://www.gpsvisualizer.com/convert?output 
+- 

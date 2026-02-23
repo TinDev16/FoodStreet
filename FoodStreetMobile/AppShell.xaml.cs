@@ -8,7 +8,6 @@ public partial class AppShell : Shell
 
         Items.Add(new ShellContent
         {
-            Title = "Kham pha",
             Content = mainPage,
             Route = "MainPage"
         });
