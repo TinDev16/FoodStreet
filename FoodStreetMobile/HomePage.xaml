@@ -1,0 +1,342 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="FoodStreetMobile.HomePage"
+             BackgroundColor="#FDF6F0">
+
+    <Grid RowDefinitions="Auto,*" RowSpacing="0">
+
+                <!-- ═══════════════════════════════════════
+                    HEADER
+                ════════════════════════════════════════ -->
+                <Border Grid.Row="0"
+                        HeightRequest="100"
+                        StrokeThickness="0"
+                        StrokeShape="RoundRectangle 0,0,28,28">
+
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#FF6B35" Offset="0.0"/>
+                            <GradientStop Color="#E8472A" Offset="0.55"/>
+                            <GradientStop Color="#C93A20" Offset="1.0"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+
+                    <Grid Padding="24,0"
+                        VerticalOptions="Center">
+
+                        <VerticalStackLayout Spacing="2"
+                                            VerticalOptions="Center">
+
+                            <Label Text="Vĩnh Khánh"
+                                FontSize="22"
+                                FontAttributes="Bold"
+                                TextColor="White" />
+
+                            <Label Text="Thiên Đường Ẩm Thực Đường Phố"
+                                FontSize="13"
+                                FontAttributes="Bold"
+                                TextColor="#FFD4BC"
+                                Opacity="0.9" />
+
+                        </VerticalStackLayout>
+
+                    </Grid>
+                </Border>
+
+                <!-- ═══════════════════════════════════════
+                    BODY SCROLL
+                ════════════════════════════════════════ -->
+                <ScrollView Grid.Row="1">
+                    <VerticalStackLayout Spacing="0"
+                                        Padding="0,20,0,0">
+
+                        <!-- Search bar -->
+                        <Grid Margin="20,-16,20,0"
+                            ZIndex="10">
+
+                            <Border BackgroundColor="White"
+                                    StrokeThickness="0"
+                                    StrokeShape="RoundRectangle 18"
+                                    Padding="14,0,6,0">
+
+                                <Border.Shadow>
+                                    <Shadow Brush="#33000000"
+                                            Offset="0,6"
+                                            Radius="18"
+                                            Opacity="0.2" />
+                                </Border.Shadow>
+
+                                <Grid ColumnDefinitions="*,Auto"
+                                    HeightRequest="50">
+
+                                    <Entry Grid.Column="0"
+                                        Placeholder="Tìm món ăn, quán ăn..."
+                                        BackgroundColor="Transparent"
+                                        TextColor="#2C1C19"
+                                        PlaceholderColor="#C4A898"
+                                        FontSize="14"
+                                        VerticalOptions="Center" />
+
+                                    <Border Grid.Column="1"
+                                            BackgroundColor="#FF6B35"
+                                            StrokeThickness="0"
+                                            StrokeShape="RoundRectangle 12"
+                                            Padding="10,8"
+                                            Margin="0,6,6,6"
+                                            VerticalOptions="Center">
+
+                                        <Label Text="🔍"
+                                            FontSize="14"
+                                            HorizontalOptions="Center"
+                                            VerticalOptions="Center" />
+
+                                    </Border>
+
+                                </Grid>
+
+                            </Border>
+
+                        </Grid>
+                <!-- ─────────────────────────────
+                     SECTION: Danh Mục
+                ──────────────────────────────── -->
+                <VerticalStackLayout Padding="24,28,24,0" Spacing="16">
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Grid.Column="0"
+                               Text="Danh Mục"
+                               FontSize="22"
+                               FontAttributes="Bold"
+                               TextColor="#1A0E0B" />
+                        <Label Grid.Column="1"
+                               Text="Xem tất cả →"
+                               FontSize="13"
+                               TextColor="#FF6B35"
+                               VerticalOptions="Center" />
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,*,*"
+                          RowDefinitions="Auto,Auto"
+                          ColumnSpacing="12"
+                          RowSpacing="12">
+
+                        <Border Grid.Row="0" Grid.Column="0"
+                                BackgroundColor="White" StrokeThickness="0"
+                                StrokeShape="RoundRectangle 20"
+                                Padding="8,18" HeightRequest="110">
+                            <Border.Shadow>
+                                <Shadow Brush="#22FF6B35" Offset="0,4" Radius="14" Opacity="0.10" />
+                            </Border.Shadow>
+                            <VerticalStackLayout Spacing="6" HorizontalOptions="Center" VerticalOptions="Center">
+                                <Label Text="🍜" FontSize="28" HorizontalTextAlignment="Center" />
+                                <Label Text="Phở &amp; Bún" FontSize="12" FontAttributes="Bold"
+                                       HorizontalTextAlignment="Center" TextColor="#3D2016" />
+                            </VerticalStackLayout>
+                        </Border>
+
+                        <Border Grid.Row="0" Grid.Column="1"
+                                BackgroundColor="White" StrokeThickness="0"
+                                StrokeShape="RoundRectangle 20"
+                                Padding="8,18" HeightRequest="110">
+                            <Border.Shadow>
+                                <Shadow Brush="#22FF6B35" Offset="0,4" Radius="14" Opacity="0.10" />
+                            </Border.Shadow>
+                            <VerticalStackLayout Spacing="6" HorizontalOptions="Center" VerticalOptions="Center">
+                                <Label Text="🥖" FontSize="28" HorizontalTextAlignment="Center" />
+                                <Label Text="Bánh Mì" FontSize="12" FontAttributes="Bold"
+                                       HorizontalTextAlignment="Center" TextColor="#3D2016" />
+                            </VerticalStackLayout>
+                        </Border>
+
+                        <Border Grid.Row="0" Grid.Column="2"
+                                BackgroundColor="White" StrokeThickness="0"
+                                StrokeShape="RoundRectangle 20"
+                                Padding="8,18" HeightRequest="110">
+                            <Border.Shadow>
+                                <Shadow Brush="#22FF6B35" Offset="0,4" Radius="14" Opacity="0.10" />
+                            </Border.Shadow>
+                            <VerticalStackLayout Spacing="6" HorizontalOptions="Center" VerticalOptions="Center">
+                                <Label Text="🍚" FontSize="28" HorizontalTextAlignment="Center" />
+                                <Label Text="Cơm" FontSize="12" FontAttributes="Bold"
+                                       HorizontalTextAlignment="Center" TextColor="#3D2016" />
+                            </VerticalStackLayout>
+                        </Border>
+
+                        <Border Grid.Row="1" Grid.Column="0"
+                                BackgroundColor="White" StrokeThickness="0"
+                                StrokeShape="RoundRectangle 20"
+                                Padding="8,18" HeightRequest="110">
+                            <Border.Shadow>
+                                <Shadow Brush="#22FF6B35" Offset="0,4" Radius="14" Opacity="0.10" />
+                            </Border.Shadow>
+                            <VerticalStackLayout Spacing="6" HorizontalOptions="Center" VerticalOptions="Center">
+                                <Label Text="☕" FontSize="28" HorizontalTextAlignment="Center" />
+                                <Label Text="Cà Phê" FontSize="12" FontAttributes="Bold"
+                                       HorizontalTextAlignment="Center" TextColor="#3D2016" />
+                            </VerticalStackLayout>
+                        </Border>
+
+                        <Border Grid.Row="1" Grid.Column="1"
+                                BackgroundColor="White" StrokeThickness="0"
+                                StrokeShape="RoundRectangle 20"
+                                Padding="8,18" HeightRequest="110">
+                            <Border.Shadow>
+                                <Shadow Brush="#22FF6B35" Offset="0,4" Radius="14" Opacity="0.10" />
+                            </Border.Shadow>
+                            <VerticalStackLayout Spacing="6" HorizontalOptions="Center" VerticalOptions="Center">
+                                <Label Text="🍮" FontSize="28" HorizontalTextAlignment="Center" />
+                                <Label Text="Tráng Miệng" FontSize="11" FontAttributes="Bold"
+                                       HorizontalTextAlignment="Center" TextColor="#3D2016" />
+                            </VerticalStackLayout>
+                        </Border>
+
+                        <Border Grid.Row="1" Grid.Column="2"
+                                BackgroundColor="White" StrokeThickness="0"
+                                StrokeShape="RoundRectangle 20"
+                                Padding="8,18" HeightRequest="110">
+                            <Border.Shadow>
+                                <Shadow Brush="#22FF6B35" Offset="0,4" Radius="14" Opacity="0.10" />
+                            </Border.Shadow>
+                            <VerticalStackLayout Spacing="6" HorizontalOptions="Center" VerticalOptions="Center">
+                                <Label Text="🧃" FontSize="28" HorizontalTextAlignment="Center" />
+                                <Label Text="Giải Khát" FontSize="12" FontAttributes="Bold"
+                                       HorizontalTextAlignment="Center" TextColor="#3D2016" />
+                            </VerticalStackLayout>
+                        </Border>
+
+                    </Grid>
+                </VerticalStackLayout>
+
+                <!-- ─────────────────────────────
+                     SECTION: Quán Ăn Nổi Bật
+                ──────────────────────────────── -->
+                <VerticalStackLayout Padding="24,28,0,28" Spacing="16">
+
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,0,24,0">
+                        <Label Grid.Column="0"
+                               Text="Quán Ăn Nổi Bật"
+                               FontSize="22"
+                               FontAttributes="Bold"
+                               TextColor="#1A0E0B" />
+                        <Label Grid.Column="1"
+                               Text="Xem tất cả →"
+                               FontSize="13"
+                               TextColor="#FF6B35"
+                               VerticalOptions="Center" />
+                    </Grid>
+
+                    <CollectionView ItemsLayout="HorizontalList"
+                                    HeightRequest="200"
+                                    SelectionMode="None">
+                        <CollectionView.ItemsSource>
+                            <x:Array Type="{x:Type x:String}">
+                                <x:String>Ốc Đào</x:String>
+                                <x:String>Pizza 4P's</x:String>
+                                <x:String>Bún Thịt Nướng Cô Liên</x:String>
+                                <x:String>Lẩu Thái Mama</x:String>
+                            </x:Array>
+                        </CollectionView.ItemsSource>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Border BackgroundColor="White"
+                                        StrokeThickness="0"
+                                        StrokeShape="RoundRectangle 24"
+                                        WidthRequest="170"
+                                        Margin="0,4,14,8">
+                                    <Border.Shadow>
+                                        <Shadow Brush="#22000000" Offset="0,6" Radius="18" Opacity="0.12" />
+                                    </Border.Shadow>
+                                    <Grid RowDefinitions="*,Auto">
+                                        <!-- Thumbnail placeholder -->
+                                        <Border Grid.Row="0"
+                                                StrokeThickness="0"
+                                                HeightRequest="110"
+                                                StrokeShape="RoundRectangle 24,24,0,0">
+                                            <Border.Background>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                    <GradientStop Color="#FFE0CC" Offset="0"/>
+                                                    <GradientStop Color="#FFCBA8" Offset="1"/>
+                                                </LinearGradientBrush>
+                                            </Border.Background>
+                                            <Label Text="🍽️" FontSize="36"
+                                                   HorizontalOptions="Center"
+                                                   VerticalOptions="Center" />
+                                        </Border>
+
+                                        <!-- Info -->
+                                        <VerticalStackLayout Grid.Row="1"
+                                                             Padding="12,10,12,12"
+                                                             Spacing="2">
+                                            <Label Text="{Binding .}"
+                                                   FontSize="13"
+                                                   FontAttributes="Bold"
+                                                   TextColor="#2C1C19"
+                                                   MaxLines="1"
+                                                   LineBreakMode="TailTruncation" />
+                                            <HorizontalStackLayout Spacing="4">
+                                                <Label Text="⭐" FontSize="11" VerticalOptions="Center" />
+                                                <Label Text="4.8 · Vĩnh Khánh"
+                                                       FontSize="11"
+                                                       TextColor="#9A7D69"
+                                                       VerticalOptions="Center" />
+                                            </HorizontalStackLayout>
+                                        </VerticalStackLayout>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+
+                </VerticalStackLayout>
+
+                <!-- ─────────────────────────────
+                     SECTION: Banner Khuyến Mãi
+                ──────────────────────────────── -->
+                <Grid Margin="24,0,24,36">
+                    <Border StrokeThickness="0"
+                            StrokeShape="RoundRectangle 24"
+                            Padding="22,20">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Color="#FF6B35" Offset="0"/>
+                                <GradientStop Color="#C93A20" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <Border.Shadow>
+                            <Shadow Brush="#44FF6B35" Offset="0,8" Radius="24" Opacity="0.30" />
+                        </Border.Shadow>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <VerticalStackLayout Grid.Column="0" Spacing="6" VerticalOptions="Center">
+                                <Label Text="🎉 Ưu đãi hôm nay"
+                                       FontSize="12"
+                                       TextColor="#FFD4BC"
+                                       FontAttributes="Bold" />
+                                <Label Text="Giảm 20% đơn đầu tiên"
+                                       FontSize="18"
+                                       FontAttributes="Bold"
+                                       TextColor="White" />
+                                <Label Text="Áp dụng đến hết 28/02"
+                                       FontSize="12"
+                                       TextColor="#FFBFA8" />
+                            </VerticalStackLayout>
+                            <Border Grid.Column="1"
+                                    BackgroundColor="White"
+                                    StrokeThickness="0"
+                                    StrokeShape="RoundRectangle 14"
+                                    Padding="14,10"
+                                    VerticalOptions="Center">
+                                <Label Text="Dùng ngay"
+                                       FontSize="13"
+                                       FontAttributes="Bold"
+                                       TextColor="#FF6B35" />
+                            </Border>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+    </Grid>
+</ContentPage>

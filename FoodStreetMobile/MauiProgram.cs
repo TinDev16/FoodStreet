@@ -1,4 +1,4 @@
-using FoodStreetMobile.Services;
+﻿using FoodStreetMobile.Services;
 using FoodStreetMobile.ViewModels;
 using Microsoft.Extensions.Logging;
 
@@ -9,9 +9,9 @@ public static class MauiProgram
     public static MauiApp CreateMauiApp()
     {
         var builder = MauiApp.CreateBuilder();
-		builder
-			.UseMauiApp<App>()
-			.UseMauiMaps()
+ 		builder
+ 			.UseMauiApp<App>()
+ 			.UseMauiMaps()
 			.ConfigureFonts(fonts =>
 			{
 				fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
@@ -19,6 +19,8 @@ public static class MauiProgram
 			});
 
         builder.Services.AddSingleton<PoiRepository>();
+        builder.Services.AddSingleton<AppDatabase>();
+        builder.Services.AddSingleton<PoiSyncService>();
         builder.Services.AddSingleton<GeofenceEngine>();
         builder.Services.AddSingleton<NarrationEngine>();
         builder.Services.AddSingleton<LocationTracker>();
@@ -41,3 +43,4 @@ public static class MauiProgram
         return builder.Build();
     }
 }
+

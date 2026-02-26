@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="FoodStreetMobile.ProfilePage"
+             BackgroundColor="#F2F2F2"
+             Title="Cá nhân">
+
+    <Grid>
+        <Border Margin="20"
+                Padding="24"
+                BackgroundColor="White"
+                Stroke="#EFE4DB"
+                StrokeShape="RoundRectangle 20">
+            <VerticalStackLayout Spacing="8"
+                                 VerticalOptions="Center"
+                                 HorizontalOptions="Center">
+                <Label Text="Tài khoản"
+                       FontSize="28"
+                       FontAttributes="Bold"
+                       TextColor="#2C1C19"
+                       HorizontalTextAlignment="Center" />
+                <Label Text="Nội dung cá nhân sẽ được cập nhật sau."
+                       FontSize="16"
+                       TextColor="#8E7A6D"
+                       HorizontalTextAlignment="Center" />
+            </VerticalStackLayout>
+        </Border>
+    </Grid>
+</ContentPage>

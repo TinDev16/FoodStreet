@@ -13,20 +13,30 @@ public sealed class PoiViewModel : INotifyPropertyChanged
     {
         Id = poi.Id;
         Name = poi.Name;
+        Description = poi.Description;
         Latitude = poi.Latitude;
         Longitude = poi.Longitude;
         RadiusMeters = poi.RadiusMeters;
         Priority = poi.Priority;
         Narration = poi.Narration;
+        ImageUrl = poi.ImageUrl;
+        MapLink = poi.MapLink;
+        AudioUrl = poi.AudioUrl;
+        Language = poi.Language;
     }
 
     public string Id { get; }
     public string Name { get; }
+    public string Description { get; }
     public double Latitude { get; }
     public double Longitude { get; }
     public double RadiusMeters { get; }
     public int Priority { get; }
     public string Narration { get; }
+    public string ImageUrl { get; }
+    public string MapLink { get; }
+    public string AudioUrl { get; }
+    public string Language { get; }
 
     public bool IsActive
     {
