@@ -1,0 +1,66 @@
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Segoe UI", sans-serif;
+  background: #f3f4f6;
+  color: #111827;
+}
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  padding: 14px;
+}
+.card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 14px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.06);
+}
+label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+input, textarea, button {
+  font: inherit;
+}
+input, textarea {
+  width: 100%;
+  margin-top: 4px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+textarea { min-height: 86px; resize: vertical; }
+.actions { display: flex; gap: 8px; margin-top: 10px; }
+button {
+  border: 0;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+button.secondary { background: #6b7280; }
+button.danger { background: #dc2626; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th, td {
+  padding: 8px 6px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+}
+.gps-preview {
+  display: flex;
+  gap: 10px;
+  padding: 8px 0 10px;
+  font-size: 13px;
+}
+#status { min-height: 18px; }
+#status.error { color: #b91c1c; }
+@media (max-width: 980px) {
+  .layout { grid-template-columns: 1fr; }
+}

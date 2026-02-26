@@ -1,15 +1,18 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:maps="http://schemas.microsoft.com/dotnet/2021/maui/maps"
              x:Class="FoodStreetMobile.MainPage"
              BackgroundColor="#FDF8F5">
-
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="VI" Command="{Binding SetVietnameseCommand}" />
+        <ToolbarItem Text="EN" Command="{Binding SetEnglishCommand}" />
+        <ToolbarItem Text="HOST" Clicked="OnConfigureHostClicked" />
+    </ContentPage.ToolbarItems>
     <Grid RowDefinitions="*" RowSpacing="0">
         <Grid>
             <maps:Map x:Name="PoiMap"
                       IsShowingUser="True" />
-
             <ImageButton x:Name="LocateMeButton"
                          Source="ic_my_location.svg"
                          WidthRequest="46"
@@ -29,7 +32,27 @@
                             Offset="0,3" />
                 </ImageButton.Shadow>
             </ImageButton>
-
+            <Border Margin="0,0,16,196"
+                    Padding="0"
+                    VerticalOptions="End"
+                    HorizontalOptions="End"
+                    BackgroundColor="White"
+                    Stroke="#E5E7EB"
+                    StrokeShape="RoundRectangle 20">
+                <Border.Shadow>
+                    <Shadow Opacity="0.14"
+                            Radius="10"
+                            Offset="0,3" />
+                </Border.Shadow>
+                <Button Text="Khám phá Vĩnh Khánh"
+                        FontSize="12"
+                        FontAttributes="Bold"
+                        Padding="12,6"
+                        BackgroundColor="#FFFFFF"
+                        TextColor="#9A3412"
+                        CornerRadius="20"
+                        Clicked="OnGoToVinhKhanhClicked" />
+            </Border>
             <Border Margin="16,20"
                     Padding="6"
                     BackgroundColor="White"
@@ -42,28 +65,25 @@
                             Radius="15"
                             Offset="0,6" />
                 </Border.Shadow>
-
                 <Grid RowDefinitions="Auto,Auto">
                     <Grid ColumnDefinitions="*,Auto">
                         <Entry x:Name="PlaceSearchEntry"
-                               Placeholder="Tim dia diem..."
+                               Placeholder="Tìm địa điểm, món ăn..."
                                BackgroundColor="Transparent"
                                Keyboard="Text"
                                Margin="12,6"
                                ReturnType="Search"
                                TextChanged="OnPlaceSearchTextChanged"
                                Completed="OnPlaceSearchCompleted" />
-
-                        <Button Grid.Column="1"
-                                Text="Tim"
-                                WidthRequest="56"
-                                HeightRequest="40"
-                                BackgroundColor="#E07A5F"
-                                TextColor="White"
-                                CornerRadius="20"
-                                Clicked="OnSearchPlaceClicked" />
+                        <ImageButton Grid.Column="1"
+                                     Source="ic_search.svg"
+                                     WidthRequest="40"
+                                     HeightRequest="40"
+                                     Padding="8"
+                                     BackgroundColor="#EDEDED"
+                                     CornerRadius="20"
+                                     Clicked="OnSearchPlaceClicked" />
                     </Grid>
-
                     <CollectionView x:Name="SearchResultsView"
                                     Grid.Row="1"
                                     Margin="6,4,6,6"
@@ -94,7 +114,20 @@
                     </CollectionView>
                 </Grid>
             </Border>
-
+            <Border x:Name="StatusBanner"
+                    Margin="16,88,16,0"
+                    Padding="10,7"
+                    BackgroundColor="#FFF7ED"
+                    Stroke="#FED7AA"
+                    StrokeShape="RoundRectangle 14"
+                    IsVisible="False"
+                    VerticalOptions="Start"
+                    HorizontalOptions="Fill">
+                <Label Text="{Binding StatusText}"
+                       FontSize="12"
+                       TextColor="#7C2D12"
+                       LineBreakMode="WordWrap" />
+            </Border>
             <Border x:Name="SearchBottomSheet"
                     VerticalOptions="End"
                     Stroke="#F2E8E0"
@@ -113,39 +146,118 @@
                                  CornerRadius="3"
                                  HorizontalOptions="Center" />
                     </Grid>
-
                     <ScrollView Grid.Row="1">
                         <VerticalStackLayout Spacing="10">
                             <Image x:Name="SheetImage"
                                    HeightRequest="138"
                                    Aspect="AspectFill"
                                    Source="dotnet_bot.png" />
-
                             <Label x:Name="SheetTitleLabel"
-                                   Text="Chua chon dia diem"
+                                   Text="ChÆ°a chá»n Ä‘á»‹a Ä‘iá»ƒm"
                                    FontSize="18"
                                    FontAttributes="Bold"
                                    TextColor="#5A2A0C" />
-
-                            <Label x:Name="SheetAddressLabel"
-                                   Text="Nhap tu khoa va chon dia diem de xem thong tin."
-                                   FontSize="13"
-                                   TextColor="#8B5E42" />
-
-                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
-                                <Button Text="Chi duong"
+                             <Label x:Name="SheetAddressLabel"
+                                    Text="Nháº­p tá»« khÃ³a vÃ  chá»n Ä‘á»‹a Ä‘iá»ƒm Ä‘á»ƒ xem thÃ´ng tin."
+                                    FontSize="13"
+                                    TextColor="#8B5E42" />
+                            <Border x:Name="AudioPlayerContainer"
+                                    IsVisible="False"
+                                    Padding="0"
+                                    BackgroundColor="#FFF7ED"
+                                    Stroke="#FED7AA"
+                                    StrokeShape="RoundRectangle 12">
+                                <WebView x:Name="AudioPlayerWebView"
+                                         HeightRequest="168" />
+                            </Border>
+                            <Border x:Name="TtsPlayerContainer"
+                                    IsVisible="False"
+                                    Padding="10"
+                                    BackgroundColor="#FFF7ED"
+                                    Stroke="#FED7AA"
+                                    StrokeShape="RoundRectangle 12">
+                                <VerticalStackLayout Spacing="8">
+                                    <Grid ColumnDefinitions="Auto,*,Auto"
+                                          ColumnSpacing="8">
+                                        <Label x:Name="TtsCurrentTimeLabel"
+                                               Text="00:00"
+                                               VerticalOptions="Center"
+                                               FontSize="11"
+                                               TextColor="#7C2D12" />
+                                        <Slider x:Name="TtsProgressSlider"
+                                                Grid.Column="1"
+                                                Minimum="0"
+                                                Maximum="1"
+                                                Value="0"
+                                                DragStarted="OnTtsProgressDragStarted"
+                                                DragCompleted="OnTtsProgressDragCompleted"
+                                                ValueChanged="OnTtsProgressValueChanged" />
+                                        <Label x:Name="TtsDurationLabel"
+                                               Grid.Column="2"
+                                               Text="00:00"
+                                               VerticalOptions="Center"
+                                               FontSize="11"
+                                               TextColor="#7C2D12" />
+                                    </Grid>
+                                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                                        <Button Text="⏪ 10s"
+                                                FontSize="12"
+                                                BackgroundColor="#FDE7D7"
+                                                TextColor="#7C2D12"
+                                                CornerRadius="12"
+                                                Clicked="OnTtsSkipBackwardClicked" />
+                                        <Button Grid.Column="1"
+                                                x:Name="TtsPlayPauseButton"
+                                                Text="▶"
+                                                FontSize="14"
+                                                FontAttributes="Bold"
+                                                BackgroundColor="#E07A5F"
+                                                TextColor="White"
+                                                CornerRadius="12"
+                                                Clicked="OnTtsPlayPauseClicked" />
+                                        <Button Grid.Column="2"
+                                                Text="10s ⏩"
+                                                FontSize="12"
+                                                BackgroundColor="#FDE7D7"
+                                                TextColor="#7C2D12"
+                                                CornerRadius="12"
+                                                Clicked="OnTtsSkipForwardClicked" />
+                                    </Grid>
+                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                        <Label Text="Âm lượng"
+                                               FontSize="12"
+                                               TextColor="#7C2D12"
+                                               VerticalOptions="Center" />
+                                        <Slider x:Name="TtsVolumeSlider"
+                                                Grid.Column="1"
+                                                Minimum="0"
+                                                Maximum="1"
+                                                Value="0.8" />
+                                    </Grid>
+                                </VerticalStackLayout>
+                            </Border>
+<Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="8">
+                                <Button Text="Chỉ đường"
                                         BackgroundColor="#E07A5F"
                                         TextColor="White"
                                         CornerRadius="14"
                                         Clicked="OnDirectionsClicked" />
                                 <Button Grid.Column="1"
-                                        Text="Luu"
+                                        x:Name="PlayAudioButton"
+                                        Text="Phát audio"
+                                        BackgroundColor="#F4E7DC"
+                                        TextColor="#5A2A0C"
+                                        CornerRadius="14"
+                                        IsEnabled="False"
+                                        Clicked="OnPlayAudioClicked" />
+                                <Button Grid.Column="2"
+                                        Text="Lưu"
                                         BackgroundColor="#F4E7DC"
                                         TextColor="#5A2A0C"
                                         CornerRadius="14"
                                         Clicked="OnSaveClicked" />
-                                <Button Grid.Column="2"
-                                        Text="Chia se"
+                                <Button Grid.Column="3"
+                                        Text="Chia sẻ»"
                                         BackgroundColor="#F4E7DC"
                                         TextColor="#5A2A0C"
                                         CornerRadius="14"
@@ -157,5 +269,8 @@
             </Border>
         </Grid>
     </Grid>
-
 </ContentPage>
+
+
+
+

@@ -1,3 +1,25 @@
 - Phố ẩm thực Vĩnh Khánh openstreet map: 10.762675, 106.703022
 - tạo file gpx : https://www.gpsvisualizer.com/convert?output 
-- 
+- prompt tạo gpx :
+Điểm bắt đầu (A):
+10.762635,+106.703037 
+(lat+Lon)
+
+Điểm kết thúc (B):
+10.762289943363472,+106.7036514800847
+(lat+Lon)
+
+Tổng thời gian di chuyển:
+10 giây
+
+Số điểm muốn nội suy:
+20 điểm
+
+Thời gian bắt đầu:
+2026-02-24T10:00:00Z
+
+chuyển thành file gpx
+
+- khởi động lại host
+adb reverse tcp:5187 tcp:5187
+adb reverse --list

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quan ly POI</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="layout">
+    <section class="card">
+      <h1>Them / Sua POI</h1>
+      <form id="poiForm">
+        <input name="id" type="hidden" />
+
+        <label>Ten shop
+          <input name="shopName" type="text" required />
+        </label>
+
+        <label>GPS (vd: 10.762548634412715, 106.70321804519753)
+          <input name="gps" type="text" required />
+        </label>
+
+        <div class="gps-preview">
+          <span>Lat: <strong id="latPreview">--</strong></span>
+          <span>Lon: <strong id="lonPreview">--</strong></span>
+        </div>
+
+        <label>Radius (m)
+          <input name="radiusMeters" type="number" step="any" min="1" value="40" required />
+        </label>
+
+        <label>Mo ta shop
+          <textarea name="description"></textarea>
+        </label>
+
+        <label>Audio file (tu may tinh)
+          <input name="audioFile" type="file" accept="audio/*" />
+        </label>
+
+        <label>Hoac nhap noi dung de Text To Speech
+          <textarea name="ttsText"></textarea>
+        </label>
+
+        <div class="actions">
+          <button type="submit">Luu POI</button>
+          <button type="button" id="resetBtn" class="secondary">Tao moi</button>
+        </div>
+      </form>
+      <p id="status"></p>
+    </section>
+
+    <section class="card">
+      <h2>Danh sach POI</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Ten shop</th>
+            <th>GPS</th>
+            <th>Radius</th>
+            <th>Audio/TTS</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="poiRows"></tbody>
+      </table>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
