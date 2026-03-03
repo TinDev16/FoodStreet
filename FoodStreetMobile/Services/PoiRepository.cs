@@ -25,25 +25,30 @@ public sealed class PoiRepository
 
         var byPoi = translations
             .GroupBy(x => x.PoiId)
-            .ToDictionary(
-                x => x.Key,
-                x => x.OrderByDescending(t => t.LangCode == languageCode).First());
+            .ToDictionary(x => x.Key, x => SelectBestTranslation(x.ToList(), languageCode));
 
         var result = new List<Poi>(pois.Count);
         foreach (var entity in pois)
         {
             byPoi.TryGetValue(entity.Id, out var translation);
 
+            var resolvedName = !string.IsNullOrWhiteSpace(translation?.Name)
+                ? translation!.Name
+                : entity.Id;
+            var resolvedNarration = !string.IsNullOrWhiteSpace(translation?.TtsText)
+                ? translation!.TtsText
+                : translation?.Description ?? string.Empty;
+
             result.Add(new Poi
             {
                 Id = entity.Id,
-                Name = translation?.Name ?? entity.Id,
+                Name = resolvedName,
                 Description = translation?.Description ?? string.Empty,
                 Latitude = entity.Latitude,
                 Longitude = entity.Longitude,
                 RadiusMeters = entity.RadiusMeters,
                 Priority = entity.Priority,
-                Narration = translation?.TtsText ?? string.Empty,
+                Narration = resolvedNarration,
                 ImageUrl = entity.ImageUrl,
                 MapLink = entity.MapLink,
                 AudioUrl = entity.AudioUrl,
@@ -70,5 +75,46 @@ public sealed class PoiRepository
             Key = "current_language",
             Value = normalized
         });
+    }
+
+    private static PoiTranslationEntity? SelectBestTranslation(IReadOnlyList<PoiTranslationEntity> candidates, string languageCode)
+    {
+        if (candidates.Count == 0)
+        {
+            return null;
+        }
+
+        bool HasUsefulContent(PoiTranslationEntity t)
+            => !string.IsNullOrWhiteSpace(t.Name)
+               || !string.IsNullOrWhiteSpace(t.TtsText)
+               || !string.IsNullOrWhiteSpace(t.Description);
+
+        var preferredLangWithContent = candidates.FirstOrDefault(t =>
+            string.Equals(t.LangCode, languageCode, StringComparison.OrdinalIgnoreCase) && HasUsefulContent(t));
+        if (preferredLangWithContent is not null)
+        {
+            return preferredLangWithContent;
+        }
+
+        var vietnameseWithContent = candidates.FirstOrDefault(t =>
+            string.Equals(t.LangCode, "vi", StringComparison.OrdinalIgnoreCase) && HasUsefulContent(t));
+        if (vietnameseWithContent is not null)
+        {
+            return vietnameseWithContent;
+        }
+
+        var preferredLang = candidates.FirstOrDefault(t => string.Equals(t.LangCode, languageCode, StringComparison.OrdinalIgnoreCase));
+        if (preferredLang is not null)
+        {
+            return preferredLang;
+        }
+
+        var vietnamese = candidates.FirstOrDefault(t => string.Equals(t.LangCode, "vi", StringComparison.OrdinalIgnoreCase));
+        if (vietnamese is not null)
+        {
+            return vietnamese;
+        }
+
+        return candidates.FirstOrDefault();
     }
 }

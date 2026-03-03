@@ -59,6 +59,25 @@ th, td {
   padding: 8px 0 10px;
   font-size: 13px;
 }
+.existing-media {
+  margin-top: 10px;
+  margin-bottom: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px;
+  display: block;
+}
+.media-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  margin: 6px 0;
+}
+.media-row a {
+  word-break: break-all;
+}
 #status { min-height: 18px; }
 #status.error { color: #b91c1c; }
 @media (max-width: 980px) {

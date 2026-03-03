@@ -27,7 +27,7 @@
                          CornerRadius="23"
                          Clicked="OnLocateMeClicked">
                 <ImageButton.Shadow>
-                    <Shadow Opacity="0.18"
+                    <Shadow Opacity="0.18"  
                             Radius="10"
                             Offset="0,3" />
                 </ImageButton.Shadow>
@@ -153,12 +153,12 @@
                                    Aspect="AspectFill"
                                    Source="dotnet_bot.png" />
                             <Label x:Name="SheetTitleLabel"
-                                   Text="ChÆ°a chá»n Ä‘á»‹a Ä‘iá»ƒm"
+                                   Text="Chưa chọn địa điểm"
                                    FontSize="18"
                                    FontAttributes="Bold"
                                    TextColor="#5A2A0C" />
                              <Label x:Name="SheetAddressLabel"
-                                    Text="Nháº­p tá»« khÃ³a vÃ  chá»n Ä‘á»‹a Ä‘iá»ƒm Ä‘á»ƒ xem thÃ´ng tin."
+                                    Text="Nhập từ khóa và chọn địa điểm để xem thông tin."
                                     FontSize="13"
                                     TextColor="#8B5E42" />
                             <Border x:Name="AudioPlayerContainer"

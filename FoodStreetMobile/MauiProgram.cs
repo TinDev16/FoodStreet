@@ -1,6 +1,12 @@
-﻿using FoodStreetMobile.Services;
+using FoodStreetMobile.Services;
 using FoodStreetMobile.ViewModels;
 using Microsoft.Extensions.Logging;
+#if ANDROID || IOS
+using Microsoft.Maui.Handlers;
+#endif
+#if IOS
+using WebKit;
+#endif
 
 namespace FoodStreetMobile;
 
@@ -9,14 +15,14 @@ public static class MauiProgram
     public static MauiApp CreateMauiApp()
     {
         var builder = MauiApp.CreateBuilder();
- 		builder
- 			.UseMauiApp<App>()
- 			.UseMauiMaps()
-			.ConfigureFonts(fonts =>
-			{
-				fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
-				fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
-			});
+        builder
+            .UseMauiApp<App>()
+            .UseMauiMaps()
+            .ConfigureFonts(fonts =>
+            {
+                fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
+                fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
+            });
 
         builder.Services.AddSingleton<PoiRepository>();
         builder.Services.AddSingleton<AppDatabase>();
@@ -38,9 +44,27 @@ public static class MauiProgram
             handler.PlatformView.BackgroundTintList =
                 Android.Content.Res.ColorStateList.ValueOf(Android.Graphics.Color.Transparent);
         });
+
+        WebViewHandler.Mapper.AppendToMapping("AllowMediaAutoplay", (handler, view) =>
+        {
+            if (handler.PlatformView.Settings is null)
+            {
+                return;
+            }
+
+            handler.PlatformView.Settings.JavaScriptEnabled = true;
+            handler.PlatformView.Settings.MediaPlaybackRequiresUserGesture = false;
+        });
+#endif
+
+#if IOS
+        WebViewHandler.Mapper.AppendToMapping("AllowMediaAutoplay", (handler, view) =>
+        {
+            handler.PlatformView.Configuration.AllowsInlineMediaPlayback = true;
+            handler.PlatformView.Configuration.MediaTypesRequiringUserActionForPlayback = WKAudiovisualMediaTypes.None;
+        });
 #endif
 
         return builder.Build();
     }
 }
-
