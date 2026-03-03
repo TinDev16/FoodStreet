@@ -12,6 +12,11 @@ using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using MauiLocation = Microsoft.Maui.Devices.Sensors.Location;
+#if ANDROID
+using AndroidMarker = Android.Gms.Maps.Model.Marker;
+using AndroidBitmapDescriptor = Android.Gms.Maps.Model.BitmapDescriptor;
+using AndroidBitmapDescriptorFactory = Android.Gms.Maps.Model.BitmapDescriptorFactory;
+#endif
 
 namespace FoodStreetMobile;
 
@@ -65,6 +70,9 @@ public partial class MainPage : ContentPage
     private CancellationTokenSource? _searchTypingCts;
     private string _lastSearchQuery = string.Empty;
     private readonly Dictionary<Pin, PoiViewModel> _poiPins = new();
+#if ANDROID
+    private readonly Dictionary<string, AndroidBitmapDescriptor> _androidPoiIconCache = new(StringComparer.Ordinal);
+#endif
     private Pin? _activePoiPin;
     private Pin? _searchPin;
     private Polyline? _routePolyline;
@@ -98,6 +106,7 @@ public partial class MainPage : ContentPage
         _viewModel.PoisLoaded += OnPoisLoaded;
         _viewModel.ActivePoiChanged += OnActivePoiChanged;
         _viewModel.UserLocationChanged += OnUserLocationChanged;
+        _viewModel.AutoPlayPoiRequested += OnAutoPlayPoiRequested;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         SizeChanged += OnPageSizeChanged;
         InitializeTtsPlayer();
@@ -149,7 +158,22 @@ public partial class MainPage : ContentPage
                 PoiMap.Pins.Add(CreatePoiPin(poi));
             }
 
-            MoveMapTo(DefaultLatitude, DefaultLongitude, DefaultZoomRadiusKm);
+#if ANDROID
+            _ = ApplyAndroidPoiMarkerUiAsync();
+#endif
+
+            if (pois.Count > 0)
+            {
+                var south = pois.Min(p => p.Latitude);
+                var north = pois.Max(p => p.Latitude);
+                var west = pois.Min(p => p.Longitude);
+                var east = pois.Max(p => p.Longitude);
+                MoveMapToBounds(south, west, north, east);
+            }
+            else
+            {
+                MoveMapTo(DefaultLatitude, DefaultLongitude, DefaultZoomRadiusKm);
+            }
             _hasCenteredOnUser = false;
         });
     }
@@ -168,14 +192,20 @@ public partial class MainPage : ContentPage
 
             _activePoiPin = new Pin
             {
-                Label = $"{active.Name} (Đang gần)",
+                Label = string.IsNullOrWhiteSpace(active.Name)
+                    ? "POI (Đang gần)"
+                    : $"{active.Name.Trim()} (Đang gần)",
                 Address = $"{active.Latitude.ToString(CultureInfo.InvariantCulture)}, {active.Longitude.ToString(CultureInfo.InvariantCulture)}",
-                Type = PinType.Place,
+                Type = PinType.Generic,
                 Location = new MauiLocation(active.Latitude, active.Longitude)
             };
             _activePoiPin.MarkerClicked += OnPoiPinClicked;
             _poiPins[_activePoiPin] = active;
             PoiMap.Pins.Add(_activePoiPin);
+
+#if ANDROID
+            _ = ApplyAndroidPoiMarkerUiAsync();
+#endif
         });
     }
 
@@ -193,6 +223,33 @@ public partial class MainPage : ContentPage
 
             _hasCenteredOnUser = true;
             MoveMapTo(location.Latitude, location.Longitude, 1.2);
+        });
+    }
+
+    private void OnAutoPlayPoiRequested(PoiViewModel poi)
+    {
+        MainThread.BeginInvokeOnMainThread(async () =>
+        {
+            _selectedPoi = poi;
+            _selectedSearchResult = null;
+            _lastRouteSummary = null;
+            PlayAudioButton.IsEnabled = !string.IsNullOrWhiteSpace(poi.AudioUrl) || !string.IsNullOrWhiteSpace(poi.Narration);
+            UpdateBottomSheetContent(poi);
+            await ShowSheetPartialAsync();
+
+            if (!string.IsNullOrWhiteSpace(poi.AudioUrl)
+                && Uri.TryCreate(poi.AudioUrl, UriKind.Absolute, out var audioUri))
+            {
+                ShowAudioPlayerHtml(BuildAudioPlayerHtml(audioUri.ToString()));
+                return;
+            }
+
+            var narration = ResolveNarrationForPlayback(poi);
+            if (!string.IsNullOrWhiteSpace(narration))
+            {
+                await StartTtsPlayerAsync(narration);
+                return;
+            }
         });
     }
 
@@ -1012,12 +1069,11 @@ public partial class MainPage : ContentPage
 
     private Pin CreatePoiPin(PoiViewModel poi)
     {
-        var compactLabel = BuildCompactPoiLabel(poi.Name);
         var pin = new Pin
         {
-            Label = compactLabel,
+            Label = string.IsNullOrWhiteSpace(poi.Name) ? "POI" : poi.Name.Trim(),
             Address = $"Bán kính {Math.Round(poi.RadiusMeters)} m",
-            Type = PinType.SavedPin,
+            Type = PinType.Generic,
             Location = new MauiLocation(poi.Latitude, poi.Longitude)
         };
         pin.MarkerClicked += OnPoiPinClicked;
@@ -1025,16 +1081,109 @@ public partial class MainPage : ContentPage
         return pin;
     }
 
-    private static string BuildCompactPoiLabel(string name)
+#if ANDROID
+    private async Task ApplyAndroidPoiMarkerUiAsync()
     {
-        if (string.IsNullOrWhiteSpace(name))
+        for (var attempt = 0; attempt < 6; attempt++)
         {
-            return "POI";
-        }
+            var allReady = true;
 
-        var trimmed = name.Trim();
-        return trimmed.Length <= 16 ? trimmed : $"{trimmed[..15]}…";
+            foreach (var pair in _poiPins)
+            {
+                var pin = pair.Key;
+                if (pin.MarkerId is not AndroidMarker marker)
+                {
+                    allReady = false;
+                    continue;
+                }
+
+                var label = BuildCompactPoiName(pin.Label);
+                if (!_androidPoiIconCache.TryGetValue(label, out var icon))
+                {
+                    icon = BuildAndroidPoiMarkerIcon(label);
+                    _androidPoiIconCache[label] = icon;
+                }
+
+                marker.SetIcon(icon);
+                marker.SetAnchor(0.5f, 1f);
+            }
+
+            if (allReady)
+            {
+                return;
+            }
+
+            await Task.Delay(120);
+        }
     }
+
+    private static string BuildCompactPoiName(string? name)
+    {
+        var trimmed = string.IsNullOrWhiteSpace(name) ? "POI" : name.Trim();
+        return trimmed.Length <= 20 ? trimmed : $"{trimmed[..19]}…";
+    }
+
+    private static AndroidBitmapDescriptor BuildAndroidPoiMarkerIcon(string label)
+    {
+        const float textSizePx = 24f;
+        const float dotRadiusPx = 8f;
+        const float paddingHorizontalPx = 14f;
+        const float paddingVerticalPx = 8f;
+        const float gapPx = 8f;
+
+        var textPaint = new Android.Graphics.Paint(Android.Graphics.PaintFlags.AntiAlias)
+        {
+            Color = Android.Graphics.Color.ParseColor("#1F2937"),
+            TextSize = textSizePx
+        };
+        var fm = textPaint.GetFontMetrics() ?? new Android.Graphics.Paint.FontMetrics();
+
+        var textWidth = Math.Max(1f, textPaint.MeasureText(label));
+        var textHeight = fm.Bottom - fm.Top;
+        var bubbleWidth = (int)Math.Ceiling(textWidth + (paddingHorizontalPx * 2f));
+        var bubbleHeight = (int)Math.Ceiling(textHeight + (paddingVerticalPx * 2f));
+        var totalHeight = (int)Math.Ceiling(bubbleHeight + gapPx + (dotRadiusPx * 2f));
+        var totalWidth = Math.Max(bubbleWidth, (int)Math.Ceiling((dotRadiusPx * 2f) + 8f));
+
+        var bitmap = Android.Graphics.Bitmap.CreateBitmap(totalWidth, totalHeight, Android.Graphics.Bitmap.Config.Argb8888!);
+        using var canvas = new Android.Graphics.Canvas(bitmap);
+
+        var bubbleLeft = (totalWidth - bubbleWidth) / 2f;
+        var bubbleTop = 0f;
+        var bubbleRight = bubbleLeft + bubbleWidth;
+        var bubbleBottom = bubbleTop + bubbleHeight;
+
+        var bubblePaint = new Android.Graphics.Paint(Android.Graphics.PaintFlags.AntiAlias) { Color = Android.Graphics.Color.ParseColor("#FFF7ED") };
+        var strokePaint = new Android.Graphics.Paint(Android.Graphics.PaintFlags.AntiAlias)
+        {
+            Color = Android.Graphics.Color.ParseColor("#FDBA74"),
+            StrokeWidth = 2f
+        };
+        strokePaint.SetStyle(Android.Graphics.Paint.Style.Stroke);
+
+        var rect = new Android.Graphics.RectF(bubbleLeft, bubbleTop, bubbleRight, bubbleBottom);
+        canvas.DrawRoundRect(rect, 18f, 18f, bubblePaint);
+        canvas.DrawRoundRect(rect, 18f, 18f, strokePaint);
+
+        var textBaseline = bubbleTop + paddingVerticalPx - fm.Top;
+        canvas.DrawText(label, bubbleLeft + paddingHorizontalPx, textBaseline, textPaint);
+
+        var dotPaint = new Android.Graphics.Paint(Android.Graphics.PaintFlags.AntiAlias) { Color = Android.Graphics.Color.ParseColor("#EA580C") };
+        var dotStroke = new Android.Graphics.Paint(Android.Graphics.PaintFlags.AntiAlias)
+        {
+            Color = Android.Graphics.Color.White,
+            StrokeWidth = 2f
+        };
+        dotStroke.SetStyle(Android.Graphics.Paint.Style.Stroke);
+
+        var dotCx = totalWidth / 2f;
+        var dotCy = bubbleBottom + gapPx + dotRadiusPx;
+        canvas.DrawCircle(dotCx, dotCy, dotRadiusPx, dotPaint);
+        canvas.DrawCircle(dotCx, dotCy, dotRadiusPx, dotStroke);
+
+        return AndroidBitmapDescriptorFactory.FromBitmap(bitmap);
+    }
+#endif
 
     private void AddPoiRadiusCircle(PoiViewModel poi)
     {
@@ -1240,7 +1389,8 @@ public partial class MainPage : ContentPage
 
     private void UpdateBottomSheetContent(PoiViewModel poi)
     {
-        PlayAudioButton.IsEnabled = !string.IsNullOrWhiteSpace(poi.AudioUrl) || !string.IsNullOrWhiteSpace(poi.Narration);
+        var hasNarration = !string.IsNullOrWhiteSpace(ResolveNarrationForPlayback(poi));
+        PlayAudioButton.IsEnabled = !string.IsNullOrWhiteSpace(poi.AudioUrl) || hasNarration;
         HideAudioPlayer();
         SheetTitleLabel.Text = poi.Name;
         var description = string.IsNullOrWhiteSpace(poi.Description) ? $"Ban kinh {Math.Round(poi.RadiusMeters)} m" : poi.Description;
@@ -1418,9 +1568,10 @@ public partial class MainPage : ContentPage
             return;
         }
 
-        if (!string.IsNullOrWhiteSpace(_selectedPoi.Narration))
+        var narration = ResolveNarrationForPlayback(_selectedPoi);
+        if (!string.IsNullOrWhiteSpace(narration))
         {
-            StartTtsPlayer(_selectedPoi.Narration);
+            await StartTtsPlayerAsync(narration);
             return;
         }
 
@@ -1468,7 +1619,7 @@ public partial class MainPage : ContentPage
         };
     }
 
-    private void StartTtsPlayer(string narration)
+    private async Task StartTtsPlayerAsync(string narration)
     {
         HideAudioPlayer();
         BuildTtsSegments(narration);
@@ -1476,12 +1627,65 @@ public partial class MainPage : ContentPage
         _ttsWordIndex = 0;
         _ttsSegmentIndex = 0;
         _ttsElapsedSeconds = 0;
-        TtsProgressSlider.Maximum = Math.Max(1, _ttsWords.Count * TtsSecondsPerWord);
+        TtsProgressSlider.Maximum = Math.Max(1, Math.Max(_ttsWords.Count, narration.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length) * TtsSecondsPerWord);
         TtsProgressSlider.Value = 0;
         TtsPlayerContainer.IsVisible = true;
         TtsVolumeSlider.Value = Math.Clamp(TtsVolumeSlider.Value, 0, 1);
         RefreshTtsUi();
-        _ = ResumeTtsPlaybackAsync();
+        if (_ttsWords.Count == 0)
+        {
+            try
+            {
+                var locale = await ResolvePreferredTtsLocaleAsync();
+                var options = new SpeechOptions
+                {
+                    Volume = (float)Math.Clamp(TtsVolumeSlider.Value, 0, 1),
+                    Pitch = 1.0f,
+                    Rate = 1.05f,
+                    Locale = locale
+                };
+                _ttsIsPlaying = true;
+                TtsPlayPauseButton.Text = "⏸";
+                await TextToSpeech.Default.SpeakAsync(narration, options, CancellationToken.None);
+                _ttsElapsedSeconds = TtsProgressSlider.Maximum;
+                RefreshTtsUi();
+                _ttsIsPlaying = false;
+                TtsPlayPauseButton.Text = "▶";
+                return;
+            }
+            catch
+            {
+                ShowAudioPlayerHtml(BuildTtsPlayerHtml(narration));
+                return;
+            }
+        }
+
+        try
+        {
+            await ResumeTtsPlaybackAsync();
+        }
+        catch
+        {
+            try
+            {
+                var locale = await ResolvePreferredTtsLocaleAsync();
+                var options = new SpeechOptions
+                {
+                    Volume = (float)Math.Clamp(TtsVolumeSlider.Value, 0, 1),
+                    Pitch = 1.0f,
+                    Rate = 1.05f,
+                    Locale = locale
+                };
+                await TextToSpeech.Default.SpeakAsync(narration, options, CancellationToken.None);
+                _ttsElapsedSeconds = TtsProgressSlider.Maximum;
+                RefreshTtsUi();
+            }
+            catch
+            {
+                // Final fallback for environments with broken native TTS.
+                ShowAudioPlayerHtml(BuildTtsPlayerHtml(narration));
+            }
+        }
     }
 
     private async Task ResumeTtsPlaybackAsync()
@@ -1534,6 +1738,16 @@ public partial class MainPage : ContentPage
                 RefreshTtsUi();
             }
         }
+    }
+
+    private static string ResolveNarrationForPlayback(PoiViewModel poi)
+    {
+        if (!string.IsNullOrWhiteSpace(poi.Narration))
+        {
+            return poi.Narration;
+        }
+
+        return poi.Description ?? string.Empty;
     }
 
     private void StopTtsPlayback()

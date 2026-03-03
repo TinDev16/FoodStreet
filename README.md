@@ -76,11 +76,6 @@ FoodStreet
 │   ├── Models
 │   └── Data (SQLite)
 │
-├── FoodStreet.API           // ASP.NET Core Web API
-│   ├── Controllers
-│   ├── Services
-│   ├── Repositories
-│   └── Models
 │
 ├── FoodStreet.Web           // ASP.NET Core MVC (Admin & Shop)
 │   ├── Controllers
@@ -92,6 +87,7 @@ FoodStreet
 ```
 
 ## System Architecture
+
 Mobile App: Offline-first, GPS tracking, geofencing, audio narration
 Backend API: Central data provider, logging, synchronization
 Web Management: Content & system administration
@@ -110,8 +106,9 @@ Database:
 ## Getting Started
 
 1. Clone the repository:
+
 ```bash
-git clone https://github.com/your-username/FoodStreet
+git clone https://github.com/Tindev16/FoodStreet
 ```
 
 2. Run Backend API
@@ -122,12 +119,12 @@ dotnet restore
 dotnet run
 ```
 3. Run Web Management
+
 ```bash
-cd FoodStreet.Web
-dotnet restore
-dotnet run
+dotnet run --project FoodStreetPoiAdmin\FoodStreetPoiAdmin.csproj --urls http://localhost:5187
 ```
 4. Run Mobile App
+
 - Open FoodStreet.Mobile in Visual Studio
 - Select Android Emulator / Device
 - Run the project

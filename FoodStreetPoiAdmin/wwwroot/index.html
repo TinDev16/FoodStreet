@@ -27,11 +27,15 @@
         </div>
 
         <label>Radius (m)
-          <input name="radiusMeters" type="number" step="any" min="1" value="40" required />
+          <input name="radiusMeters" type="number" step="any" min="1" value="15" required />
         </label>
 
         <label>Mo ta shop
           <textarea name="description"></textarea>
+        </label>
+
+        <label>Hinh anh (tu may tinh)
+          <input name="imageFile" type="file" accept="image/*" />
         </label>
 
         <label>Audio file (tu may tinh)
@@ -41,6 +45,22 @@
         <label>Hoac nhap noi dung de Text To Speech
           <textarea name="ttsText"></textarea>
         </label>
+
+        <h2>Nội dung của POI đã nhập</h2>
+        <div class="existing-media" id="existingMedia">
+          <div class="media-row">
+            <span>Audio cu: <a id="currentAudioLink" href="#" target="_blank" rel="noopener" hidden></a><span id="currentAudioEmpty">Khong co</span></span>
+            <button type="button" id="clearAudioBtn" class="danger">Xoa audio</button>
+          </div>
+          <div class="media-row">
+            <span>TTS cu: <span id="currentTtsText">Khong co</span></span>
+            <button type="button" id="clearTtsBtn" class="danger">Xoa TTS</button>
+          </div>
+          <div class="media-row">
+            <span>Anh cu: <a id="currentImageLink" href="#" target="_blank" rel="noopener" hidden></a><span id="currentImageEmpty">Khong co</span></span>
+            <button type="button" id="clearImageBtn" class="danger">Xoa anh</button>
+          </div>
+        </div>
 
         <div class="actions">
           <button type="submit">Luu POI</button>
@@ -58,6 +78,7 @@
             <th>Ten shop</th>
             <th>GPS</th>
             <th>Radius</th>
+            <th>Anh</th>
             <th>Audio/TTS</th>
             <th>Action</th>
           </tr>

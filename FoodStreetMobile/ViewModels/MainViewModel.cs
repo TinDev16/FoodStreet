@@ -1,4 +1,5 @@
 using FoodStreetMobile.Services;
+using FoodStreetMobile.Models;
 using Microsoft.Maui.Devices.Sensors;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -20,8 +21,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private string _statusText = "San sang.";
     private PoiViewModel? _activePoi;
     private CancellationTokenSource? _narrationCts;
+    private readonly SemaphoreSlim _autoNarrationLock = new(1, 1);
+    private string? _currentAutoNarrationPoiId;
     private bool _initialized;
     private string _currentLanguage = "vi";
+    private DateTimeOffset _lastAutoSyncAt = DateTimeOffset.MinValue;
+    private readonly SemaphoreSlim _autoSyncLock = new(1, 1);
+    private static readonly TimeSpan AutoSyncInterval = TimeSpan.FromSeconds(12);
     private readonly ICommand _setVietnameseCommand;
     private readonly ICommand _setEnglishCommand;
     private readonly ICommand _syncNowCommand;
@@ -105,6 +111,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public event Action<IReadOnlyList<PoiViewModel>>? PoisLoaded;
     public event Action<PoiViewModel?>? ActivePoiChanged;
     public event Action<Location>? UserLocationChanged;
+    public event Action<PoiViewModel>? AutoPlayPoiRequested;
 
     public async Task InitializeAsync()
     {
@@ -115,6 +122,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
 
         await RefreshFromServerAsync();
+
+        if (!IsTracking)
+        {
+            await StartTrackingAsync();
+        }
     }
 
     public async Task SetLanguageAsync(string languageCode)
@@ -133,7 +145,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         await ReloadPoisAsync(_currentLanguage);
         if (synced)
         {
-            StatusText = "Da dong bo POI tu web admin.";
+            var source = string.IsNullOrWhiteSpace(_poiSyncService.LastSuccessfulBaseUrl)
+                ? "web admin"
+                : _poiSyncService.LastSuccessfulBaseUrl;
+            StatusText = $"Da dong bo POI tu {source}.";
             return;
         }
 
@@ -189,6 +204,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public async Task<bool> PlayPoiAudioAsync(PoiViewModel poi)
     {
         _narrationCts?.Cancel();
+        _narrationCts?.Dispose();
         _narrationCts = new CancellationTokenSource();
 
         try
@@ -219,6 +235,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private async Task ReloadPoisAsync(string languageCode)
     {
         var pois = await _poiRepository.GetPoisAsync(languageCode);
+        if (!HasPoiCollectionChanged(pois))
+        {
+            return;
+        }
+
         Pois.Clear();
         foreach (var poi in pois)
         {
@@ -226,6 +247,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
 
         SetActivePoi(null);
+        _currentAutoNarrationPoiId = null;
         PoisLoaded?.Invoke(Pois);
     }
 
@@ -244,6 +266,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         try
         {
+            _locationTracker.LocationUpdated -= OnLocationUpdated;
             _locationTracker.LocationUpdated += OnLocationUpdated;
             await _locationTracker.StartAsync();
             IsTracking = true;
@@ -260,6 +283,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         _locationTracker.LocationUpdated -= OnLocationUpdated;
         _locationTracker.Stop();
+        _narrationCts?.Cancel();
+        _narrationCts?.Dispose();
+        _narrationCts = null;
+        _currentAutoNarrationPoiId = null;
         IsTracking = false;
         StatusText = "Da tam dung theo doi.";
         SetActivePoi(null);
@@ -269,18 +296,92 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         UserLocationChanged?.Invoke(location);
 
+        await TryAutoSyncOnTrackingAsync();
+
         var newActive = _geofenceEngine.SelectActive(location, Pois);
         SetActivePoi(newActive);
 
-        if (newActive is not null)
+        if (newActive is null)
         {
-            StatusText = $"Dang gan: {newActive.Name}.";
-            await TryNarrationAsync(newActive);
-        }
-        else
-        {
+            _currentAutoNarrationPoiId = null;
             StatusText = "Chua co gian hang nao trong pham vi.";
+            return;
         }
+
+        StatusText = $"Dang gan: {newActive.Name}.";
+        if (string.Equals(_currentAutoNarrationPoiId, newActive.Id, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _currentAutoNarrationPoiId = newActive.Id;
+        _ = TryAutoNarrationAsync(newActive);
+    }
+
+    private async Task TryAutoSyncOnTrackingAsync()
+    {
+        var now = DateTimeOffset.UtcNow;
+        if (now - _lastAutoSyncAt < AutoSyncInterval)
+        {
+            return;
+        }
+
+        if (!await _autoSyncLock.WaitAsync(0))
+        {
+            return;
+        }
+
+        try
+        {
+            now = DateTimeOffset.UtcNow;
+            if (now - _lastAutoSyncAt < AutoSyncInterval)
+            {
+                return;
+            }
+
+            _lastAutoSyncAt = now;
+            var synced = await _poiSyncService.TrySyncAsync();
+            if (!synced)
+            {
+                return;
+            }
+
+            await ReloadPoisAsync(_currentLanguage);
+        }
+        finally
+        {
+            _autoSyncLock.Release();
+        }
+    }
+
+    private bool HasPoiCollectionChanged(IReadOnlyList<Poi> newPois)
+    {
+        if (Pois.Count != newPois.Count)
+        {
+            return true;
+        }
+
+        for (var i = 0; i < newPois.Count; i++)
+        {
+            var current = Pois[i];
+            var next = newPois[i];
+
+            if (!string.Equals(current.Id, next.Id, StringComparison.Ordinal)
+                || Math.Abs(current.Latitude - next.Latitude) > 0.0000001
+                || Math.Abs(current.Longitude - next.Longitude) > 0.0000001
+                || Math.Abs(current.RadiusMeters - next.RadiusMeters) > 0.01
+                || current.Priority != next.Priority
+                || !string.Equals(current.Name, next.Name, StringComparison.Ordinal)
+                || !string.Equals(current.Description, next.Description, StringComparison.Ordinal)
+                || !string.Equals(current.Narration, next.Narration, StringComparison.Ordinal)
+                || !string.Equals(current.AudioUrl, next.AudioUrl, StringComparison.Ordinal)
+                || !string.Equals(current.Language, next.Language, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void SetActivePoi(PoiViewModel? poi)
@@ -303,18 +404,36 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    private async Task TryNarrationAsync(PoiViewModel poi)
+    private async Task TryAutoNarrationAsync(PoiViewModel poi)
     {
-        _narrationCts?.Cancel();
-        _narrationCts = new CancellationTokenSource();
+        await _autoNarrationLock.WaitAsync();
 
         try
         {
-            await _narrationEngine.TryPlayAsync(poi, _narrationCts.Token);
+            if (!string.Equals(_currentAutoNarrationPoiId, poi.Id, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _narrationCts?.Cancel();
+            _narrationCts?.Dispose();
+            _narrationCts = new CancellationTokenSource();
+
+            // Drive auto playback through the page UI so the POI info bar/bottom-sheet
+            // and the in-app player state are always synchronized with GPS-triggered POI.
+            AutoPlayPoiRequested?.Invoke(poi);
+        }
+        catch (OperationCanceledException)
+        {
+            // Ignore cancellation when user moves between POIs quickly.
         }
         catch
         {
             // Ignore narration errors.
+        }
+        finally
+        {
+            _autoNarrationLock.Release();
         }
     }
 

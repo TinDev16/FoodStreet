@@ -12,6 +12,7 @@ public sealed class PoiSyncService
     private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(8) };
     private string? _lastSuccessfulBaseUrl;
     public string? LastError { get; private set; }
+    public string? LastSuccessfulBaseUrl => _lastSuccessfulBaseUrl;
 
     public PoiSyncService(AppDatabase database)
     {
@@ -175,6 +176,17 @@ public sealed class PoiSyncService
 
         foreach (var shop in shops)
         {
+            var normalizedName = string.IsNullOrWhiteSpace(shop.ShopName)
+                ? shop.Id
+                : shop.ShopName.Trim();
+            var normalizedDescription = shop.Description?.Trim() ?? string.Empty;
+            var normalizedAudioUrl = NormalizeAssetUrl(baseUrl, shop.AudioUrl);
+            var normalizedTtsText = shop.TtsText?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(normalizedTtsText) && string.IsNullOrWhiteSpace(normalizedAudioUrl) && !string.IsNullOrWhiteSpace(normalizedDescription))
+            {
+                normalizedTtsText = normalizedDescription;
+            }
+
             await connection.InsertOrReplaceAsync(new PoiEntity
             {
                 Id = shop.Id,
@@ -183,38 +195,59 @@ public sealed class PoiSyncService
                 RadiusMeters = shop.RadiusMeters,
                 Priority = 0,
                 MapLink = $"https://maps.google.com/?q={shop.Latitude},{shop.Longitude}",
-                ImageUrl = string.Empty,
-                AudioUrl = NormalizeAudioUrl(baseUrl, shop.AudioUrl),
+                ImageUrl = NormalizeAssetUrl(baseUrl, shop.ImageUrl),
+                AudioUrl = normalizedAudioUrl,
                 IsActive = true
             });
 
-            await connection.InsertOrReplaceAsync(new PoiTranslationEntity
-            {
-                PoiId = shop.Id,
-                LangCode = "vi",
-                Name = shop.ShopName,
-                Description = shop.Description ?? string.Empty,
-                TtsText = shop.TtsText ?? string.Empty
-            });
+            const string upsertTranslationSql = """
+                INSERT INTO poi_translations (poi_id, lang_code, name, description, tts_text)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(poi_id, lang_code) DO UPDATE SET
+                    name = excluded.name,
+                    description = excluded.description,
+                    tts_text = excluded.tts_text;
+                """;
+            await connection.ExecuteAsync(
+                upsertTranslationSql,
+                shop.Id,
+                "vi",
+                normalizedName,
+                normalizedDescription,
+                normalizedTtsText);
         }
     }
 
     private IEnumerable<string> GetPreferredBaseUrls()
     {
         var list = new List<string>();
-        if (!string.IsNullOrWhiteSpace(_lastSuccessfulBaseUrl))
-        {
-            list.Add(NormalizeBaseUrl(_lastSuccessfulBaseUrl));
-        }
 
         var configured = GetConfiguredBaseUrls();
+        var configuredUrls = new List<string>();
         if (!string.IsNullOrWhiteSpace(configured))
         {
             foreach (var item in configured
                 .Split(new[] { ',', ';', ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {
-                list.Add(NormalizeBaseUrl(item));
+                configuredUrls.Add(NormalizeBaseUrl(item));
             }
+        }
+
+        if (!string.IsNullOrWhiteSpace(_lastSuccessfulBaseUrl))
+        {
+            var normalizedLastSuccess = NormalizeBaseUrl(_lastSuccessfulBaseUrl);
+            if (configuredUrls.Count == 0 || configuredUrls.Contains(normalizedLastSuccess, StringComparer.OrdinalIgnoreCase))
+            {
+                list.Add(normalizedLastSuccess);
+            }
+        }
+
+        if (configuredUrls.Count > 0)
+        {
+            list.AddRange(configuredUrls);
+            return list
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase);
         }
 
         var configuredRaw = Environment.GetEnvironmentVariable("FOODSTREET_ADMIN_BASE_URLS");
@@ -284,8 +317,11 @@ public sealed class PoiSyncService
                     Longitude = poi.Longitude,
                     RadiusMeters = poi.RadiusMeters,
                     Description = translation?.Description ?? string.Empty,
+                    ImageUrl = poi.ImageUrl,
                     AudioUrl = poi.AudioUrl,
-                    TtsText = translation?.TtsText ?? string.Empty
+                    TtsText = !string.IsNullOrWhiteSpace(translation?.TtsText)
+                        ? translation!.TtsText
+                        : translation?.Description ?? string.Empty
                 });
             }
 
@@ -340,7 +376,7 @@ public sealed class PoiSyncService
     private static string NormalizeBaseUrl(string baseUrl)
         => baseUrl.Trim().TrimEnd('/');
 
-    private static string NormalizeAudioUrl(string baseUrl, string? value)
+    private static string NormalizeAssetUrl(string baseUrl, string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -386,6 +422,7 @@ public sealed class PoiSyncService
         public double Longitude { get; set; }
         public double RadiusMeters { get; set; }
         public string? Description { get; set; }
+        public string? ImageUrl { get; set; }
         public string? AudioUrl { get; set; }
         public string? TtsText { get; set; }
     }

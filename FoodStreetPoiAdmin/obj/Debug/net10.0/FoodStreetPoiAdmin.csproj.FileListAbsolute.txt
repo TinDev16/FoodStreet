@@ -55,9 +55,6 @@ E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\r
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\FoodStreetPoiAdmin.pdb
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\FoodStreetPoiAdmin.genruntimeconfig.cache
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\ref\FoodStreetPoiAdmin.dll
-E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\k9mnuggnn9-{0}-k9btd7dtcp-k9btd7dtcp.gz
-E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\ypiyamc441-{0}-s7aqqc9hyo-s7aqqc9hyo.gz
-E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\tihf3uqke4-{0}-28kxqj4ofq-28kxqj4ofq.gz
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify\FoodStreetPoiAdmin.staticwebassets.runtime.json
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify\FoodStreetPoiAdmin.staticwebassets.endpoints.json
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify\FoodStreetPoiAdmin.exe
@@ -96,3 +93,6 @@ E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin\Debug\net10.0\b
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin\Debug\net10.0\bin_verify\FoodStreetPoiAdmin.runtimeconfig.json
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin\Debug\net10.0\bin_verify\FoodStreetPoiAdmin.staticwebassets.endpoints.json
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin\Debug\net10.0\bin_verify\FoodStreetPoiAdmin.staticwebassets.runtime.json
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\tihf3uqke4-{0}-ctx5jnuw21-ctx5jnuw21.gz
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\ypiyamc441-{0}-vri76s6czo-vri76s6czo.gz
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\k9mnuggnn9-{0}-ralj1kkzgd-ralj1kkzgd.gz
