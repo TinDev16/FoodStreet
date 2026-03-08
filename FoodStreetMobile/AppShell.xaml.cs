@@ -9,28 +9,43 @@ public partial class AppShell : Shell
 
         var tabBar = new TabBar();
 
-        tabBar.Items.Add(new ShellContent
+        tabBar.Items.Add(new Tab
         {
-            Title = "Trang chủ",
             Icon = "ic_tab_home.svg",
-            Route = "HomePage",
-            Content = new HomePage()
+            Items =
+            {
+                new ShellContent
+                {
+                    Route = "HomePage",
+                    Content = new HomePage()
+                }
+            }
         });
 
-        tabBar.Items.Add(new ShellContent
+        tabBar.Items.Add(new Tab
         {
-            Title = "Khám phá",
             Icon = "ic_tab_explore.svg",
-            Route = "MainPage",
-            Content = mainPage
+            Items =
+            {
+                new ShellContent
+                {
+                    Route = "MainPage",
+                    Content = mainPage
+                }
+            }
         });
 
-        tabBar.Items.Add(new ShellContent
+        tabBar.Items.Add(new Tab
         {
-            Title = "Cá nhân",
             Icon = "ic_tab_profile.svg",
-            Route = "ProfilePage",
-            Content = new ProfilePage()
+            Items =
+            {
+                new ShellContent
+                {
+                    Route = "ProfilePage",
+                    Content = new ProfilePage()
+                }
+            }
         });
 
         Items.Add(tabBar);

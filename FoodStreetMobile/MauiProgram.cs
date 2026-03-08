@@ -18,6 +18,14 @@ public static class MauiProgram
         builder
             .UseMauiApp<App>()
             .UseMauiMaps()
+            .ConfigureMauiHandlers(handlers =>
+            {
+            #if ANDROID
+                handlers.AddHandler<
+                    Microsoft.Maui.Controls.Maps.Map,
+                    CustomMapHandler>();
+            #endif
+            })
             .ConfigureFonts(fonts =>
             {
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");

@@ -12,7 +12,7 @@
     <Grid RowDefinitions="*" RowSpacing="0">
         <Grid>
             <maps:Map x:Name="PoiMap"
-                      IsShowingUser="True" />
+                      IsShowingUser="False" />
             <ImageButton x:Name="LocateMeButton"
                          Source="ic_my_location.svg"
                          WidthRequest="46"
@@ -163,12 +163,12 @@
                                     TextColor="#8B5E42" />
                             <Border x:Name="AudioPlayerContainer"
                                     IsVisible="False"
-                                    Padding="0"
+                                    Padding="10"
                                     BackgroundColor="#FFF7ED"
                                     Stroke="#FED7AA"
                                     StrokeShape="RoundRectangle 12">
                                 <WebView x:Name="AudioPlayerWebView"
-                                         HeightRequest="168" />
+                                         HeightRequest="190" />
                             </Border>
                             <Border x:Name="TtsPlayerContainer"
                                     IsVisible="False"

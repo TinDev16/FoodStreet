@@ -51,10 +51,9 @@ public partial class MainPage : ContentPage
     private const string GoogleMapsApiKey = "AIzaSyAg9cHLgybrf3Edkl8ZK9nuRuQpF9nzCNY";
     private const double DefaultLatitude = 10.762011;
     private const double DefaultLongitude =  106.703465;
-    private const double DefaultZoomRadiusKm = 0.08;
+    private const double DefaultMapZoomKm = 0.1;
     private const double VinhKhanhLatitude = 10.759312;
     private const double VinhKhanhLongitude = 106.703836;
-    private const double VinhKhanhZoomRadiusKm = 0.55;
     private const double VinhKhanhZoneRadiusMeters = 320;
     private const double TtsSecondsPerWord = 0.33;
     private static readonly HttpClient HttpClient = new();
@@ -96,6 +95,10 @@ public partial class MainPage : ContentPage
     private double _sheetPartialTranslation;
     private double _sheetHiddenTranslation;
     private double _sheetPanStartTranslation;
+    private double _lastAppliedMapBottomMargin = -1;
+    private long _lastMapMarginUpdateTicks;
+    private const double MapMarginUpdateThresholdPx = 3;
+    private const int MapMarginUpdateMinIntervalMs = 16;
 
     public MainPage(MainViewModel viewModel)
     {
@@ -172,7 +175,7 @@ public partial class MainPage : ContentPage
             }
             else
             {
-                MoveMapTo(DefaultLatitude, DefaultLongitude, DefaultZoomRadiusKm);
+                MoveMapTo(DefaultLatitude, DefaultLongitude);
             }
             _hasCenteredOnUser = false;
         });
@@ -196,7 +199,7 @@ public partial class MainPage : ContentPage
                     ? "POI (Đang gần)"
                     : $"{active.Name.Trim()} (Đang gần)",
                 Address = $"{active.Latitude.ToString(CultureInfo.InvariantCulture)}, {active.Longitude.ToString(CultureInfo.InvariantCulture)}",
-                Type = PinType.Generic,
+                Type = PinType.Place,
                 Location = new MauiLocation(active.Latitude, active.Longitude)
             };
             _activePoiPin.MarkerClicked += OnPoiPinClicked;
@@ -222,7 +225,7 @@ public partial class MainPage : ContentPage
             }
 
             _hasCenteredOnUser = true;
-            MoveMapTo(location.Latitude, location.Longitude, 1.2);
+            MoveMapTo(location.Latitude, location.Longitude);
         });
     }
 
@@ -390,7 +393,7 @@ public partial class MainPage : ContentPage
             _lastRouteSummary = null;
             ClearRoute();
             await AnimateBottomSheetToAsync(_sheetHiddenTranslation, 140, Easing.CubicIn);
-            MoveMapTo(_lastUserLocation.Latitude, _lastUserLocation.Longitude, 0.1);
+            MoveMapTo(_lastUserLocation.Latitude, _lastUserLocation.Longitude);
         }
         finally
         {
@@ -430,7 +433,7 @@ public partial class MainPage : ContentPage
                 return;
             }
 
-            MoveMapTo(_lastUserLocation.Latitude, _lastUserLocation.Longitude, 0.1);
+            MoveMapTo(_lastUserLocation.Latitude, _lastUserLocation.Longitude);
         }
         catch
         {
@@ -1035,7 +1038,7 @@ public partial class MainPage : ContentPage
             {
                 Label = destination.Name,
                 Address = destination.Address,
-                Type = PinType.SearchResult,
+                Type = PinType.Place,
                 Location = new MauiLocation(destination.Latitude, destination.Longitude)
             };
             PoiMap.Pins.Add(_searchPin);
@@ -1047,24 +1050,20 @@ public partial class MainPage : ContentPage
 
     private void CenterSearchPinInVisibleMap(SearchPlaceResult destination)
     {
-        UpdateMapMarginBySheet();
-        MoveMapTo(destination.Latitude, destination.Longitude, 1.0);
+        UpdateMapMarginBySheet(force: true);
+        MoveMapTo(destination.Latitude, destination.Longitude);
     }
 
-    private void MoveMapTo(double latitude, double longitude, double radiusKm)
+    private void MoveMapTo(double latitude, double longitude)
     {
         PoiMap.MoveToRegion(MapSpan.FromCenterAndRadius(
             new MauiLocation(latitude, longitude),
-            Distance.FromKilometers(radiusKm)));
+            Distance.FromKilometers(DefaultMapZoomKm)));
     }
 
-    private void MoveMapToPreserveZoom(double latitude, double longitude, double fallbackRadiusKm = 0.1)
+    private void MoveMapToPreserveZoom(double latitude, double longitude)
     {
-        var currentRadiusKm = PoiMap.VisibleRegion?.Radius.Kilometers;
-        var radiusKm = currentRadiusKm.HasValue && currentRadiusKm.Value > 0
-            ? currentRadiusKm.Value
-            : fallbackRadiusKm;
-        MoveMapTo(latitude, longitude, radiusKm);
+        MoveMapTo(latitude, longitude);
     }
 
     private Pin CreatePoiPin(PoiViewModel poi)
@@ -1073,7 +1072,7 @@ public partial class MainPage : ContentPage
         {
             Label = string.IsNullOrWhiteSpace(poi.Name) ? "POI" : poi.Name.Trim(),
             Address = $"Bán kính {Math.Round(poi.RadiusMeters)} m",
-            Type = PinType.Generic,
+            Type = PinType.Place,
             Location = new MauiLocation(poi.Latitude, poi.Longitude)
         };
         pin.MarkerClicked += OnPoiPinClicked;
@@ -1084,14 +1083,19 @@ public partial class MainPage : ContentPage
 #if ANDROID
     private async Task ApplyAndroidPoiMarkerUiAsync()
     {
-        for (var attempt = 0; attempt < 6; attempt++)
+        for (var attempt = 0; attempt < 24; attempt++)
         {
             var allReady = true;
+            var pinPairs = _poiPins.ToArray();
+            if (pinPairs.Length == 0)
+            {
+                return;
+            }
 
-            foreach (var pair in _poiPins)
+            foreach (var pair in pinPairs)
             {
                 var pin = pair.Key;
-                if (pin.MarkerId is not AndroidMarker marker)
+                if (pin.MarkerId is null)
                 {
                     allReady = false;
                     continue;
@@ -1104,8 +1108,17 @@ public partial class MainPage : ContentPage
                     _androidPoiIconCache[label] = icon;
                 }
 
-                marker.SetIcon(icon);
-                marker.SetAnchor(0.5f, 1f);
+                var iconApplied = TryApplyAndroidMarkerIcon(pin.MarkerId, icon);
+                var titleApplied = TryApplyAndroidMarkerTitle(pin.MarkerId, pin.Label);
+                if (!iconApplied)
+                {
+                    allReady = false;
+                }
+
+                if (!titleApplied)
+                {
+                    allReady = false;
+                }
             }
 
             if (allReady)
@@ -1113,7 +1126,65 @@ public partial class MainPage : ContentPage
                 return;
             }
 
-            await Task.Delay(120);
+            await Task.Delay(180);
+        }
+    }
+
+    private static bool TryApplyAndroidMarkerIcon(object markerId, AndroidBitmapDescriptor icon)
+    {
+        try
+        {
+            if (markerId is AndroidMarker marker)
+            {
+                marker.SetIcon(icon);
+                marker.SetAnchor(0.1f, 0.5f);
+                return true;
+            }
+
+            var type = markerId.GetType();
+            var setIcon = type.GetMethod("SetIcon", new[] { icon.GetType() })
+                ?? type.GetMethod("SetIcon");
+            var setAnchor = type.GetMethod("SetAnchor", new[] { typeof(float), typeof(float) });
+            if (setIcon is null || setAnchor is null)
+            {
+                return false;
+            }
+
+            setIcon.Invoke(markerId, new object[] { icon });
+            setAnchor.Invoke(markerId, new object[] { 0.5f, 1f });
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool TryApplyAndroidMarkerTitle(object markerId, string? title)
+    {
+        try
+        {
+            if (markerId is AndroidMarker marker)
+            {
+                marker.Title = title ?? "POI";
+                marker.HideInfoWindow();
+                marker.ShowInfoWindow();
+                return true;
+            }
+
+            var type = markerId.GetType();
+            var setTitle = type.GetMethod("SetTitle", new[] { typeof(string) });
+            if (setTitle is null)
+            {
+                return false;
+            }
+
+            setTitle.Invoke(markerId, new object[] { title ?? "POI" });
+            return true;
+        }
+        catch
+        {
+            return false;
         }
     }
 
@@ -1126,10 +1197,10 @@ public partial class MainPage : ContentPage
     private static AndroidBitmapDescriptor BuildAndroidPoiMarkerIcon(string label)
     {
         const float textSizePx = 24f;
-        const float dotRadiusPx = 8f;
         const float paddingHorizontalPx = 14f;
         const float paddingVerticalPx = 8f;
         const float gapPx = 8f;
+        const float shopSizePx = 24f;
 
         var textPaint = new Android.Graphics.Paint(Android.Graphics.PaintFlags.AntiAlias)
         {
@@ -1142,8 +1213,8 @@ public partial class MainPage : ContentPage
         var textHeight = fm.Bottom - fm.Top;
         var bubbleWidth = (int)Math.Ceiling(textWidth + (paddingHorizontalPx * 2f));
         var bubbleHeight = (int)Math.Ceiling(textHeight + (paddingVerticalPx * 2f));
-        var totalHeight = (int)Math.Ceiling(bubbleHeight + gapPx + (dotRadiusPx * 2f));
-        var totalWidth = Math.Max(bubbleWidth, (int)Math.Ceiling((dotRadiusPx * 2f) + 8f));
+        var totalHeight = (int)Math.Ceiling(bubbleHeight + gapPx + shopSizePx);
+        var totalWidth = Math.Max(bubbleWidth, (int)Math.Ceiling(shopSizePx + 8f));
 
         var bitmap = Android.Graphics.Bitmap.CreateBitmap(totalWidth, totalHeight, Android.Graphics.Bitmap.Config.Argb8888!);
         using var canvas = new Android.Graphics.Canvas(bitmap);
@@ -1168,18 +1239,55 @@ public partial class MainPage : ContentPage
         var textBaseline = bubbleTop + paddingVerticalPx - fm.Top;
         canvas.DrawText(label, bubbleLeft + paddingHorizontalPx, textBaseline, textPaint);
 
-        var dotPaint = new Android.Graphics.Paint(Android.Graphics.PaintFlags.AntiAlias) { Color = Android.Graphics.Color.ParseColor("#EA580C") };
-        var dotStroke = new Android.Graphics.Paint(Android.Graphics.PaintFlags.AntiAlias)
+        var iconLeft = (totalWidth - shopSizePx) / 2f;
+        var iconTop = bubbleBottom + gapPx;
+        var iconRight = iconLeft + shopSizePx;
+        var iconBottom = iconTop + shopSizePx;
+        var iconRect = new Android.Graphics.RectF(iconLeft, iconTop, iconRight, iconBottom);
+
+        var iconBackground = new Android.Graphics.Paint(Android.Graphics.PaintFlags.AntiAlias)
+        {
+            Color = Android.Graphics.Color.ParseColor("#EA580C")
+        };
+        canvas.DrawRoundRect(iconRect, 6f, 6f, iconBackground);
+
+        var iconStroke = new Android.Graphics.Paint(Android.Graphics.PaintFlags.AntiAlias)
         {
             Color = Android.Graphics.Color.White,
             StrokeWidth = 2f
         };
-        dotStroke.SetStyle(Android.Graphics.Paint.Style.Stroke);
+        iconStroke.SetStyle(Android.Graphics.Paint.Style.Stroke);
+        canvas.DrawRoundRect(iconRect, 6f, 6f, iconStroke);
 
-        var dotCx = totalWidth / 2f;
-        var dotCy = bubbleBottom + gapPx + dotRadiusPx;
-        canvas.DrawCircle(dotCx, dotCy, dotRadiusPx, dotPaint);
-        canvas.DrawCircle(dotCx, dotCy, dotRadiusPx, dotStroke);
+        var shopLine = new Android.Graphics.Paint(Android.Graphics.PaintFlags.AntiAlias)
+        {
+            Color = Android.Graphics.Color.White,
+            StrokeWidth = 1.8f
+        };
+        shopLine.SetStyle(Android.Graphics.Paint.Style.Stroke);
+
+        var shopFill = new Android.Graphics.Paint(Android.Graphics.PaintFlags.AntiAlias)
+        {
+            Color = Android.Graphics.Color.White
+        };
+
+        var awningTop = iconTop + 5f;
+        var awningBottom = awningTop + 4.5f;
+        var awningRect = new Android.Graphics.RectF(iconLeft + 4.5f, awningTop, iconRight - 4.5f, awningBottom);
+        canvas.DrawRect(awningRect, shopFill);
+
+        var bodyTop = awningBottom + 2.2f;
+        var bodyBottom = iconBottom - 4f;
+        var bodyRect = new Android.Graphics.RectF(iconLeft + 6f, bodyTop, iconRight - 6f, bodyBottom);
+        canvas.DrawRect(bodyRect, shopLine);
+
+        var doorWidth = 3.8f;
+        var doorRect = new Android.Graphics.RectF(
+            (iconLeft + iconRight - doorWidth) / 2f,
+            bodyBottom - 6f,
+            (iconLeft + iconRight + doorWidth) / 2f,
+            bodyBottom);
+        canvas.DrawRect(doorRect, shopFill);
 
         return AndroidBitmapDescriptorFactory.FromBitmap(bitmap);
     }
@@ -1238,7 +1346,7 @@ public partial class MainPage : ContentPage
 
         UpdateBottomSheetContent(poi);
         await ShowSheetPartialAsync();
-        MoveMapToPreserveZoom(poi.Latitude, poi.Longitude, 0.6);
+        MoveMapToPreserveZoom(poi.Latitude, poi.Longitude);
     }
 
     private void RemovePin(Pin? pin)
@@ -1299,30 +1407,38 @@ public partial class MainPage : ContentPage
     {
         targetTranslation = Math.Clamp(targetTranslation, _sheetExpandedTranslation, _sheetHiddenTranslation);
         await SearchBottomSheet.TranslateToAsync(0, targetTranslation, duration, easing);
-        UpdateMapMarginBySheet();
-
-        if (_selectedSearchResult is not null)
-        {
-            CenterSearchPinInVisibleMap(_selectedSearchResult);
-            return;
-        }
-
-        if (_selectedPoi is not null)
-        {
-            MoveMapToPreserveZoom(_selectedPoi.Latitude, _selectedPoi.Longitude, 0.1);
-        }
+        UpdateMapMarginBySheet(force: true);
     }
 
-    private void UpdateMapMarginBySheet()
+    private void UpdateMapMarginBySheet(bool force = false)
     {
         if (!_sheetInitialized)
         {
-            PoiMap.Margin = new Thickness(0);
+            if (force || _lastAppliedMapBottomMargin != 0)
+            {
+                PoiMap.Margin = new Thickness(0);
+                _lastAppliedMapBottomMargin = 0;
+            }
+
             return;
         }
 
         var visibleHeight = Math.Max(0, SearchBottomSheet.Height - SearchBottomSheet.TranslationY);
+        if (!force)
+        {
+            var delta = Math.Abs(visibleHeight - _lastAppliedMapBottomMargin);
+            var nowTicks = DateTime.UtcNow.Ticks;
+            var minTicks = TimeSpan.FromMilliseconds(MapMarginUpdateMinIntervalMs).Ticks;
+            if (delta < MapMarginUpdateThresholdPx || (nowTicks - _lastMapMarginUpdateTicks) < minTicks)
+            {
+                return;
+            }
+
+            _lastMapMarginUpdateTicks = nowTicks;
+        }
+
         PoiMap.Margin = new Thickness(0, 0, 0, visibleHeight);
+        _lastAppliedMapBottomMargin = visibleHeight;
     }
 
     private void OnBottomSheetPanUpdated(object? sender, PanUpdatedEventArgs e)
@@ -1962,7 +2078,7 @@ public partial class MainPage : ContentPage
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <style>
-    body {{ margin:0; padding:10px; font-family: Arial, sans-serif; background:#FFF7ED; color:#7C2D12; }}
+    body {{ margin:0; padding:0; font-family: Arial, sans-serif; background:#FFF7ED; color:#7C2D12; }}
     .controls {{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; margin-bottom:8px; }}
     button {{ border:0; border-radius:10px; padding:8px 6px; font-size:12px; background:#FDE7D7; color:#7C2D12; }}
     .play {{ background:#E07A5F; color:#fff; font-weight:700; }}
@@ -1972,12 +2088,12 @@ public partial class MainPage : ContentPage
   </style>
 </head>
 <body>
-  <audio id="audio" preload="metadata" src="__AUDIO_URL__"></audio>
   <div class="controls">
     <button onclick="skip(-10)">⏪ 10s</button>
     <button id="playPause" class="play" onclick="toggle()">▶</button>
     <button onclick="skip(10)">10s ⏩</button>
   </div>
+  <audio id="audio" preload="metadata" src="__AUDIO_URL__"></audio>
   <div class="row">
     <span id="cur">00:00</span>
     <input id="progress" type="range" min="0" max="1" step="0.1" value="0" />
@@ -2360,14 +2476,7 @@ public partial class MainPage : ContentPage
     private void MoveMapToBounds(double south, double west, double north, double east)
     {
         var center = new MauiLocation((south + north) / 2d, (west + east) / 2d);
-        var northEast = new MauiLocation(north, east);
-        var southWest = new MauiLocation(south, west);
-
-        var r1 = MauiLocation.CalculateDistance(center.Latitude, center.Longitude, northEast.Latitude, northEast.Longitude, DistanceUnits.Kilometers);
-        var r2 = MauiLocation.CalculateDistance(center.Latitude, center.Longitude, southWest.Latitude, southWest.Longitude, DistanceUnits.Kilometers);
-        var radius = Math.Max(0.1, Math.Max(r1, r2) * 1.25);
-
-        PoiMap.MoveToRegion(MapSpan.FromCenterAndRadius(center, Distance.FromKilometers(radius)));
+        MoveMapTo(center.Latitude, center.Longitude);
     }
 
     private void ClearRoute()
