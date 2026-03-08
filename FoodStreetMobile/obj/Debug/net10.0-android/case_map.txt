@@ -8,6 +8,7 @@ animation\nav_default_pop_enter_anim;animation\nav_default_pop_enter_anim
 animation\nav_default_pop_exit_anim;animation\nav_default_pop_exit_anim
 animation\nav_modal_default_enter_anim;animation\nav_modal_default_enter_anim
 animation\nav_modal_default_exit_anim;animation\nav_modal_default_exit_anim
+drawable\marker_poi;drawable\marker_poi
 drawable\maui_splash;drawable\maui_splash
 drawable\maui_splash_image;drawable\maui_splash_image
 layout\drawer_layout;layout\drawer_layout

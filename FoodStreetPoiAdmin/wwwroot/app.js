@@ -322,7 +322,7 @@ function renderExistingMedia() {
 function resetForm(clearStatus) {
   form.reset();
   form.elements.id.value = "";
-  form.elements.radiusMeters.value = "40";
+  form.elements.radiusMeters.value = "15";
 
   state.currentAudioUrl = "";
   state.currentTtsText = "";
