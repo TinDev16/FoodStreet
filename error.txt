@@ -2,3 +2,4 @@
 
 
 - app:
+hightight POI gần nhất, đang phát
