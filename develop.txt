@@ -1,0 +1,9 @@
+1. Trang chủ:
+- Hiển thị kết qảu sau khi Tìm kiếm
+- Chỉnh lại tên các danh mục, dùng tên chung
+(Kết quả tìm kiếm dưới dạng hightight POI || Chỉ hiển thị POI)
+
+2. map
+- hightight POI gần nhất
+- Hiển thị kết qảu sau khi Tìm kiếm
+- Cải thiện UI đẹp, thân thiện hơn
