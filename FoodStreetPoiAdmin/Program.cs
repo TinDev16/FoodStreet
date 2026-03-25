@@ -30,7 +30,7 @@ var supportedLanguageSet = supportedLanguages.Select(x => x.Code).ToHashSet(Stri
 var translationApiKey = Environment.GetEnvironmentVariable("GOOGLE_TRANSLATE_API_KEY")?.Trim();
 if (string.IsNullOrWhiteSpace(translationApiKey))
 {
-    translationApiKey = "AIzaSyBe6oYZg8K70gk2HdDWo5n9UcqzIG2WqJo";
+    translationApiKey = "";
 }
 
 await InitializeDatabaseAsync(connectionString);
