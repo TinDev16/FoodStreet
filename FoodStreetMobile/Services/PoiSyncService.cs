@@ -27,23 +27,23 @@ public sealed class PoiSyncService
         Preferences.Set(BaseUrlsPreferenceKey, normalized);
     }
 
-    public async Task<bool> TrySyncAsync()
+    public async Task<bool> TrySyncAsync(string? languageCode = null)
     {
         LastError = null;
+        var requestedLang = NormalizeAppLanguageCode(languageCode) ?? "vi";
         var errors = new List<string>();
         foreach (var baseUrl in GetPreferredBaseUrls())
         {
             try
             {
-                var endpoint = $"{baseUrl}/api/shops";
-                var shops = await _httpClient.GetFromJsonAsync<List<ShopSyncDto>>(endpoint);
-                if (shops is null)
+                var pois = await TryFetchPoisAsync(baseUrl, requestedLang);
+                if (pois is null)
                 {
                     errors.Add($"{baseUrl}: empty response");
                     continue;
                 }
 
-                await ApplyRemoteDataAsync(baseUrl, shops);
+                await ApplyRemoteDataAsync(baseUrl, requestedLang, pois);
                 _lastSuccessfulBaseUrl = baseUrl;
                 LastError = null;
                 return true;
@@ -70,7 +70,7 @@ public sealed class PoiSyncService
 
         if (canReadAdminDbFile)
         {
-            var syncedFromFile = await TrySyncFromAdminDbFileAsync(errors);
+            var syncedFromFile = await TrySyncFromAdminDbFileAsync(requestedLang, errors);
             if (syncedFromFile)
             {
                 LastError = null;
@@ -85,6 +85,49 @@ public sealed class PoiSyncService
 
         return false;
     }
+
+    private async Task<List<PoiSyncDto>?> TryFetchPoisAsync(string baseUrl, string requestedLang)
+    {
+        var endpoint = $"{baseUrl}/api/pois?lang={Uri.EscapeDataString(requestedLang)}";
+        try
+        {
+            var pois = await _httpClient.GetFromJsonAsync<List<PoiSyncDto>>(endpoint);
+            if (pois is not null)
+            {
+                return pois;
+            }
+        }
+        catch
+        {
+            // Ignore and try legacy endpoint below.
+        }
+
+        var legacyEndpoint = $"{baseUrl}/api/shops?lang={Uri.EscapeDataString(requestedLang)}";
+        var legacy = await _httpClient.GetFromJsonAsync<List<ShopSyncDto>>(legacyEndpoint);
+        if (legacy is null)
+        {
+            return null;
+        }
+
+        return legacy.Select(x => new PoiSyncDto
+        {
+            Id = x.Id,
+            LangCode = requestedLang,
+            Name = x.ShopName,
+            Latitude = x.Latitude,
+            Longitude = x.Longitude,
+            RadiusMeters = x.RadiusMeters,
+            Priority = 0,
+            MapLink = $"https://maps.google.com/?q={x.Latitude},{x.Longitude}",
+            Description = x.Description,
+            ImageUrl = x.ImageUrl,
+            AudioUrl = x.AudioUrl,
+            TtsText = x.TtsText
+        }).ToList();
+    }
+
+    private static string? NormalizeAppLanguageCode(string? languageCode)
+        => AppLanguageService.NormalizeLanguageCode(languageCode);
 
     public async Task<bool> UpsertRemoteAsync(ShopUpsertRequest request)
     {
@@ -169,19 +212,19 @@ public sealed class PoiSyncService
         return false;
     }
 
-    private async Task ApplyRemoteDataAsync(string baseUrl, IReadOnlyList<ShopSyncDto> shops)
+    private async Task ApplyRemoteDataAsync(string baseUrl, string requestedLang, IReadOnlyList<PoiSyncDto> pois)
     {
         var connection = await _database.GetConnectionAsync();
         await connection.ExecuteAsync("UPDATE pois SET is_active = 0;");
 
-        foreach (var shop in shops)
+        foreach (var poi in pois)
         {
-            var normalizedName = string.IsNullOrWhiteSpace(shop.ShopName)
-                ? shop.Id
-                : shop.ShopName.Trim();
-            var normalizedDescription = shop.Description?.Trim() ?? string.Empty;
-            var normalizedAudioUrl = NormalizeAssetUrl(baseUrl, shop.AudioUrl);
-            var normalizedTtsText = shop.TtsText?.Trim() ?? string.Empty;
+            var normalizedName = string.IsNullOrWhiteSpace(poi.Name)
+                ? poi.Id
+                : poi.Name.Trim();
+            var normalizedDescription = poi.Description?.Trim() ?? string.Empty;
+            var normalizedAudioUrl = NormalizeAssetUrl(baseUrl, poi.AudioUrl);
+            var normalizedTtsText = poi.TtsText?.Trim() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(normalizedTtsText) && string.IsNullOrWhiteSpace(normalizedAudioUrl) && !string.IsNullOrWhiteSpace(normalizedDescription))
             {
                 normalizedTtsText = normalizedDescription;
@@ -189,13 +232,15 @@ public sealed class PoiSyncService
 
             await connection.InsertOrReplaceAsync(new PoiEntity
             {
-                Id = shop.Id,
-                Latitude = shop.Latitude,
-                Longitude = shop.Longitude,
-                RadiusMeters = shop.RadiusMeters,
-                Priority = 0,
-                MapLink = $"https://maps.google.com/?q={shop.Latitude},{shop.Longitude}",
-                ImageUrl = NormalizeAssetUrl(baseUrl, shop.ImageUrl),
+                Id = poi.Id,
+                Latitude = poi.Latitude,
+                Longitude = poi.Longitude,
+                RadiusMeters = poi.RadiusMeters,
+                Priority = poi.Priority,
+                MapLink = !string.IsNullOrWhiteSpace(poi.MapLink)
+                    ? poi.MapLink
+                    : $"https://maps.google.com/?q={poi.Latitude},{poi.Longitude}",
+                ImageUrl = NormalizeAssetUrl(baseUrl, poi.ImageUrl),
                 AudioUrl = normalizedAudioUrl,
                 IsActive = true
             });
@@ -210,8 +255,8 @@ public sealed class PoiSyncService
                 """;
             await connection.ExecuteAsync(
                 upsertTranslationSql,
-                shop.Id,
-                "vi",
+                poi.Id,
+                requestedLang,
                 normalizedName,
                 normalizedDescription,
                 normalizedTtsText);
@@ -278,7 +323,7 @@ public sealed class PoiSyncService
             .Distinct(StringComparer.OrdinalIgnoreCase);
     }
 
-    private async Task<bool> TrySyncFromAdminDbFileAsync(List<string> errors)
+    private async Task<bool> TrySyncFromAdminDbFileAsync(string requestedLang, List<string> errors)
     {
         var dbPath = ResolveAdminDbPath();
         if (string.IsNullOrWhiteSpace(dbPath))
@@ -298,34 +343,37 @@ public sealed class PoiSyncService
                 .ToListAsync();
 
             var sourceTranslations = await sourceConnection.Table<PoiTranslationEntity>()
-                .Where(x => x.LangCode == "vi")
+                .Where(x => x.LangCode == requestedLang || x.LangCode == "vi")
                 .ToListAsync();
 
             var byPoiId = sourceTranslations
                 .GroupBy(x => x.PoiId)
-                .ToDictionary(x => x.Key, x => x.First());
+                .ToDictionary(x => x.Key, x => SelectBestTranslation(x.ToList(), requestedLang));
 
-            var shops = new List<ShopSyncDto>(sourcePois.Count);
+            var pois = new List<PoiSyncDto>(sourcePois.Count);
             foreach (var poi in sourcePois)
             {
                 byPoiId.TryGetValue(poi.Id, out var translation);
-                shops.Add(new ShopSyncDto
+                pois.Add(new PoiSyncDto
                 {
                     Id = poi.Id,
-                    ShopName = translation?.Name ?? poi.Id,
+                    LangCode = requestedLang,
+                    Name = translation?.Name ?? poi.Id,
                     Latitude = poi.Latitude,
                     Longitude = poi.Longitude,
                     RadiusMeters = poi.RadiusMeters,
-                    Description = translation?.Description ?? string.Empty,
+                    Priority = poi.Priority,
+                    MapLink = poi.MapLink,
                     ImageUrl = poi.ImageUrl,
                     AudioUrl = poi.AudioUrl,
+                    Description = translation?.Description ?? string.Empty,
                     TtsText = !string.IsNullOrWhiteSpace(translation?.TtsText)
                         ? translation!.TtsText
                         : translation?.Description ?? string.Empty
                 });
             }
 
-            await ApplyRemoteDataAsync("http://localhost:5187", shops);
+            await ApplyRemoteDataAsync("http://localhost:5187", requestedLang, pois);
             return true;
         }
         catch (Exception ex)
@@ -414,6 +462,22 @@ public sealed class PoiSyncService
         public string TtsText { get; set; } = string.Empty;
     }
 
+    private sealed class PoiSyncDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string LangCode { get; set; } = "vi";
+        public string Name { get; set; } = string.Empty;
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public double RadiusMeters { get; set; }
+        public int Priority { get; set; }
+        public string? MapLink { get; set; }
+        public string? Description { get; set; }
+        public string? ImageUrl { get; set; }
+        public string? AudioUrl { get; set; }
+        public string? TtsText { get; set; }
+    }
+
     private sealed class ShopSyncDto
     {
         public string Id { get; set; } = string.Empty;
@@ -425,5 +489,46 @@ public sealed class PoiSyncService
         public string? ImageUrl { get; set; }
         public string? AudioUrl { get; set; }
         public string? TtsText { get; set; }
+    }
+
+    private static PoiTranslationEntity? SelectBestTranslation(IReadOnlyList<PoiTranslationEntity> candidates, string languageCode)
+    {
+        if (candidates.Count == 0)
+        {
+            return null;
+        }
+
+        bool HasUsefulContent(PoiTranslationEntity t)
+            => !string.IsNullOrWhiteSpace(t.Name)
+               || !string.IsNullOrWhiteSpace(t.TtsText)
+               || !string.IsNullOrWhiteSpace(t.Description);
+
+        var preferredLangWithContent = candidates.FirstOrDefault(t =>
+            string.Equals(t.LangCode, languageCode, StringComparison.OrdinalIgnoreCase) && HasUsefulContent(t));
+        if (preferredLangWithContent is not null)
+        {
+            return preferredLangWithContent;
+        }
+
+        var vietnameseWithContent = candidates.FirstOrDefault(t =>
+            string.Equals(t.LangCode, "vi", StringComparison.OrdinalIgnoreCase) && HasUsefulContent(t));
+        if (vietnameseWithContent is not null)
+        {
+            return vietnameseWithContent;
+        }
+
+        var preferredLang = candidates.FirstOrDefault(t => string.Equals(t.LangCode, languageCode, StringComparison.OrdinalIgnoreCase));
+        if (preferredLang is not null)
+        {
+            return preferredLang;
+        }
+
+        var vietnamese = candidates.FirstOrDefault(t => string.Equals(t.LangCode, "vi", StringComparison.OrdinalIgnoreCase));
+        if (vietnamese is not null)
+        {
+            return vietnamese;
+        }
+
+        return candidates.FirstOrDefault();
     }
 }

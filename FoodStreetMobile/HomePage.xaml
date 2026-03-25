@@ -1,6 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:loc="clr-namespace:FoodStreetMobile.Localization"
              x:Class="FoodStreetMobile.HomePage"
              BackgroundColor="#FDF6F0">
 
@@ -28,12 +29,12 @@
                         <VerticalStackLayout Spacing="2"
                                             VerticalOptions="Center">
 
-                            <Label Text="Vĩnh Khánh"
+                            <Label Text="{loc:Translate Key=Home_HeaderTitle}"
                                 FontSize="22"
                                 FontAttributes="Bold"
                                 TextColor="White" />
 
-                            <Label Text="Thiên Đường Ẩm Thực Đường Phố"
+                            <Label Text="{loc:Translate Key=Home_HeaderSubtitle}"
                                 FontSize="13"
                                 FontAttributes="Bold"
                                 TextColor="#FFD4BC"
@@ -71,7 +72,7 @@
                                     HeightRequest="50">
 
                                     <Entry Grid.Column="0"
-                                        Placeholder="Tìm món ăn, quán ăn..."
+                                        Placeholder="{loc:Translate Key=Home_SearchPlaceholder}"
                                         BackgroundColor="Transparent"
                                         TextColor="#2C1C19"
                                         PlaceholderColor="#C4A898"
@@ -105,12 +106,12 @@
 
                     <Grid ColumnDefinitions="*,Auto">
                         <Label Grid.Column="0"
-                               Text="Danh Mục"
+                               Text="{loc:Translate Key=Home_CategoriesTitle}"
                                FontSize="22"
                                FontAttributes="Bold"
                                TextColor="#1A0E0B" />
                         <Label Grid.Column="1"
-                               Text="Xem tất cả →"
+                               Text="{loc:Translate Key=Home_ViewAll}"
                                FontSize="13"
                                TextColor="#FF6B35"
                                VerticalOptions="Center" />
@@ -130,7 +131,7 @@
                             </Border.Shadow>
                             <VerticalStackLayout Spacing="6" HorizontalOptions="Center" VerticalOptions="Center">
                                 <Label Text="🍜" FontSize="28" HorizontalTextAlignment="Center" />
-                                <Label Text="Phở &amp; Bún" FontSize="12" FontAttributes="Bold"
+                                <Label Text="{loc:Translate Key=Home_CategoryPhoBun}" FontSize="12" FontAttributes="Bold"
                                        HorizontalTextAlignment="Center" TextColor="#3D2016" />
                             </VerticalStackLayout>
                         </Border>
@@ -144,7 +145,7 @@
                             </Border.Shadow>
                             <VerticalStackLayout Spacing="6" HorizontalOptions="Center" VerticalOptions="Center">
                                 <Label Text="🥖" FontSize="28" HorizontalTextAlignment="Center" />
-                                <Label Text="Bánh Mì" FontSize="12" FontAttributes="Bold"
+                                <Label Text="{loc:Translate Key=Home_CategoryBanhMi}" FontSize="12" FontAttributes="Bold"
                                        HorizontalTextAlignment="Center" TextColor="#3D2016" />
                             </VerticalStackLayout>
                         </Border>
@@ -158,7 +159,7 @@
                             </Border.Shadow>
                             <VerticalStackLayout Spacing="6" HorizontalOptions="Center" VerticalOptions="Center">
                                 <Label Text="🍚" FontSize="28" HorizontalTextAlignment="Center" />
-                                <Label Text="Cơm" FontSize="12" FontAttributes="Bold"
+                                <Label Text="{loc:Translate Key=Home_CategoryCom}" FontSize="12" FontAttributes="Bold"
                                        HorizontalTextAlignment="Center" TextColor="#3D2016" />
                             </VerticalStackLayout>
                         </Border>
@@ -172,7 +173,7 @@
                             </Border.Shadow>
                             <VerticalStackLayout Spacing="6" HorizontalOptions="Center" VerticalOptions="Center">
                                 <Label Text="☕" FontSize="28" HorizontalTextAlignment="Center" />
-                                <Label Text="Cà Phê" FontSize="12" FontAttributes="Bold"
+                                <Label Text="{loc:Translate Key=Home_CategoryCoffee}" FontSize="12" FontAttributes="Bold"
                                        HorizontalTextAlignment="Center" TextColor="#3D2016" />
                             </VerticalStackLayout>
                         </Border>
@@ -186,7 +187,7 @@
                             </Border.Shadow>
                             <VerticalStackLayout Spacing="6" HorizontalOptions="Center" VerticalOptions="Center">
                                 <Label Text="🍮" FontSize="28" HorizontalTextAlignment="Center" />
-                                <Label Text="Tráng Miệng" FontSize="11" FontAttributes="Bold"
+                                <Label Text="{loc:Translate Key=Home_CategoryDessert}" FontSize="11" FontAttributes="Bold"
                                        HorizontalTextAlignment="Center" TextColor="#3D2016" />
                             </VerticalStackLayout>
                         </Border>
@@ -200,7 +201,7 @@
                             </Border.Shadow>
                             <VerticalStackLayout Spacing="6" HorizontalOptions="Center" VerticalOptions="Center">
                                 <Label Text="🧃" FontSize="28" HorizontalTextAlignment="Center" />
-                                <Label Text="Giải Khát" FontSize="12" FontAttributes="Bold"
+                                <Label Text="{loc:Translate Key=Home_CategoryDrinks}" FontSize="12" FontAttributes="Bold"
                                        HorizontalTextAlignment="Center" TextColor="#3D2016" />
                             </VerticalStackLayout>
                         </Border>
@@ -215,28 +216,21 @@
 
                     <Grid ColumnDefinitions="*,Auto" Margin="0,0,24,0">
                         <Label Grid.Column="0"
-                               Text="Quán Ăn Nổi Bật"
+                               Text="{loc:Translate Key=Home_FeaturedTitle}"
                                FontSize="22"
                                FontAttributes="Bold"
                                TextColor="#1A0E0B" />
                         <Label Grid.Column="1"
-                               Text="Xem tất cả →"
+                               Text="{loc:Translate Key=Home_ViewAll}"
                                FontSize="13"
                                TextColor="#FF6B35"
                                VerticalOptions="Center" />
                     </Grid>
 
-                    <CollectionView ItemsLayout="HorizontalList"
+                    <CollectionView x:Name="FeaturedPlacesCollection"
+                                    ItemsLayout="HorizontalList"
                                     HeightRequest="200"
                                     SelectionMode="None">
-                        <CollectionView.ItemsSource>
-                            <x:Array Type="{x:Type x:String}">
-                                <x:String>Ốc Đào</x:String>
-                                <x:String>Pizza 4P's</x:String>
-                                <x:String>Bún Thịt Nướng Cô Liên</x:String>
-                                <x:String>Lẩu Thái Mama</x:String>
-                            </x:Array>
-                        </CollectionView.ItemsSource>
                         <CollectionView.ItemTemplate>
                             <DataTemplate>
                                 <Border BackgroundColor="White"
@@ -276,7 +270,7 @@
                                                    LineBreakMode="TailTruncation" />
                                             <HorizontalStackLayout Spacing="4">
                                                 <Label Text="⭐" FontSize="11" VerticalOptions="Center" />
-                                                <Label Text="4.8 · Vĩnh Khánh"
+                                                <Label Text="{loc:Translate Key=Home_RatingLocation}"
                                                        FontSize="11"
                                                        TextColor="#9A7D69"
                                                        VerticalOptions="Center" />
@@ -308,15 +302,15 @@
                         </Border.Shadow>
                         <Grid ColumnDefinitions="*,Auto">
                             <VerticalStackLayout Grid.Column="0" Spacing="6" VerticalOptions="Center">
-                                <Label Text="🎉 Ưu đãi hôm nay"
+                                <Label Text="{loc:Translate Key=Home_PromoToday}"
                                        FontSize="12"
                                        TextColor="#FFD4BC"
                                        FontAttributes="Bold" />
-                                <Label Text="Giảm 20% đơn đầu tiên"
+                                <Label Text="{loc:Translate Key=Home_PromoDiscount}"
                                        FontSize="18"
                                        FontAttributes="Bold"
                                        TextColor="White" />
-                                <Label Text="Áp dụng đến hết 28/02"
+                                <Label Text="{loc:Translate Key=Home_PromoValidUntil}"
                                        FontSize="12"
                                        TextColor="#FFBFA8" />
                             </VerticalStackLayout>
@@ -326,7 +320,7 @@
                                     StrokeShape="RoundRectangle 14"
                                     Padding="14,10"
                                     VerticalOptions="Center">
-                                <Label Text="Dùng ngay"
+                                <Label Text="{loc:Translate Key=Home_PromoUseNow}"
                                        FontSize="13"
                                        FontAttributes="Bold"
                                        TextColor="#FF6B35" />

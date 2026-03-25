@@ -3,83 +3,117 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Quan ly POI</title>
+  <title>POI Admin</title>
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
   <main class="layout">
     <section class="card">
-      <h1>Them / Sua POI</h1>
-      <form id="poiForm">
+      <header class="card-header">
+        <h1>POI Management</h1>
+        <div class="header-actions">
+          <button type="button" id="createBtn" class="secondary">Add POI</button>
+        </div>
+      </header>
+
+      <form id="poiForm" class="poi-form">
         <input name="id" type="hidden" />
 
-        <label>Ten shop
-          <input name="shopName" type="text" required />
+        <label>Enter GPS
+          <input name="gps" type="text" placeholder="lat, lon" required />
         </label>
 
-        <label>GPS (vd: 10.762548634412715, 106.70321804519753)
-          <input name="gps" type="text" required />
-        </label>
-
-        <div class="gps-preview">
-          <span>Lat: <strong id="latPreview">--</strong></span>
-          <span>Lon: <strong id="lonPreview">--</strong></span>
+        <div class="grid-2">
+          <label>Latitude
+            <input name="latitude" type="text" readonly required />
+          </label>
+          <label>Longitude
+            <input name="longitude" type="text" readonly required />
+          </label>
         </div>
 
-        <label>Radius (m)
-          <input name="radiusMeters" type="number" step="any" min="1" value="15" required />
+        <label>Map link
+          <input name="mapLink" type="url" readonly />
         </label>
 
-        <label>Mo ta shop
-          <textarea name="description"></textarea>
+        <div class="grid-2">
+          <label>Radius (m)
+            <input name="radiusMeters" type="number" step="any" min="1" value="15" required />
+          </label>
+          <label>Priority
+            <input name="priority" type="number" step="1" value="0" required />
+          </label>
+        </div>
+
+        <label>Input Language
+          <select name="sourceLang" id="sourceLang"></select>
         </label>
 
-        <label>Hinh anh đại diện của POI
-          <input name="imageFile" type="file" accept="image/*" />
+        <label>POI Name
+          <input name="sourceName" type="text" required />
         </label>
 
-        <label>Audio file
-          <input name="audioFile" type="file" accept="audio/*" />
+        <label>Description
+          <textarea name="sourceDescription" placeholder="Description of the POI"></textarea>
         </label>
 
-        <label>Hoac nhap noi dung de Text To Speech
-          <textarea name="ttsText"></textarea>
+        <label>TTS Text
+          <textarea name="sourceTtsText" placeholder="Content for TTS reading"></textarea>
         </label>
 
-        <h2>Nội dung của POI đã nhập</h2>
-        <div class="existing-media" id="existingMedia">
-          <div class="media-row">
-            <span>Audio cu: <a id="currentAudioLink" href="#" target="_blank" rel="noopener" hidden></a><span id="currentAudioEmpty">Khong co</span></span>
-            <button type="button" id="clearAudioBtn" class="danger">Xoa audio</button>
-          </div>
-          <div class="media-row">
-            <span>TTS cu: <span id="currentTtsText">Khong co</span></span>
-            <button type="button" id="clearTtsBtn" class="danger">Xoa TTS</button>
-          </div>
-          <div class="media-row">
-            <span>Anh cu: <a id="currentImageLink" href="#" target="_blank" rel="noopener" hidden></a><span id="currentImageEmpty">Khong co</span></span>
-            <button type="button" id="clearImageBtn" class="danger">Xoa anh</button>
+        <div class="file-block">
+          <label>Image
+            <input name="imageFile" type="file" accept="image/*" />
+          </label>
+          <div class="file-meta">
+            <span>Current: <a id="currentImageLink" href="#" target="_blank" rel="noopener" hidden></a><span id="currentImageEmpty">None</span></span>
+            <label class="checkbox">
+              <input name="removeImage" type="checkbox" />
+              <span>Remove</span>
+            </label>
           </div>
         </div>
+
+        <div class="file-block">
+          <label>Audio (fallback)
+            <input name="audioFile" type="file" accept="audio/*" />
+          </label>
+          <div class="file-meta">
+            <span>Current: <a id="currentAudioLink" href="#" target="_blank" rel="noopener" hidden></a><span id="currentAudioEmpty">None</span></span>
+            <label class="checkbox">
+              <input name="removeAudio" type="checkbox" />
+              <span>Remove</span>
+            </label>
+          </div>
+        </div>
+
+        <label class="checkbox">
+          <input name="isActive" type="checkbox" />
+          <span>Is Active</span>
+        </label>
 
         <div class="actions">
-          <button type="submit">Luu POI</button>
-          <button type="button" id="resetBtn" class="secondary">Tao moi</button>
+          <button type="submit">Save</button>
+          <button type="button" id="resetBtn" class="secondary">Reset</button>
         </div>
-      </form>
-      <p id="status"></p>
-    </section>
+            </form>
+            <p id="status"></p>
+          </section>
 
-    <section class="card">
-      <h2>Danh sach POI</h2>
-      <table>
+          <section class="card">
+            <header class="card-header">
+        <h2>POI List</h2>
+        <div class="small muted" id="listHint"></div>
+            </header>
+            <table>
         <thead>
           <tr>
-            <th>Ten shop</th>
-            <th>GPS</th>
+            <th>ID</th>
+            <th>POI name</th>
+            <th>Lat/Lon</th>
             <th>Radius</th>
-            <th>Anh</th>
-            <th>Audio/TTS</th>
+            <th>Priority</th>
+            <th>Active</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -87,6 +121,7 @@
       </table>
     </section>
   </main>
+
   <script src="/app.js"></script>
 </body>
 </html>

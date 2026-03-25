@@ -1,0 +1,61 @@
+using FoodStreetMobile.Services;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+
+namespace FoodStreetMobile.ViewModels;
+
+public sealed class ProfileViewModel : INotifyPropertyChanged
+{
+    private readonly AppLanguageService _languageService;
+    private AppLanguageOption? _selectedLanguage;
+
+    public ProfileViewModel(AppLanguageService languageService)
+    {
+        _languageService = languageService;
+        Languages = new ObservableCollection<AppLanguageOption>(_languageService.SupportedLanguages);
+
+        _selectedLanguage =
+            Languages.FirstOrDefault(x => string.Equals(x.Code, _languageService.CurrentLanguage, StringComparison.OrdinalIgnoreCase))
+            ?? Languages.FirstOrDefault(x => x.Code == "vi")
+            ?? new AppLanguageOption { Code = "vi", Label = "Tiếng Việt (vi)" };
+
+        _languageService.LanguageChanged += code =>
+        {
+            var option = Languages.FirstOrDefault(x => string.Equals(x.Code, code, StringComparison.OrdinalIgnoreCase));
+            if (option is not null)
+            {
+                SelectedLanguage = option;
+            }
+        };
+    }
+
+    public ObservableCollection<AppLanguageOption> Languages { get; }
+
+    public AppLanguageOption? SelectedLanguage
+    {
+        get => _selectedLanguage;
+        set
+        {
+            if (value is null)
+            {
+                return;
+            }
+
+            if (Equals(_selectedLanguage, value) || string.Equals(_selectedLanguage?.Code, value.Code, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            _selectedLanguage = value;
+            OnPropertyChanged();
+            _languageService.SetLanguage(value.Code);
+        }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    private void OnPropertyChanged([CallerMemberName] string? name = null)
+        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+}
+

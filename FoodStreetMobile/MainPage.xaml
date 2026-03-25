@@ -2,13 +2,14 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:maps="http://schemas.microsoft.com/dotnet/2021/maui/maps"
+             xmlns:loc="clr-namespace:FoodStreetMobile.Localization"
              x:Class="FoodStreetMobile.MainPage"
              BackgroundColor="#FDF8F5">
-    <ContentPage.ToolbarItems>
+    <!-- <ContentPage.ToolbarItems>
         <ToolbarItem Text="VI" Command="{Binding SetVietnameseCommand}" />
         <ToolbarItem Text="EN" Command="{Binding SetEnglishCommand}" />
         <ToolbarItem Text="HOST" Clicked="OnConfigureHostClicked" />
-    </ContentPage.ToolbarItems>
+    </ContentPage.ToolbarItems> -->
     <Grid RowDefinitions="*" RowSpacing="0">
         <Grid>
             <maps:Map x:Name="PoiMap"
@@ -44,7 +45,7 @@
                             Radius="10"
                             Offset="0,3" />
                 </Border.Shadow>
-                <Button Text="Khám phá Vĩnh Khánh"
+                <Button Text="{loc:Translate Key=Main_ExploreVinhKhanh}"
                         FontSize="12"
                         FontAttributes="Bold"
                         Padding="12,6"
@@ -67,8 +68,8 @@
                 </Border.Shadow>
                 <Grid RowDefinitions="Auto,Auto">
                     <Grid ColumnDefinitions="*,Auto">
-                        <Entry x:Name="PlaceSearchEntry"
-                               Placeholder="Tìm địa điểm, món ăn..."
+                         <Entry x:Name="PlaceSearchEntry"
+                               Placeholder="{loc:Translate Key=Main_SearchPlaceholder}"
                                BackgroundColor="Transparent"
                                Keyboard="Text"
                                Margin="12,6"
@@ -152,15 +153,15 @@
                                    HeightRequest="138"
                                    Aspect="AspectFill"
                                    Source="dotnet_bot.png" />
-                            <Label x:Name="SheetTitleLabel"
-                                   Text="Chưa chọn địa điểm"
+                             <Label x:Name="SheetTitleLabel"
+                                   Text="{loc:Translate Key=Main_SheetNoPlaceSelected}"
                                    FontSize="18"
                                    FontAttributes="Bold"
                                    TextColor="#5A2A0C" />
-                             <Label x:Name="SheetAddressLabel"
-                                    Text="Nhập từ khóa và chọn địa điểm để xem thông tin."
-                                    FontSize="13"
-                                    TextColor="#8B5E42" />
+                              <Label x:Name="SheetAddressLabel"
+                                     Text="{loc:Translate Key=Main_SheetHintSelectPlace}"
+                                     FontSize="13"
+                                     TextColor="#8B5E42" />
                             <Border x:Name="AudioPlayerContainer"
                                     IsVisible="False"
                                     Padding="10"
@@ -224,7 +225,7 @@
                                                 Clicked="OnTtsSkipForwardClicked" />
                                     </Grid>
                                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-                                        <Label Text="Âm lượng"
+                                        <Label Text="{loc:Translate Key=Main_Volume}"
                                                FontSize="12"
                                                TextColor="#7C2D12"
                                                VerticalOptions="Center" />
@@ -237,27 +238,27 @@
                                 </VerticalStackLayout>
                             </Border>
 <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="8">
-                                <Button Text="Chỉ đường"
+                                <Button Text="{loc:Translate Key=Main_Directions}"
                                         BackgroundColor="#E07A5F"
                                         TextColor="White"
                                         CornerRadius="14"
                                         Clicked="OnDirectionsClicked" />
                                 <Button Grid.Column="1"
                                         x:Name="PlayAudioButton"
-                                        Text="Phát audio"
+                                        Text="{loc:Translate Key=Main_PlayAudio}"
                                         BackgroundColor="#F4E7DC"
                                         TextColor="#5A2A0C"
                                         CornerRadius="14"
                                         IsEnabled="False"
                                         Clicked="OnPlayAudioClicked" />
                                 <Button Grid.Column="2"
-                                        Text="Lưu"
+                                        Text="{loc:Translate Key=Main_Save}"
                                         BackgroundColor="#F4E7DC"
                                         TextColor="#5A2A0C"
                                         CornerRadius="14"
                                         Clicked="OnSaveClicked" />
                                 <Button Grid.Column="3"
-                                        Text="Chia sẻ»"
+                                        Text="{loc:Translate Key=Main_Share}"
                                         BackgroundColor="#F4E7DC"
                                         TextColor="#5A2A0C"
                                         CornerRadius="14"
@@ -270,7 +271,6 @@
         </Grid>
     </Grid>
 </ContentPage>
-
 
 
 

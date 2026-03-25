@@ -23,3 +23,22 @@ chuyển thành file gpx
 - khởi động lại host
 adb reverse tcp:5187 tcp:5187
 adb reverse --list
+
+
+    Luồng “nhận diện POI gần nhất” + “phát audio” trong app MAUI đang đi theo chuỗi sau:
+
+    Bật theo dõi GPS: FoodStreetMobile/ViewModels/MainViewModel.cs:265 gọi LocationTracker.StartAsync() (FoodStreetMobile/Services/LocationTracker.cs:16) → tạo timer poll mỗi 5s (FoodStreetMobile/Services/LocationTracker.cs:14) và bắn event LocationUpdated khi lấy được vị trí (FoodStreetMobile/Services/LocationTracker.cs:65).
+
+    Mỗi lần có vị trí mới: MainViewModel.OnLocationUpdated (FoodStreetMobile/ViewModels/MainViewModel.cs:295)
+
+    Gọi GeofenceEngine.SelectActive(location, Pois) (FoodStreetMobile/ViewModels/MainViewModel.cs:301).
+    SelectActive (FoodStreetMobile/Services/GeofenceEngine.cs:8) tính khoảng cách Haversine (FoodStreetMobile/Services/GeoMath.cs:9), loại POI nếu distance > RadiusMeters (FoodStreetMobile/Services/GeofenceEngine.cs:17), rồi chọn POI “tốt nhất” theo:
+    Priority cao hơn thắng (FoodStreetMobile/Services/GeofenceEngine.cs:28)
+    nếu cùng priority → POI gần hơn thắng (FoodStreetMobile/Services/GeofenceEngine.cs:34)
+    Set ActivePoi và cập nhật pin “Đang gần” trên bản đồ ở MainPage.OnActivePoiChanged (FoodStreetMobile/MainPage.xaml.cs:184).
+    Chống phát lặp khi vẫn ở cùng POI: nếu newActive.Id trùng _currentAutoNarrationPoiId thì return (FoodStreetMobile/ViewModels/MainViewModel.cs:312); nếu khác thì set id mới và kích hoạt auto-play (FoodStreetMobile/ViewModels/MainViewModel.cs:317).
+    Auto-play (UI điều khiển phát): MainViewModel phát event AutoPlayPoiRequested (FoodStreetMobile/ViewModels/MainViewModel.cs:424) → MainPage.OnAutoPlayPoiRequested nhận (FoodStreetMobile/MainPage.xaml.cs:232)
+
+    Nếu POI có AudioUrl: dựng HTML audio player và phát trong WebView (FoodStreetMobile/MainPage.xaml.cs:243, player template ở FoodStreetMobile/MainPage.xaml.cs:2072).
+    Nếu không có AudioUrl: lấy text để đọc (Narration ưu tiên, fallback Description) (FoodStreetMobile/MainPage.xaml.cs:1859) rồi chạy TTS player (FoodStreetMobile/MainPage.xaml.cs:1738) → chia segment và gọi TextToSpeech.Default.SpeakAsync theo từng đoạn (FoodStreetMobile/MainPage.xaml.cs:1807), có fallback sang HTML TTS player nếu native TTS lỗi (FoodStreetMobile/MainPage.xaml.cs:1802).
+    Ghi chú nhanh: có NarrationEngine (FoodStreetMobile/Services/NarrationEngine.cs:19) hỗ trợ cooldown + mở audio bằng Launcher.OpenAsync (FoodStreetMobile/Services/NarrationEngine.cs:74), nhưng luồng auto-play hiện tại đang phát qua MainPage (WebView/TTS), không đi qua NarrationEngine.

@@ -7,3 +7,8 @@
 - hightight POI gần nhất
 - Hiển thị kết qảu sau khi Tìm kiếm
 - Cải thiện UI đẹp, thân thiện hơn
+
+PRD
+Đa ngôn ngữ 
+QR
+Pháp

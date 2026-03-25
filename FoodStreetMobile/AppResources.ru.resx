@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <data name="Profile_Title" xml:space="preserve">
+    <value>Профиль</value>
+  </data>
+  <data name="Profile_AccountHeader" xml:space="preserve">
+    <value>Аккаунт</value>
+  </data>
+  <data name="Profile_AccountHint" xml:space="preserve">
+    <value>Личные данные будут обновлены позже.</value>
+  </data>
+  <data name="Profile_LanguageLabel" xml:space="preserve">
+    <value>Язык</value>
+  </data>
+
+  <data name="Main_ExploreVinhKhanh" xml:space="preserve">
+    <value>Открыть Винькхань</value>
+  </data>
+  <data name="Main_SearchPlaceholder" xml:space="preserve">
+    <value>Поиск мест, еды...</value>
+  </data>
+  <data name="Main_SheetNoPlaceSelected" xml:space="preserve">
+    <value>Место не выбрано</value>
+  </data>
+  <data name="Main_SheetHintSelectPlace" xml:space="preserve">
+    <value>Введите запрос и выберите место, чтобы увидеть информацию.</value>
+  </data>
+  <data name="Main_Volume" xml:space="preserve">
+    <value>Громкость</value>
+  </data>
+  <data name="Main_Directions" xml:space="preserve">
+    <value>Маршрут</value>
+  </data>
+  <data name="Main_PlayAudio" xml:space="preserve">
+    <value>Воспроизвести аудио</value>
+  </data>
+  <data name="Main_Save" xml:space="preserve">
+    <value>Сохранить</value>
+  </data>
+  <data name="Main_Share" xml:space="preserve">
+    <value>Поделиться</value>
+  </data>
+
+  <data name="Home_HeaderTitle" xml:space="preserve">
+    <value>Винькхань</value>
+  </data>
+  <data name="Home_HeaderSubtitle" xml:space="preserve">
+    <value>Рай уличной еды</value>
+  </data>
+  <data name="Home_SearchPlaceholder" xml:space="preserve">
+    <value>Поиск еды и заведений...</value>
+  </data>
+  <data name="Home_CategoriesTitle" xml:space="preserve">
+    <value>Категории</value>
+  </data>
+  <data name="Home_ViewAll" xml:space="preserve">
+    <value>Смотреть все →</value>
+  </data>
+  <data name="Home_CategoryPhoBun" xml:space="preserve">
+    <value>Фо &amp; лапша</value>
+  </data>
+  <data name="Home_CategoryBanhMi" xml:space="preserve">
+    <value>Бань ми</value>
+  </data>
+  <data name="Home_CategoryCom" xml:space="preserve">
+    <value>Рис</value>
+  </data>
+  <data name="Home_CategoryCoffee" xml:space="preserve">
+    <value>Кофе</value>
+  </data>
+  <data name="Home_CategoryDessert" xml:space="preserve">
+    <value>Десерты</value>
+  </data>
+  <data name="Home_CategoryDrinks" xml:space="preserve">
+    <value>Напитки</value>
+  </data>
+  <data name="Home_FeaturedTitle" xml:space="preserve">
+    <value>Рекомендуемое</value>
+  </data>
+  <data name="Home_RatingLocation" xml:space="preserve">
+    <value>4.8 · Винькхань</value>
+  </data>
+  <data name="Home_PromoToday" xml:space="preserve">
+    <value>🎉 Акции сегодня</value>
+  </data>
+  <data name="Home_PromoDiscount" xml:space="preserve">
+    <value>Скидка 20% на первый заказ</value>
+  </data>
+  <data name="Home_PromoValidUntil" xml:space="preserve">
+    <value>Действует до 28/02</value>
+  </data>
+  <data name="Home_PromoUseNow" xml:space="preserve">
+    <value>Использовать</value>
+  </data>
+  <data name="Main_RadiusFallbackMeters" xml:space="preserve">
+    <value>Радиус: {0} м</value>
+  </data>
+  <data name="Main_DistanceMetersFormat" xml:space="preserve">
+    <value>Расстояние: {0} м</value>
+  </data>
+  <data name="Home_FeaturedItem1" xml:space="preserve">
+    <value>Oc Dao</value>
+  </data>
+  <data name="Home_FeaturedItem2" xml:space="preserve">
+    <value>Pizza 4P's</value>
+  </data>
+  <data name="Home_FeaturedItem3" xml:space="preserve">
+    <value>Bun Thit Nuong Co Lien</value>
+  </data>
+  <data name="Home_FeaturedItem4" xml:space="preserve">
+    <value>Lau Thai Mama</value>
+  </data>
+</root>

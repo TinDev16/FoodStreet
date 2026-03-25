@@ -114,7 +114,7 @@ target triple = "x86_64-unknown-linux-android21"
 	i32 3, ; uint32_t package_naming_policy
 	i32 6, ; uint32_t environment_variable_count
 	i32 0, ; uint32_t system_property_count
-	i32 334, ; uint32_t number_of_assemblies_in_apk
+	i32 339, ; uint32_t number_of_assemblies_in_apk
 	i32 66, ; uint32_t bundled_assembly_name_width
 	i32 44, ; uint32_t number_of_dso_cache_entries
 	i32 0, ; uint32_t number_of_aot_cache_entries
@@ -1174,9 +1174,19 @@ target triple = "x86_64-unknown-linux-android21"
 @_XamarinAndroidBundledAssembly_name_14c_14c = internal dso_local global [66 x i8] zeroinitializer, align 16
 @_XamarinAndroidBundledAssembly_file_name_14d_14d = internal dso_local global [74 x i8] zeroinitializer, align 16
 @_XamarinAndroidBundledAssembly_name_14d_14d = internal dso_local global [66 x i8] zeroinitializer, align 16
+@_XamarinAndroidBundledAssembly_file_name_14e_14e = internal dso_local global [74 x i8] zeroinitializer, align 16
+@_XamarinAndroidBundledAssembly_name_14e_14e = internal dso_local global [66 x i8] zeroinitializer, align 16
+@_XamarinAndroidBundledAssembly_file_name_14f_14f = internal dso_local global [74 x i8] zeroinitializer, align 16
+@_XamarinAndroidBundledAssembly_name_14f_14f = internal dso_local global [66 x i8] zeroinitializer, align 16
+@_XamarinAndroidBundledAssembly_file_name_150_150 = internal dso_local global [74 x i8] zeroinitializer, align 16
+@_XamarinAndroidBundledAssembly_name_150_150 = internal dso_local global [66 x i8] zeroinitializer, align 16
+@_XamarinAndroidBundledAssembly_file_name_151_151 = internal dso_local global [74 x i8] zeroinitializer, align 16
+@_XamarinAndroidBundledAssembly_name_151_151 = internal dso_local global [66 x i8] zeroinitializer, align 16
+@_XamarinAndroidBundledAssembly_file_name_152_152 = internal dso_local global [74 x i8] zeroinitializer, align 16
+@_XamarinAndroidBundledAssembly_name_152_152 = internal dso_local global [66 x i8] zeroinitializer, align 16
 
 ; Bundled assembly name buffers, all 66 bytes long
-@bundled_assemblies = dso_local local_unnamed_addr global [334 x %struct.XamarinAndroidBundledAssembly] [
+@bundled_assemblies = dso_local local_unnamed_addr global [339 x %struct.XamarinAndroidBundledAssembly] [
 	%struct.XamarinAndroidBundledAssembly {
 		i32 -1, ; int32_t file_fd
 		ptr @_XamarinAndroidBundledAssembly_file_name_0_0, ; char* file_name
@@ -4182,7 +4192,52 @@ target triple = "x86_64-unknown-linux-android21"
 		ptr null, ; uint8_t* data
 		i32 66, ; uint32_t name_length
 		ptr @_XamarinAndroidBundledAssembly_name_14d_14d; char* name
-	} ; 333
+	}, ; 333
+	%struct.XamarinAndroidBundledAssembly {
+		i32 -1, ; int32_t file_fd
+		ptr @_XamarinAndroidBundledAssembly_file_name_14e_14e, ; char* file_name
+		i32 0, ; uint32_t data_offset
+		i32 0, ; uint32_t data_size
+		ptr null, ; uint8_t* data
+		i32 66, ; uint32_t name_length
+		ptr @_XamarinAndroidBundledAssembly_name_14e_14e; char* name
+	}, ; 334
+	%struct.XamarinAndroidBundledAssembly {
+		i32 -1, ; int32_t file_fd
+		ptr @_XamarinAndroidBundledAssembly_file_name_14f_14f, ; char* file_name
+		i32 0, ; uint32_t data_offset
+		i32 0, ; uint32_t data_size
+		ptr null, ; uint8_t* data
+		i32 66, ; uint32_t name_length
+		ptr @_XamarinAndroidBundledAssembly_name_14f_14f; char* name
+	}, ; 335
+	%struct.XamarinAndroidBundledAssembly {
+		i32 -1, ; int32_t file_fd
+		ptr @_XamarinAndroidBundledAssembly_file_name_150_150, ; char* file_name
+		i32 0, ; uint32_t data_offset
+		i32 0, ; uint32_t data_size
+		ptr null, ; uint8_t* data
+		i32 66, ; uint32_t name_length
+		ptr @_XamarinAndroidBundledAssembly_name_150_150; char* name
+	}, ; 336
+	%struct.XamarinAndroidBundledAssembly {
+		i32 -1, ; int32_t file_fd
+		ptr @_XamarinAndroidBundledAssembly_file_name_151_151, ; char* file_name
+		i32 0, ; uint32_t data_offset
+		i32 0, ; uint32_t data_size
+		ptr null, ; uint8_t* data
+		i32 66, ; uint32_t name_length
+		ptr @_XamarinAndroidBundledAssembly_name_151_151; char* name
+	}, ; 337
+	%struct.XamarinAndroidBundledAssembly {
+		i32 -1, ; int32_t file_fd
+		ptr @_XamarinAndroidBundledAssembly_file_name_152_152, ; char* file_name
+		i32 0, ; uint32_t data_offset
+		i32 0, ; uint32_t data_size
+		ptr null, ; uint8_t* data
+		i32 66, ; uint32_t name_length
+		ptr @_XamarinAndroidBundledAssembly_name_152_152; char* name
+	} ; 338
 ], align 16
 
 @assembly_store_bundled_assemblies = dso_local local_unnamed_addr global [0 x %struct.AssemblyStoreSingleAssemblyRuntimeData] zeroinitializer, align 8

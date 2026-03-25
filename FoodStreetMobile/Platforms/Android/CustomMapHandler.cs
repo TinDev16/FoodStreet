@@ -18,7 +18,17 @@ public class CustomMapHandler : MapHandler
     protected override void ConnectHandler(MapView platformView)
     {
         base.ConnectHandler(platformView);
-        platformView.GetMapAsync(new MapReadyCallback((Microsoft.Maui.Controls.Maps.Map)VirtualView));
+        try
+        {
+            if (VirtualView is Microsoft.Maui.Controls.Maps.Map map)
+            {
+                platformView.GetMapAsync(new MapReadyCallback(map));
+            }
+        }
+        catch
+        {
+            // Best-effort only. Avoid crashing app when Google Maps is unavailable/misconfigured.
+        }
     }
 
     public static new IPropertyMapper<Microsoft.Maui.Controls.Maps.Map, CustomMapHandler> Mapper =
@@ -29,7 +39,13 @@ public class CustomMapHandler : MapHandler
 
     private static void MapPins(CustomMapHandler handler, Microsoft.Maui.Controls.Maps.Map map)
     {
-        handler.PlatformView.GetMapAsync(new MapReadyCallback(map));
+        try
+        {
+            handler.PlatformView?.GetMapAsync(new MapReadyCallback(map));
+        }
+        catch
+        {
+        }
     }
 
     private sealed class MapReadyCallback : Java.Lang.Object, IOnMapReadyCallback
@@ -43,24 +59,30 @@ public class CustomMapHandler : MapHandler
 
         public void OnMapReady(GoogleMap googleMap)
         {
-            googleMap.Clear();
-            var pinByMarkerId = new Dictionary<string, Pin>(StringComparer.Ordinal);
-
-            foreach (var pin in _map.Pins)
+            try
             {
-                var marker = googleMap.AddMarker(new MarkerOptions()
-                    .SetPosition(new LatLng(pin.Location.Latitude, pin.Location.Longitude))
-                    .SetTitle(pin.Label)
-                    .SetIcon(BuildPoiIcon(pin.Label)));
+                googleMap.Clear();
+                var pinByMarkerId = new Dictionary<string, Pin>(StringComparer.Ordinal);
 
-                if (marker is not null)
+                foreach (var pin in _map.Pins)
                 {
-                    marker.SetAnchor(0.5f, 1f);
-                    pinByMarkerId[marker.Id] = pin;
-                }
-            }
+                    var marker = googleMap.AddMarker(new MarkerOptions()
+                        .SetPosition(new LatLng(pin.Location.Latitude, pin.Location.Longitude))
+                        .SetTitle(pin.Label)
+                        .SetIcon(BuildPoiIcon(pin.Label)));
 
-            googleMap.SetOnMarkerClickListener(new MarkerClickListener(pinByMarkerId));
+                    if (marker is not null)
+                    {
+                        marker.SetAnchor(0.5f, 1f);
+                        pinByMarkerId[marker.Id] = pin;
+                    }
+                }
+
+                googleMap.SetOnMarkerClickListener(new MarkerClickListener(pinByMarkerId));
+            }
+            catch
+            {
+            }
         }
 
         private sealed class MarkerClickListener : Java.Lang.Object, GoogleMap.IOnMarkerClickListener

@@ -1,369 +1,400 @@
-const form = document.getElementById("poiForm");
-const rows = document.getElementById("poiRows");
-const statusText = document.getElementById("status");
-const resetBtn = document.getElementById("resetBtn");
-const gpsInput = form.elements.gps;
-const latPreview = document.getElementById("latPreview");
-const lonPreview = document.getElementById("lonPreview");
+(() => {
+  const $ = (sel) => document.querySelector(sel);
+  const formEl = $("#poiForm");
+  const statusEl = $("#status");
+  const rowsEl = $("#poiRows");
+  const listHintEl = $("#listHint");
+  const createBtn = $("#createBtn");
+  const resetBtn = $("#resetBtn");
+  const sourceLangSelect = $("#sourceLang");
 
-const audioFileInput = form.elements.audioFile;
-const ttsInput = form.elements.ttsText;
-const imageFileInput = form.elements.imageFile;
+  const state = {
+    languages: [],
+    selectedSourceLang: "vi",
+    current: {
+      id: "",
+      coreImageUrl: "",
+      coreAudioUrl: "",
+      translationsByLang: {},
+    },
+  };
 
-const existingMedia = document.getElementById("existingMedia");
-const currentAudioLink = document.getElementById("currentAudioLink");
-const currentAudioEmpty = document.getElementById("currentAudioEmpty");
-const currentTtsText = document.getElementById("currentTtsText");
-const currentImageLink = document.getElementById("currentImageLink");
-const currentImageEmpty = document.getElementById("currentImageEmpty");
-const clearAudioBtn = document.getElementById("clearAudioBtn");
-const clearTtsBtn = document.getElementById("clearTtsBtn");
-const clearImageBtn = document.getElementById("clearImageBtn");
+  const setStatus = (msg, isError = false) => {
+    statusEl.textContent = msg || "";
+    statusEl.classList.toggle("error", !!isError);
+  };
 
-const state = {
-  currentAudioUrl: "",
-  currentTtsText: "",
-  currentImageUrl: "",
-  clearAudio: false,
-  clearTts: false,
-  clearImage: false
-};
+  const safeError = async (res) => {
+    try {
+      const j = await res.json();
+      return j?.error ? `${j.error}${j.detail ? `: ${j.detail}` : ""}` : JSON.stringify(j);
+    } catch {
+      return `${res.status} ${res.statusText}`;
+    }
+  };
 
-gpsInput.addEventListener("input", updateGpsPreview);
-resetBtn.addEventListener("click", () => resetForm(true));
-form.addEventListener("submit", onSubmit);
-audioFileInput?.addEventListener("change", updateMediaConstraints);
-ttsInput?.addEventListener("input", updateMediaConstraints);
-imageFileInput?.addEventListener("change", updateImageInputConstraints);
-clearAudioBtn?.addEventListener("click", onClearAudioClicked);
-clearTtsBtn?.addEventListener("click", onClearTtsClicked);
-clearImageBtn?.addEventListener("click", onClearImageClicked);
+  const apiGet = async (url) => {
+    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    if (!res.ok) throw new Error(await safeError(res));
+    return res.json();
+  };
 
-loadPois();
-resetForm(false);
+  const apiPostJson = async (url, body) => {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(await safeError(res));
+    return res.json();
+  };
 
-async function loadPois() {
-  try {
-    const response = await fetch("/api/shops", { cache: "no-store" });
-    if (!response.ok) {
-      setStatus(`Khong tai duoc danh sach POI (${response.status}).`, true);
-      return;
+  const apiDelete = async (url) => {
+    const res = await fetch(url, { method: "DELETE", headers: { Accept: "application/json" } });
+    if (!res.ok) throw new Error(await safeError(res));
+    return res.json().catch(() => ({}));
+  };
+
+  const ensureTranslationState = (langCode) => {
+    const code = String(langCode || "vi").toLowerCase();
+    if (!state.current.translationsByLang[code]) {
+      state.current.translationsByLang[code] = {
+        name: "",
+        description: "",
+        ttsText: "",
+        audioUrl: "",
+      };
+    }
+    return state.current.translationsByLang[code];
+  };
+
+  const setCurrentLink = (anchor, emptySpan, url) => {
+    if (url) {
+      anchor.href = url;
+      anchor.textContent = url;
+      anchor.hidden = false;
+      emptySpan.hidden = true;
+    } else {
+      anchor.hidden = true;
+      emptySpan.hidden = false;
+    }
+  };
+
+  const parseGps = (raw) => {
+    const cleaned = (raw || "").trim().replace(/[()]/g, "");
+    if (!cleaned) return null;
+    const parts = cleaned.split(/[\s,;]+/).filter(Boolean);
+    if (parts.length < 2) return null;
+
+    const lat = Number.parseFloat(parts[0]);
+    const lon = Number.parseFloat(parts[1]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+
+    return { lat, lon };
+  };
+
+  const setGeoFields = (lat, lon) => {
+    formEl.elements.namedItem("latitude").value = String(lat);
+    formEl.elements.namedItem("longitude").value = String(lon);
+    formEl.elements.namedItem("mapLink").value = `https://maps.google.com/?q=${lat},${lon}`;
+  };
+
+  const updateFromGpsInput = () => {
+    const gpsInput = formEl.elements.namedItem("gps");
+    const latInput = formEl.elements.namedItem("latitude");
+    const lonInput = formEl.elements.namedItem("longitude");
+    const mapLinkInput = formEl.elements.namedItem("mapLink");
+    const raw = (gpsInput.value || "").trim();
+    if (!raw) {
+      latInput.value = "";
+      lonInput.value = "";
+      mapLinkInput.value = "";
+      gpsInput.setCustomValidity("");
+      return false;
     }
 
-    const payload = await response.json();
-    const list = Array.isArray(payload) ? payload : (Array.isArray(payload?.value) ? payload.value : []);
-    rows.innerHTML = "";
+    const parsed = parseGps(gpsInput.value);
+    if (!parsed) {
+      gpsInput.setCustomValidity("GPS khong hop le. Vi du: 10.761895379862327, 106.70358792842893");
+      return false;
+    }
 
-    for (const item of list) {
+    gpsInput.setCustomValidity("");
+    setGeoFields(parsed.lat, parsed.lon);
+    return true;
+  };
+
+  const saveSourceFieldsToState = () => {
+    const tr = ensureTranslationState(state.selectedSourceLang);
+    tr.name = (formEl.elements.namedItem("sourceName").value || "").trim();
+    tr.description = (formEl.elements.namedItem("sourceDescription").value || "").trim();
+    tr.ttsText = (formEl.elements.namedItem("sourceTtsText").value || "").trim();
+  };
+
+  const loadSourceFieldsFromState = () => {
+    const tr = ensureTranslationState(state.selectedSourceLang);
+    formEl.elements.namedItem("sourceName").value = tr.name || "";
+    formEl.elements.namedItem("sourceDescription").value = tr.description || "";
+    formEl.elements.namedItem("sourceTtsText").value = tr.ttsText || "";
+  };
+
+  const setActiveSourceLang = (langCode, options = {}) => {
+    if (!options.skipSave) {
+      saveSourceFieldsToState();
+    }
+    state.selectedSourceLang = String(langCode || "vi").toLowerCase();
+    sourceLangSelect.value = state.selectedSourceLang;
+    loadSourceFieldsFromState();
+  };
+
+  const renderList = (items) => {
+    rowsEl.innerHTML = "";
+    listHintEl.textContent = `${items.length} POI`;
+
+    for (const item of items) {
       const tr = document.createElement("tr");
-      const audioLabel = item.audioUrl ? "Audio file" : (item.ttsText ? "TTS text" : "Khong");
-      const imageLabel = item.imageUrl ? `<a href="${escapeHtml(item.imageUrl)}" target="_blank" rel="noopener">Xem</a>` : "Khong";
       tr.innerHTML = `
-      <td>${escapeHtml(item.shopName)}</td>
-      <td>${item.latitude}, ${item.longitude}</td>
-      <td>${item.radiusMeters}</td>
-      <td>${imageLabel}</td>
-      <td>${audioLabel}</td>
-      <td>
-        <button type="button" data-action="edit" data-id="${item.id}">Sua</button>
-        <button type="button" data-action="delete" data-id="${item.id}" class="danger">Xoa</button>
-      </td>
+        <td class="mono">${escapeHtml(item.id)}</td>
+        <td>${escapeHtml(item.nameVi || "")}</td>
+        <td class="mono">${escapeHtml(String(item.latitude))}, ${escapeHtml(String(item.longitude))}</td>
+        <td class="mono">${escapeHtml(String(item.radiusMeters))}</td>
+        <td class="mono">${escapeHtml(String(item.priority))}</td>
+        <td>${item.isActive ? "YES" : ""}</td>
+        <td>
+          <button type="button" class="secondary" data-action="edit" data-id="${escapeAttr(item.id)}">Sua</button>
+          <button type="button" class="danger" data-action="del" data-id="${escapeAttr(item.id)}">Xoa</button>
+        </td>
       `;
-      rows.appendChild(tr);
+      rowsEl.appendChild(tr);
+    }
+  };
+
+  const escapeHtml = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const escapeAttr = (s) => escapeHtml(s).replace(/"/g, "&quot;");
+
+  const loadList = async () => {
+    const items = await apiGet("/api/pois/admin");
+    renderList(items);
+  };
+
+  const resetForm = () => {
+    formEl.reset();
+    state.current.id = "";
+    state.current.coreImageUrl = "";
+    state.current.coreAudioUrl = "";
+    state.current.translationsByLang = {};
+
+    for (const lang of state.languages) {
+      ensureTranslationState(lang.code);
     }
 
-    rows.querySelectorAll("button[data-action='edit']").forEach(btn =>
-      btn.addEventListener("click", () => editPoi(btn.dataset.id)));
-    rows.querySelectorAll("button[data-action='delete']").forEach(btn =>
-      btn.addEventListener("click", () => deletePoi(btn.dataset.id)));
+    const defaultLang = state.languages.some((x) => x.code === "vi") ? "vi" : (state.languages[0]?.code || "vi");
+    state.selectedSourceLang = defaultLang;
+    sourceLangSelect.value = defaultLang;
 
-    if (list.length === 0) {
-      setStatus("Danh sach POI dang rong.");
-    }
-  } catch (error) {
-    setStatus(`Khong tai duoc danh sach POI: ${error}`, true);
-  }
-}
+    $("#currentImageLink").hidden = true;
+    $("#currentImageEmpty").hidden = false;
+    $("#currentAudioLink").hidden = true;
+    $("#currentAudioEmpty").hidden = false;
 
-async function editPoi(id) {
-  const response = await fetch(`/api/shops/${id}`);
-  if (!response.ok) {
-    setStatus("Khong tai duoc POI.", true);
-    return;
-  }
-
-  const item = await response.json();
-  form.elements.id.value = item.id;
-  form.elements.shopName.value = item.shopName || "";
-  form.elements.gps.value = `${item.latitude}, ${item.longitude}`;
-  form.elements.radiusMeters.value = item.radiusMeters;
-  form.elements.description.value = item.description || "";
-  form.elements.ttsText.value = "";
-  form.elements.audioFile.value = "";
-  form.elements.imageFile.value = "";
-
-  state.currentAudioUrl = item.audioUrl || "";
-  state.currentTtsText = item.ttsText || "";
-  state.currentImageUrl = item.imageUrl || "";
-  state.clearAudio = false;
-  state.clearTts = false;
-  state.clearImage = false;
-
-  updateGpsPreview();
-  updateMediaConstraints();
-  updateImageInputConstraints();
-  renderExistingMedia();
-  if (state.currentAudioUrl) {
-    setStatus(`Da nap audio cu: ${state.currentAudioUrl}`);
-  }
-}
-
-async function deletePoi(id) {
-  if (!confirm(`Xoa POI ${id}?`)) {
-    return;
-  }
-
-  const response = await fetch(`/api/shops/${id}`, { method: "DELETE" });
-  if (!response.ok) {
-    setStatus("Xoa that bai.", true);
-    return;
-  }
-
-  setStatus("Da xoa.");
-  if (form.elements.id.value === id) {
-    resetForm(false);
-  }
-  await loadPois();
-}
-
-async function onSubmit(event) {
-  event.preventDefault();
-  const gps = parseGps(form.elements.gps.value);
-  if (!gps) {
-    setStatus("GPS khong hop le. Dung dinh dang: lat, lon", true);
-    return;
-  }
-
-  if (!validateAudioTtsMutualExclusion()) {
-    return;
-  }
-
-  const body = new FormData();
-  if (form.elements.id.value.trim()) {
-    body.append("id", form.elements.id.value.trim());
-  }
-
-  body.append("shopName", form.elements.shopName.value.trim());
-  body.append("gps", form.elements.gps.value.trim());
-  body.append("radiusMeters", form.elements.radiusMeters.value);
-  body.append("description", form.elements.description.value.trim());
-  body.append("ttsText", ttsInput.value.trim());
-  body.append("clearAudio", state.clearAudio ? "1" : "0");
-  body.append("clearTts", state.clearTts ? "1" : "0");
-  body.append("clearImage", state.clearImage ? "1" : "0");
-
-  const audioFile = audioFileInput.files[0];
-  if (audioFile) {
-    body.append("audioFile", audioFile);
-  }
-
-  const imageFile = imageFileInput?.files?.[0];
-  if (imageFile) {
-    body.append("imageFile", imageFile);
-  }
-
-  const response = await fetch("/api/shops", { method: "POST", body });
-  if (!response.ok) {
-    const err = await safeReadError(response);
-    setStatus(`Luu that bai: ${err}`, true);
-    return;
-  }
-
-  setStatus("Luu thanh cong.");
-  resetForm(false);
-  await loadPois();
-}
-
-function onClearAudioClicked() {
-  if (!state.currentAudioUrl) {
-    return;
-  }
-
-  state.currentAudioUrl = "";
-  state.clearAudio = true;
-  audioFileInput.value = "";
-  updateMediaConstraints();
-  renderExistingMedia();
-}
-
-function onClearTtsClicked() {
-  if (!state.currentTtsText && !ttsInput.value.trim()) {
-    return;
-  }
-
-  state.currentTtsText = "";
-  state.clearTts = true;
-  ttsInput.value = "";
-  updateMediaConstraints();
-  renderExistingMedia();
-}
-
-function onClearImageClicked() {
-  if (!state.currentImageUrl) {
-    return;
-  }
-
-  state.currentImageUrl = "";
-  state.clearImage = true;
-  if (imageFileInput) {
-    imageFileInput.value = "";
-  }
-  updateImageInputConstraints();
-  renderExistingMedia();
-}
-
-function validateAudioTtsMutualExclusion() {
-  const hasExistingAudio = !!state.currentAudioUrl;
-  const hasExistingTts = !!state.currentTtsText;
-  const hasNewAudio = !!audioFileInput.files[0];
-  const hasNewTts = !!ttsInput.value.trim();
-
-  if ((hasExistingAudio || hasNewAudio) && hasNewTts) {
-    setStatus("Audio file va TTS chi duoc chon 1. Neu muon doi kieu, hay xoa ben con lai.", true);
-    return false;
-  }
-
-  if ((hasExistingTts || hasNewTts) && hasNewAudio) {
-    setStatus("Audio file va TTS chi duoc chon 1. Neu muon doi kieu, hay xoa ben con lai.", true);
-    return false;
-  }
-
-  return true;
-}
-
-function parseGps(raw) {
-  if (!raw) return null;
-  const parts = raw.split(",").map(x => x.trim());
-  if (parts.length !== 2) return null;
-  const lat = Number(parts[0]);
-  const lon = Number(parts[1]);
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
-  return { lat, lon };
-}
-
-function updateGpsPreview() {
-  const gps = parseGps(gpsInput.value);
-  latPreview.textContent = gps ? String(gps.lat) : "--";
-  lonPreview.textContent = gps ? String(gps.lon) : "--";
-}
-
-function updateMediaConstraints() {
-  const hasAudio = !!state.currentAudioUrl || !!audioFileInput.files[0];
-  const hasTts = !!state.currentTtsText || !!ttsInput.value.trim();
-
-  if (hasAudio) {
-    ttsInput.value = "";
-    ttsInput.disabled = true;
-    clearTtsBtn.disabled = !state.currentTtsText;
-  } else {
-    ttsInput.disabled = false;
-    clearTtsBtn.disabled = !state.currentTtsText;
-  }
-
-  if (hasTts) {
-    audioFileInput.value = "";
-    audioFileInput.disabled = true;
-    clearAudioBtn.disabled = !state.currentAudioUrl;
-  } else {
-    audioFileInput.disabled = false;
-    clearAudioBtn.disabled = !state.currentAudioUrl;
-  }
-
-  renderExistingMedia();
-}
-
-function updateImageInputConstraints() {
-  const hasCurrentImage = !!state.currentImageUrl;
-  if (imageFileInput) {
-    imageFileInput.disabled = false;
-  }
-  clearImageBtn.disabled = !hasCurrentImage;
-}
-
-function renderExistingMedia() {
-  existingMedia.style.display = "block";
-
-  const hasAudio = !!state.currentAudioUrl;
-  currentAudioLink.hidden = !hasAudio;
-  currentAudioEmpty.hidden = hasAudio;
-  if (hasAudio) {
-    currentAudioLink.href = state.currentAudioUrl;
-    currentAudioLink.textContent = state.currentAudioUrl;
-  } else {
-    currentAudioLink.href = "#";
-    currentAudioLink.textContent = "";
-  }
-
-  currentTtsText.textContent = state.currentTtsText || "Khong co";
-
-  const hasImage = !!state.currentImageUrl;
-  currentImageLink.hidden = !hasImage;
-  currentImageEmpty.hidden = hasImage;
-  if (hasImage) {
-    currentImageLink.href = state.currentImageUrl;
-    currentImageLink.textContent = state.currentImageUrl;
-  } else {
-    currentImageLink.href = "#";
-    currentImageLink.textContent = "";
-  }
-}
-
-function resetForm(clearStatus) {
-  form.reset();
-  form.elements.id.value = "";
-  form.elements.radiusMeters.value = "15";
-
-  state.currentAudioUrl = "";
-  state.currentTtsText = "";
-  state.currentImageUrl = "";
-  state.clearAudio = false;
-  state.clearTts = false;
-  state.clearImage = false;
-
-  audioFileInput.disabled = false;
-  ttsInput.disabled = false;
-  if (imageFileInput) {
-    imageFileInput.disabled = false;
-  }
-
-  updateGpsPreview();
-  updateMediaConstraints();
-  updateImageInputConstraints();
-  renderExistingMedia();
-  if (clearStatus) {
+    formEl.elements.namedItem("gps").value = "";
+    formEl.elements.namedItem("latitude").value = "";
+    formEl.elements.namedItem("longitude").value = "";
+    formEl.elements.namedItem("mapLink").value = "";
+    loadSourceFieldsFromState();
     setStatus("");
-  }
-}
+  };
 
-function setStatus(text, isError = false) {
-  statusText.textContent = text;
-  statusText.className = isError ? "error" : "";
-}
+  const loadPoi = async (id) => {
+    const data = await apiGet(`/api/pois/${encodeURIComponent(id)}`);
+    resetForm();
 
-async function safeReadError(response) {
-  try {
-    const payload = await response.json();
-    return payload.error || response.statusText;
-  } catch {
-    return response.statusText;
-  }
-}
+    state.current.id = data.id || "";
+    state.current.coreImageUrl = data.imageUrl || "";
+    state.current.coreAudioUrl = data.audioUrl || "";
 
-function escapeHtml(text) {
-  return (text || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll("\"", "&quot;");
-}
+    formEl.elements.namedItem("id").value = data.id || "";
+    formEl.elements.namedItem("gps").value = `${data.latitude}, ${data.longitude}`;
+    updateFromGpsInput();
+
+    formEl.elements.namedItem("radiusMeters").value = String(data.radiusMeters ?? 15);
+    formEl.elements.namedItem("priority").value = String(data.priority ?? 0);
+    const isActiveInput = formEl.elements.namedItem("isActive");
+    if (isActiveInput) {
+      isActiveInput.checked = !!data.isActive;
+    }
+
+    setCurrentLink($("#currentImageLink"), $("#currentImageEmpty"), state.current.coreImageUrl);
+    setCurrentLink($("#currentAudioLink"), $("#currentAudioEmpty"), state.current.coreAudioUrl);
+
+    const translations = Array.isArray(data.translations) ? data.translations : [];
+    for (const t of translations) {
+      if (!t || !t.langCode) continue;
+      const code = String(t.langCode).toLowerCase();
+      state.current.translationsByLang[code] = {
+        name: t.name || "",
+        description: t.description || "",
+        ttsText: t.ttsText || "",
+        audioUrl: t.audioUrl || "",
+      };
+    }
+
+    const preferred = state.current.translationsByLang.vi ? "vi" : (translations[0]?.langCode || state.selectedSourceLang || "vi");
+    setActiveSourceLang(preferred, { skipSave: true });
+
+    setStatus(`Loaded POI #${id}`);
+  };
+
+  const uploadFile = async (file, kind, lang) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    const qs = new URLSearchParams({ kind });
+    if (lang) qs.set("lang", lang);
+
+    const res = await fetch(`/api/uploads?${qs.toString()}`, { method: "POST", body: fd });
+    if (!res.ok) throw new Error(await safeError(res));
+    const j = await res.json();
+    return j.url;
+  };
+
+  const buildPayloadAndUpload = async () => {
+    saveSourceFieldsToState();
+    if (!updateFromGpsInput()) {
+      throw new Error("GPS khong hop le.");
+    }
+
+    const id = formEl.elements.namedItem("id").value.trim();
+    const latitude = Number.parseFloat(formEl.elements.namedItem("latitude").value);
+    const longitude = Number.parseFloat(formEl.elements.namedItem("longitude").value);
+    const radiusMeters = Number.parseFloat(formEl.elements.namedItem("radiusMeters").value);
+    const priority = Number.parseInt(formEl.elements.namedItem("priority").value, 10);
+    const mapLink = (formEl.elements.namedItem("mapLink").value || "").trim();
+    const isActive = formEl.elements.namedItem("isActive")?.checked ?? false;
+
+    let imageUrl = state.current.coreImageUrl;
+    let audioUrl = state.current.coreAudioUrl;
+
+    const removeImage = formEl.elements.namedItem("removeImage")?.checked ?? false;
+    const removeAudio = formEl.elements.namedItem("removeAudio")?.checked ?? false;
+    const imageFile = formEl.elements.namedItem("imageFile")?.files?.[0] || null;
+    const audioFile = formEl.elements.namedItem("audioFile")?.files?.[0] || null;
+
+    if (removeImage) imageUrl = "";
+    if (removeAudio) audioUrl = "";
+    if (imageFile) imageUrl = await uploadFile(imageFile, "image", null);
+    if (audioFile) audioUrl = await uploadFile(audioFile, "audio", null);
+
+    const source = ensureTranslationState(state.selectedSourceLang);
+
+    const translations = state.languages.map((lang) => {
+      const tr = ensureTranslationState(lang.code);
+      return {
+        langCode: lang.code,
+        name: tr.name || "",
+        description: tr.description || "",
+        ttsText: tr.ttsText || "",
+        audioUrl: tr.audioUrl || "",
+      };
+    });
+
+    return {
+      id: id || null,
+      latitude,
+      longitude,
+      radiusMeters: Number.isFinite(radiusMeters) ? radiusMeters : 15,
+      priority: Number.isFinite(priority) ? priority : 0,
+      mapLink: mapLink || null,
+      imageUrl,
+      audioUrl,
+      isActive,
+      sourceLangCode: state.selectedSourceLang,
+      sourceName: source.name || "",
+      sourceDescription: source.description || "",
+      sourceTtsText: source.ttsText || "",
+      translations,
+    };
+  };
+
+  const buildSourceLangOptions = () => {
+    sourceLangSelect.innerHTML = "";
+    for (const lang of state.languages) {
+      const opt = document.createElement("option");
+      opt.value = lang.code;
+      opt.textContent = lang.label;
+      sourceLangSelect.appendChild(opt);
+    }
+  };
+
+  const wireEvents = () => {
+    sourceLangSelect.addEventListener("change", () => setActiveSourceLang(sourceLangSelect.value || "vi"));
+
+    const gpsInput = formEl.elements.namedItem("gps");
+    gpsInput.addEventListener("input", () => updateFromGpsInput());
+    gpsInput.addEventListener("blur", () => updateFromGpsInput());
+
+    createBtn.addEventListener("click", () => resetForm());
+    resetBtn.addEventListener("click", () => resetForm());
+
+    rowsEl.addEventListener("click", async (e) => {
+      const btn = e.target?.closest("button[data-action]");
+      if (!btn) return;
+      const action = btn.dataset.action;
+      const id = btn.dataset.id;
+      if (!id) return;
+
+      try {
+        if (action === "edit") {
+          await loadPoi(id);
+        } else if (action === "del") {
+          if (!confirm(`Xoa POI #${id}?`)) return;
+          setStatus("Deleting...");
+          await apiDelete(`/api/pois/${encodeURIComponent(id)}`);
+          await loadList();
+          resetForm();
+          setStatus(`Deleted POI #${id}`);
+        }
+      } catch (err) {
+        setStatus(err?.message || String(err), true);
+      }
+    });
+
+    formEl.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      updateFromGpsInput();
+      if (!formEl.reportValidity()) return;
+
+      setStatus("Saving...");
+      try {
+        const payload = await buildPayloadAndUpload();
+        const res = await apiPostJson("/api/pois", payload);
+        await loadList();
+        await loadPoi(res.id);
+        setStatus(`Saved POI #${res.id}`);
+      } catch (err) {
+        setStatus(err?.message || String(err), true);
+      }
+    });
+  };
+
+  const init = async () => {
+    setStatus("Loading...");
+    state.languages = await apiGet("/api/languages");
+    buildSourceLangOptions();
+
+    for (const lang of state.languages) {
+      ensureTranslationState(lang.code);
+    }
+
+    const defaultLang = state.languages.some((x) => x.code === "vi") ? "vi" : (state.languages[0]?.code || "vi");
+    state.selectedSourceLang = defaultLang;
+    sourceLangSelect.value = defaultLang;
+
+    wireEvents();
+    resetForm();
+    await loadList();
+    setStatus("");
+  };
+
+  init().catch((err) => setStatus(err?.message || String(err), true));
+})();

@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <data name="Profile_Title" xml:space="preserve">
+    <value>Cá nhân</value>
+  </data>
+  <data name="Profile_AccountHeader" xml:space="preserve">
+    <value>Tài khoản</value>
+  </data>
+  <data name="Profile_AccountHint" xml:space="preserve">
+    <value>Nội dung cá nhân sẽ được cập nhật sau.</value>
+  </data>
+  <data name="Profile_LanguageLabel" xml:space="preserve">
+    <value>Ngôn ngữ</value>
+  </data>
+
+  <data name="Main_ExploreVinhKhanh" xml:space="preserve">
+    <value>Khám phá Vĩnh Khánh</value>
+  </data>
+  <data name="Main_SearchPlaceholder" xml:space="preserve">
+    <value>Tìm địa điểm, món ăn...</value>
+  </data>
+  <data name="Main_SheetNoPlaceSelected" xml:space="preserve">
+    <value>Chưa chọn địa điểm</value>
+  </data>
+  <data name="Main_SheetHintSelectPlace" xml:space="preserve">
+    <value>Nhập từ khóa và chọn địa điểm để xem thông tin.</value>
+  </data>
+  <data name="Main_Volume" xml:space="preserve">
+    <value>Âm lượng</value>
+  </data>
+  <data name="Main_Directions" xml:space="preserve">
+    <value>Chỉ đường</value>
+  </data>
+  <data name="Main_PlayAudio" xml:space="preserve">
+    <value>Phát audio</value>
+  </data>
+  <data name="Main_Save" xml:space="preserve">
+    <value>Lưu</value>
+  </data>
+  <data name="Main_Share" xml:space="preserve">
+    <value>Chia sẻ</value>
+  </data>
+
+  <data name="Home_HeaderTitle" xml:space="preserve">
+    <value>Vĩnh Khánh</value>
+  </data>
+  <data name="Home_HeaderSubtitle" xml:space="preserve">
+    <value>Thiên Đường Ẩm Thực Đường Phố</value>
+  </data>
+  <data name="Home_SearchPlaceholder" xml:space="preserve">
+    <value>Tìm món ăn, quán ăn...</value>
+  </data>
+  <data name="Home_CategoriesTitle" xml:space="preserve">
+    <value>Danh Mục</value>
+  </data>
+  <data name="Home_ViewAll" xml:space="preserve">
+    <value>Xem tất cả →</value>
+  </data>
+  <data name="Home_CategoryPhoBun" xml:space="preserve">
+    <value>Phở &amp; Bún</value>
+  </data>
+  <data name="Home_CategoryBanhMi" xml:space="preserve">
+    <value>Bánh Mì</value>
+  </data>
+  <data name="Home_CategoryCom" xml:space="preserve">
+    <value>Cơm</value>
+  </data>
+  <data name="Home_CategoryCoffee" xml:space="preserve">
+    <value>Cà Phê</value>
+  </data>
+  <data name="Home_CategoryDessert" xml:space="preserve">
+    <value>Tráng Miệng</value>
+  </data>
+  <data name="Home_CategoryDrinks" xml:space="preserve">
+    <value>Giải Khát</value>
+  </data>
+  <data name="Home_FeaturedTitle" xml:space="preserve">
+    <value>Quán Ăn Nổi Bật</value>
+  </data>
+  <data name="Home_RatingLocation" xml:space="preserve">
+    <value>4.8 · Vĩnh Khánh</value>
+  </data>
+  <data name="Home_PromoToday" xml:space="preserve">
+    <value>🎉 Ưu đãi hôm nay</value>
+  </data>
+  <data name="Home_PromoDiscount" xml:space="preserve">
+    <value>Giảm 20% đơn đầu tiên</value>
+  </data>
+  <data name="Home_PromoValidUntil" xml:space="preserve">
+    <value>Áp dụng đến hết 28/02</value>
+  </data>
+  <data name="Home_PromoUseNow" xml:space="preserve">
+    <value>Dùng ngay</value>
+  </data>
+  <data name="Main_RadiusFallbackMeters" xml:space="preserve">
+    <value>Ban kinh: {0} m</value>
+  </data>
+  <data name="Main_DistanceMetersFormat" xml:space="preserve">
+    <value>Khoang cach: {0} m</value>
+  </data>
+  <data name="Home_FeaturedItem1" xml:space="preserve">
+    <value>Oc Dao</value>
+  </data>
+  <data name="Home_FeaturedItem2" xml:space="preserve">
+    <value>Pizza 4P's</value>
+  </data>
+  <data name="Home_FeaturedItem3" xml:space="preserve">
+    <value>Bun Thit Nuong Co Lien</value>
+  </data>
+  <data name="Home_FeaturedItem4" xml:space="preserve">
+    <value>Lau Thai Mama</value>
+  </data>
+</root>

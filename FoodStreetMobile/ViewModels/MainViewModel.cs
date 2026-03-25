@@ -1,5 +1,6 @@
 using FoodStreetMobile.Services;
 using FoodStreetMobile.Models;
+using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.Devices.Sensors;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -16,9 +17,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private readonly NarrationEngine _narrationEngine;
     private readonly LocationTracker _locationTracker;
     private readonly PoiSyncService _poiSyncService;
+    private readonly AppLanguageService _languageService;
 
     private bool _isTracking;
-    private string _statusText = "San sang.";
+    private string _statusText = "Sẵn sàng.";
     private PoiViewModel? _activePoi;
     private CancellationTokenSource? _narrationCts;
     private readonly SemaphoreSlim _autoNarrationLock = new(1, 1);
@@ -37,19 +39,26 @@ public sealed class MainViewModel : INotifyPropertyChanged
         PoiSyncService poiSyncService,
         GeofenceEngine geofenceEngine,
         NarrationEngine narrationEngine,
-        LocationTracker locationTracker)
+        LocationTracker locationTracker,
+        AppLanguageService languageService)
     {
         _poiRepository = poiRepository;
         _poiSyncService = poiSyncService;
         _geofenceEngine = geofenceEngine;
         _narrationEngine = narrationEngine;
         _locationTracker = locationTracker;
+        _languageService = languageService;
 
         Pois = new ObservableCollection<PoiViewModel>();
         ToggleTrackingCommand = new Command(async () => await ToggleTrackingAsync());
         _setVietnameseCommand = new Command(async () => await SetLanguageAsync("vi"));
         _setEnglishCommand = new Command(async () => await SetLanguageAsync("en"));
         _syncNowCommand = new Command(async () => await RefreshFromServerAsync());
+
+        _languageService.LanguageChanged += language =>
+        {
+            MainThread.BeginInvokeOnMainThread(() => _ = ApplyLanguageAsync(language));
+        };
     }
 
     public ObservableCollection<PoiViewModel> Pois { get; }
@@ -108,6 +117,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public ICommand SetEnglishCommand => _setEnglishCommand;
     public ICommand SyncNowCommand => _syncNowCommand;
 
+    public string CurrentLanguage => _currentLanguage;
+
     public event Action<IReadOnlyList<PoiViewModel>>? PoisLoaded;
     public event Action<PoiViewModel?>? ActivePoiChanged;
     public event Action<Location>? UserLocationChanged;
@@ -117,7 +128,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         if (!_initialized)
         {
-            _currentLanguage = await _poiRepository.GetCurrentLanguageAsync();
+            _currentLanguage = AppLanguageService.NormalizeLanguageCode(_languageService.CurrentLanguage) ?? "vi";
+            await _poiRepository.SetCurrentLanguageAsync(_currentLanguage);
             _initialized = true;
         }
 
@@ -131,17 +143,20 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public async Task SetLanguageAsync(string languageCode)
     {
+        _languageService.SetLanguage(languageCode);
+    }
+
+    private async Task ApplyLanguageAsync(string languageCode)
+    {
         _currentLanguage = string.IsNullOrWhiteSpace(languageCode) ? "vi" : languageCode.Trim().ToLowerInvariant();
         await _poiRepository.SetCurrentLanguageAsync(_currentLanguage);
+        OnPropertyChanged(nameof(CurrentLanguage));
         await ReloadPoisAsync(_currentLanguage);
-        StatusText = _currentLanguage == "en"
-            ? "Language switched to English."
-            : "Da chuyen ngon ngu sang tieng Viet.";
     }
 
     public async Task RefreshFromServerAsync()
     {
-        var synced = await _poiSyncService.TrySyncAsync();
+        var synced = await _poiSyncService.TrySyncAsync(_currentLanguage);
         await ReloadPoisAsync(_currentLanguage);
         if (synced)
         {
@@ -308,7 +323,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             return;
         }
 
-        StatusText = $"Dang gan: {newActive.Name}.";
+            StatusText = $"Dang gan: {newActive.Name}.";
         if (string.Equals(_currentAutoNarrationPoiId, newActive.Id, StringComparison.Ordinal))
         {
             return;
@@ -340,7 +355,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             }
 
             _lastAutoSyncAt = now;
-            var synced = await _poiSyncService.TrySyncAsync();
+            var synced = await _poiSyncService.TrySyncAsync(_currentLanguage);
             if (!synced)
             {
                 return;

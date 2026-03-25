@@ -35,6 +35,11 @@ public sealed class PoiRepository
             var resolvedName = !string.IsNullOrWhiteSpace(translation?.Name)
                 ? translation!.Name
                 : entity.Id;
+
+            if (!string.Equals(languageCode, "vi", StringComparison.OrdinalIgnoreCase))
+            {
+                resolvedName = TextNormalizer.RemoveDiacritics(resolvedName);
+            }
             var resolvedNarration = !string.IsNullOrWhiteSpace(translation?.TtsText)
                 ? translation!.TtsText
                 : translation?.Description ?? string.Empty;
@@ -52,7 +57,7 @@ public sealed class PoiRepository
                 ImageUrl = entity.ImageUrl,
                 MapLink = entity.MapLink,
                 AudioUrl = entity.AudioUrl,
-                Language = translation?.LangCode ?? "vi"
+                Language = languageCode
             });
         }
 

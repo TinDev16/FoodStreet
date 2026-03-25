@@ -1,6 +1,8 @@
-using Microsoft.Data.Sqlite;
-using System.Globalization;
+﻿using Microsoft.Data.Sqlite;
 using System.Diagnostics;
+using System.Globalization;
+using System.Net;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,234 +25,416 @@ var connectionString = $"Data Source={dbPath}";
 var adbReverseSync = new object();
 var lastAdbReverseAttemptUtc = DateTimeOffset.MinValue;
 
+var supportedLanguages = SupportedLanguage.CreateDefaults();
+var supportedLanguageSet = supportedLanguages.Select(x => x.Code).ToHashSet(StringComparer.OrdinalIgnoreCase);
+var translationApiKey = Environment.GetEnvironmentVariable("GOOGLE_TRANSLATE_API_KEY")?.Trim();
+if (string.IsNullOrWhiteSpace(translationApiKey))
+{
+    translationApiKey = "AIzaSyBe6oYZg8K70gk2HdDWo5n9UcqzIG2WqJo";
+}
+
 await InitializeDatabaseAsync(connectionString);
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
-app.MapGet("/api/shops", async (HttpContext context) =>
+app.Use(async (context, next) =>
 {
-    await TryEnsureAdbReverseAsync();
-    await using var connection = new SqliteConnection(connectionString);
-    await connection.OpenAsync();
-
-    const string sql = """
-        SELECT
-            p.id, p.latitude, p.longitude, p.radius_meters, p.image_url, p.audio_url,
-            t.name, t.description, t.tts_text
-        FROM pois p
-        LEFT JOIN poi_translations t ON p.id = t.poi_id AND t.lang_code = 'vi'
-        ORDER BY p.priority DESC, p.id ASC;
-        """;
-
-    var result = new List<ShopDto>();
-    await using var command = new SqliteCommand(sql, connection);
-    await using var reader = await command.ExecuteReaderAsync();
-    while (await reader.ReadAsync())
+    try
     {
-        var imageUrl = reader.IsDBNull(4) ? string.Empty : reader.GetString(4);
-        var audioUrl = reader.IsDBNull(5) ? string.Empty : reader.GetString(5);
-        result.Add(new ShopDto
+        await next();
+    }
+    catch (Exception ex)
+    {
+        try
         {
-            Id = reader.GetString(0),
-            Latitude = reader.GetDouble(1),
-            Longitude = reader.GetDouble(2),
-            RadiusMeters = reader.GetDouble(3),
-            ImageUrl = imageUrl,
-            AudioUrl = audioUrl,
-            ShopName = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
-            Description = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
-            TtsText = reader.IsDBNull(8) ? string.Empty : reader.GetString(8)
+            var logPath = Path.Combine(dataDirectory, "server-errors.log");
+            var entry = $"-----{Environment.NewLine}{DateTimeOffset.Now:O}{Environment.NewLine}{ex}{Environment.NewLine}";
+            await File.AppendAllTextAsync(logPath, entry);
+        }
+        catch
+        {
+        }
+
+        if (context.Response.HasStarted)
+        {
+            throw;
+        }
+
+        context.Response.Clear();
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        context.Response.ContentType = "application/json; charset=utf-8";
+        await context.Response.WriteAsJsonAsync(new
+        {
+            error = "Internal Server Error",
+            detail = ex.Message
         });
     }
-
-    return Results.Ok(result);
 });
 
-app.MapGet("/api/shops/{id}", async (string id) =>
+app.MapGet("/api/languages", () => Results.Ok(supportedLanguages));
+
+app.MapPost("/api/uploads", async (HttpContext context) =>
 {
     await TryEnsureAdbReverseAsync();
-    await using var connection = new SqliteConnection(connectionString);
-    await connection.OpenAsync();
 
-    const string sql = """
-        SELECT
-            p.id, p.latitude, p.longitude, p.radius_meters, p.image_url, p.audio_url,
-            t.name, t.description, t.tts_text
-        FROM pois p
-        LEFT JOIN poi_translations t ON p.id = t.poi_id AND t.lang_code = 'vi'
-        WHERE p.id = $id;
-        """;
-
-    await using var command = new SqliteCommand(sql, connection);
-    command.Parameters.AddWithValue("$id", id);
-    await using var reader = await command.ExecuteReaderAsync();
-    if (!await reader.ReadAsync())
+    if (!context.Request.HasFormContentType)
     {
-        return Results.NotFound();
+        return Results.BadRequest(new { error = "Expected multipart/form-data." });
     }
 
-    var imageUrl = reader.IsDBNull(4) ? string.Empty : reader.GetString(4);
-    var audioUrl = reader.IsDBNull(5) ? string.Empty : reader.GetString(5);
-    var item = new ShopDto
+    var kind = (context.Request.Query["kind"].ToString() ?? string.Empty).Trim().ToLowerInvariant();
+    if (kind is not ("image" or "audio"))
     {
-        Id = reader.GetString(0),
-        Latitude = reader.GetDouble(1),
-        Longitude = reader.GetDouble(2),
-        RadiusMeters = reader.GetDouble(3),
-        ImageUrl = imageUrl,
-        AudioUrl = audioUrl,
-        ShopName = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
-        Description = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
-        TtsText = reader.IsDBNull(8) ? string.Empty : reader.GetString(8)
+        return Results.BadRequest(new { error = "Invalid kind. Use kind=image or kind=audio." });
+    }
+
+    var lang = NormalizeAppLanguageCode(context.Request.Query["lang"].ToString());
+    if (!string.IsNullOrWhiteSpace(lang) && !supportedLanguageSet.Contains(lang))
+    {
+        return Results.BadRequest(new { error = $"Unsupported lang: {lang}" });
+    }
+
+    var form = await context.Request.ReadFormAsync();
+    var file = form.Files.GetFile("file") ?? form.Files.FirstOrDefault();
+    if (file is null || file.Length <= 0)
+    {
+        return Results.BadRequest(new { error = "Missing file." });
+    }
+
+    var ext = Path.GetExtension(file.FileName ?? string.Empty);
+    ext = string.IsNullOrWhiteSpace(ext) ? string.Empty : ext.Trim().ToLowerInvariant();
+
+    var allowed = kind switch
+    {
+        "image" => new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".png", ".gif", ".webp" },
+        _ => new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".mp3", ".wav", ".m4a", ".aac", ".ogg" }
     };
-    return Results.Ok(item);
+
+    if (!allowed.Contains(ext))
+    {
+        return Results.BadRequest(new { error = $"Unsupported file extension: {ext}" });
+    }
+
+    var safeLang = string.IsNullOrWhiteSpace(lang) ? "x" : lang;
+    var fileName = $"{kind}_{safeLang}_{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}{ext}";
+    var fullPath = Path.Combine(uploadDirectory, fileName);
+    if (!Path.GetFullPath(fullPath).StartsWith(Path.GetFullPath(uploadDirectory), StringComparison.OrdinalIgnoreCase))
+    {
+        return Results.BadRequest(new { error = "Invalid file path." });
+    }
+
+    await using (var stream = File.Create(fullPath))
+    {
+        await file.CopyToAsync(stream);
+    }
+
+    var url = $"/uploads/{fileName}";
+    var contentType = file.ContentType ?? string.Empty;
+    return Results.Ok(new { url, kind, lang = safeLang, contentType, size = file.Length });
 });
 
-app.MapPost("/api/shops", async (HttpRequest request) =>
+app.MapGet("/api/pois", async (HttpContext context) =>
 {
     await TryEnsureAdbReverseAsync();
-    if (!request.HasFormContentType)
+    var requestedLang = NormalizeLanguageOrFallback(context.Request.Query["lang"].ToString(), supportedLanguageSet);
+    var items = await GetPoisForMobileAsync(connectionString, requestedLang);
+    return Results.Ok(items);
+});
+
+// Admin list (includes inactive).
+app.MapGet("/api/pois/admin", async () =>
+{
+    await TryEnsureAdbReverseAsync();
+    var items = await GetPoisForAdminListAsync(connectionString);
+    return Results.Ok(items);
+});
+
+// Admin: load core + all translations.
+app.MapGet("/api/pois/{id}", async (string id) =>
+{
+    await TryEnsureAdbReverseAsync();
+    if (string.IsNullOrWhiteSpace(id))
     {
-        return Results.BadRequest(new { error = "Request must be multipart/form-data." });
+        return Results.BadRequest(new { error = "Missing id." });
     }
 
-    var form = await request.ReadFormAsync();
-
-    var id = form["id"].ToString().Trim();
-    var shopName = form["shopName"].ToString().Trim();
-    var gpsRaw = form["gps"].ToString().Trim();
-    var description = form["description"].ToString().Trim();
-    var ttsText = form["ttsText"].ToString().Trim();
-    var imageUrlInput = form["imageUrl"].ToString().Trim();
-    var clearAudioRequested = ParseBooleanForm(form["clearAudio"]);
-    var clearTtsRequested = ParseBooleanForm(form["clearTts"]);
-    var clearImageRequested = ParseBooleanForm(form["clearImage"]);
-
-    if (string.IsNullOrWhiteSpace(shopName))
+    await using var connection = await OpenConnectionAsync(connectionString);
+    if (!TryParsePoiId(id, out var poiId))
     {
-        return Results.BadRequest(new { error = "Ten shop bat buoc." });
+        return Results.BadRequest(new { error = "Invalid id." });
     }
 
-    if (!TryParseGps(gpsRaw, out var latitude, out var longitude))
+    var core = await GetPoiAdminAsync(connection, poiId);
+    return core is null ? Results.NotFound() : Results.Ok(core);
+});
+
+// Mobile: load localized view (fallback to Vietnamese when missing).
+app.MapGet("/api/pois/{id}/localized", async (HttpContext context, string id) =>
+{
+    await TryEnsureAdbReverseAsync();
+    if (string.IsNullOrWhiteSpace(id))
     {
-        return Results.BadRequest(new { error = "GPS khong hop le. Dung dang 'lat, lon'." });
+        return Results.BadRequest(new { error = "Missing id." });
     }
 
-    if (!double.TryParse(form["radiusMeters"], NumberStyles.Float, CultureInfo.InvariantCulture, out var radiusMeters) || radiusMeters <= 0)
+    var requestedLang = NormalizeLanguageOrFallback(context.Request.Query["lang"].ToString(), supportedLanguageSet);
+    await using var connection = await OpenConnectionAsync(connectionString);
+    if (!TryParsePoiId(id, out var poiId))
+    {
+        return Results.BadRequest(new { error = "Invalid id." });
+    }
+
+    var item = await GetPoiForMobileAsync(connection, poiId, requestedLang);
+    return item is null ? Results.NotFound() : Results.Ok(item);
+});
+
+app.MapPost("/api/pois", async (PoiAdminUpsertRequest request) =>
+{
+    await TryEnsureAdbReverseAsync();
+
+    if (request.Latitude is < -90 or > 90 || request.Longitude is < -180 or > 180)
+    {
+        return Results.BadRequest(new { error = "Latitude/Longitude khong hop le." });
+    }
+
+    if (request.RadiusMeters <= 0)
     {
         return Results.BadRequest(new { error = "Radius (m) phai lon hon 0." });
     }
 
-    var audioFile = form.Files.GetFile("audioFile");
-    var imageFile = form.Files.GetFile("imageFile");
-    string existingAudioUrl = string.Empty;
-    string existingImageUrl = string.Empty;
-    string existingTtsText = string.Empty;
+    var translations = request.Translations ?? [];
+    var normalizedTranslations = new List<PoiTranslationDto>();
+    var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var translationSeedByLang = new Dictionary<string, PoiTranslationDto>(StringComparer.OrdinalIgnoreCase);
 
-    await using var connection = new SqliteConnection(connectionString);
-    await connection.OpenAsync();
-
-    if (!string.IsNullOrWhiteSpace(id))
+    foreach (var t in translations)
     {
-        const string sqlCurrent = """
-            SELECT p.audio_url, p.image_url, t.tts_text
-            FROM pois p
-            LEFT JOIN poi_translations t ON p.id = t.poi_id AND t.lang_code = 'vi'
-            WHERE p.id = $id;
-            """;
-        await using var currentCommand = new SqliteCommand(sqlCurrent, connection);
-        currentCommand.Parameters.AddWithValue("$id", id);
-        await using var currentReader = await currentCommand.ExecuteReaderAsync();
-        if (await currentReader.ReadAsync())
+        var normalizedCode = NormalizeAppLanguageCode(t.LangCode) ?? "vi";
+        if (!supportedLanguageSet.Contains(normalizedCode))
         {
-            existingAudioUrl = currentReader.IsDBNull(0) ? string.Empty : currentReader.GetString(0);
-            existingImageUrl = currentReader.IsDBNull(1) ? string.Empty : currentReader.GetString(1);
-            existingTtsText = currentReader.IsDBNull(2) ? string.Empty : currentReader.GetString(2);
-        }
-    }
-
-    if (!string.IsNullOrWhiteSpace(imageUrlInput) && imageFile is not null && imageFile.Length > 0)
-    {
-        return Results.BadRequest(new { error = "Chi duoc chon 1 trong 2: link anh hoac upload anh." });
-    }
-
-    var finalAudioUrl = clearAudioRequested ? string.Empty : existingAudioUrl;
-    var finalTtsText = clearTtsRequested ? string.Empty : existingTtsText;
-    var finalImageUrl = clearImageRequested ? string.Empty : existingImageUrl;
-
-    if (audioFile is not null && audioFile.Length > 0)
-    {
-        if (!string.IsNullOrWhiteSpace(ttsText) || !string.IsNullOrWhiteSpace(finalTtsText))
-        {
-            return Results.BadRequest(new { error = "Audio va TTS chi duoc chon 1. Hay xoa TTS truoc." });
+            return Results.BadRequest(new { error = $"Unsupported lang_code: {t.LangCode}" });
         }
 
-        var ext = Path.GetExtension(audioFile.FileName);
-        var fileName = $"{Guid.NewGuid():N}{ext}";
-        var fullPath = Path.Combine(uploadDirectory, fileName);
-        await using var fs = File.Create(fullPath);
-        await audioFile.CopyToAsync(fs);
-        if (!string.IsNullOrWhiteSpace(existingAudioUrl) && !string.Equals(existingAudioUrl, $"/uploads/{fileName}", StringComparison.OrdinalIgnoreCase))
+        if (!seen.Add(normalizedCode))
         {
-            TryDeleteUploadedFile(uploadDirectory, existingAudioUrl);
+            return Results.BadRequest(new { error = $"Duplicate lang_code: {normalizedCode}" });
         }
 
-        finalAudioUrl = $"/uploads/{fileName}";
-        finalTtsText = string.Empty;
-    }
-    else if (!string.IsNullOrWhiteSpace(ttsText))
-    {
-        if (!string.IsNullOrWhiteSpace(finalAudioUrl))
+        var normalized = new PoiTranslationDto
         {
-            return Results.BadRequest(new { error = "Audio va TTS chi duoc chon 1. Hay xoa audio truoc." });
+            LangCode = normalizedCode,
+            Name = (t.Name ?? string.Empty).Trim(),
+            Description = (t.Description ?? string.Empty).Trim(),
+            TtsText = (t.TtsText ?? string.Empty).Trim(),
+            AudioUrl = (t.AudioUrl ?? string.Empty).Trim(),
+        };
+        translationSeedByLang[normalizedCode] = normalized;
+        normalizedTranslations.Add(normalized);
+    }
+
+    var sourceLangCode = NormalizeAppLanguageCode(request.SourceLangCode);
+    var sourceName = (request.SourceName ?? string.Empty).Trim();
+    var sourceDescription = (request.SourceDescription ?? string.Empty).Trim();
+    var sourceTtsText = (request.SourceTtsText ?? string.Empty).Trim();
+    var hasSourcePayload = !string.IsNullOrWhiteSpace(sourceLangCode)
+                           || !string.IsNullOrWhiteSpace(sourceName)
+                           || !string.IsNullOrWhiteSpace(sourceDescription)
+                           || !string.IsNullOrWhiteSpace(sourceTtsText);
+
+    if (hasSourcePayload)
+    {
+        if (string.IsNullOrWhiteSpace(sourceLangCode) || !supportedLanguageSet.Contains(sourceLangCode))
+        {
+            return Results.BadRequest(new { error = $"Unsupported sourceLangCode: {request.SourceLangCode}" });
         }
 
-        finalTtsText = ttsText;
-    }
-
-    if (clearAudioRequested && !string.IsNullOrWhiteSpace(existingAudioUrl))
-    {
-        TryDeleteUploadedFile(uploadDirectory, existingAudioUrl);
-    }
-
-    if (imageFile is not null && imageFile.Length > 0)
-    {
-        var ext = Path.GetExtension(imageFile.FileName);
-        var fileName = $"{Guid.NewGuid():N}{ext}";
-        var fullPath = Path.Combine(uploadDirectory, fileName);
-        await using var fs = File.Create(fullPath);
-        await imageFile.CopyToAsync(fs);
-        if (!string.IsNullOrWhiteSpace(existingImageUrl) && !string.Equals(existingImageUrl, $"/uploads/{fileName}", StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(sourceName))
         {
-            TryDeleteUploadedFile(uploadDirectory, existingImageUrl);
+            return Results.BadRequest(new { error = "Ten POI cua ngon ngu dau vao khong duoc de trong." });
         }
 
-        finalImageUrl = $"/uploads/{fileName}";
-    }
-    else if (!string.IsNullOrWhiteSpace(imageUrlInput))
-    {
-        finalImageUrl = imageUrlInput;
+        var generated = new List<PoiTranslationDto>(supportedLanguages.Count);
+        foreach (var lang in supportedLanguages)
+        {
+            var audioUrl = translationSeedByLang.TryGetValue(lang.Code, out var seed)
+                ? (seed.AudioUrl ?? string.Empty).Trim()
+                : string.Empty;
+
+            if (string.Equals(lang.Code, sourceLangCode, StringComparison.OrdinalIgnoreCase))
+            {
+                generated.Add(new PoiTranslationDto
+                {
+                    LangCode = lang.Code,
+                    Name = sourceName,
+                    Description = sourceDescription,
+                    TtsText = sourceTtsText,
+                    AudioUrl = audioUrl
+                });
+                continue;
+            }
+
+            try
+            {
+                var translated = await TranslatePoiContentAsync(
+                    translationApiKey ?? string.Empty,
+                    sourceLangCode,
+                    lang.Code,
+                    sourceName,
+                    sourceDescription,
+                    sourceTtsText);
+
+                generated.Add(new PoiTranslationDto
+                {
+                    LangCode = lang.Code,
+                    Name = translated.Name,
+                    Description = translated.Description,
+                    TtsText = translated.TtsText,
+                    AudioUrl = audioUrl
+                });
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { error = $"Khong the dich sang '{lang.Code}'.", detail = ex.Message });
+            }
+        }
+
+        normalizedTranslations = generated;
     }
 
-    if (clearImageRequested && !string.IsNullOrWhiteSpace(existingImageUrl))
+    if (!normalizedTranslations.Any(t => !string.IsNullOrWhiteSpace(t.Name)))
     {
-        TryDeleteUploadedFile(uploadDirectory, existingImageUrl);
+        return Results.BadRequest(new { error = "Khong duoc de trong ten POI o tat ca ngon ngu (khuyen nghi: vi)." });
     }
 
-    if (string.IsNullOrWhiteSpace(id))
+    long? poiId = null;
+    if (!string.IsNullOrWhiteSpace(request.Id))
     {
-        id = Guid.NewGuid().ToString("N");
+        if (!TryParsePoiId(request.Id, out var parsed))
+        {
+            return Results.BadRequest(new { error = "Invalid id." });
+        }
+
+        poiId = parsed;
     }
 
-    var mapLink = $"https://maps.google.com/?q={latitude},{longitude}";
+    var mapLink = string.IsNullOrWhiteSpace(request.MapLink)
+        ? $"https://maps.google.com/?q={request.Latitude.ToString(CultureInfo.InvariantCulture)},{request.Longitude.ToString(CultureInfo.InvariantCulture)}"
+        : request.MapLink.Trim();
+
+    await using var connection = await OpenConnectionAsync(connectionString);
 
     await using var transaction = await connection.BeginTransactionAsync();
-    await UpsertPoiAsync(connection, transaction, id, latitude, longitude, radiusMeters, mapLink, finalImageUrl, finalAudioUrl);
-    await UpsertTranslationAsync(connection, transaction, id, shopName, description, finalTtsText);
+
+    var savedId = await UpsertPoiCoreAsync(connection, transaction, new PoiCoreUpsert
+    {
+        Id = poiId,
+        Latitude = request.Latitude,
+        Longitude = request.Longitude,
+        RadiusMeters = request.RadiusMeters,
+        Priority = request.Priority,
+        MapLink = mapLink,
+        ImageUrl = (request.ImageUrl ?? string.Empty).Trim(),
+        AudioUrl = (request.AudioUrl ?? string.Empty).Trim(),
+        IsActive = request.IsActive
+    });
+
+    foreach (var t in normalizedTranslations)
+    {
+        await UpsertTranslationAsync(
+            connection,
+            transaction,
+            savedId,
+            t.LangCode,
+            t.Name,
+            t.Description,
+            t.TtsText,
+            t.AudioUrl);
+    }
+
     await transaction.CommitAsync();
 
-    return Results.Ok(new { id });
+    return Results.Ok(new { id = savedId.ToString(CultureInfo.InvariantCulture) });
+});
+
+app.MapDelete("/api/pois/{id}", async (string id) =>
+{
+    await TryEnsureAdbReverseAsync();
+    if (string.IsNullOrWhiteSpace(id))
+    {
+        return Results.BadRequest(new { error = "Missing id." });
+    }
+
+    if (!TryParsePoiId(id, out var poiId))
+    {
+        return Results.BadRequest(new { error = "Invalid id." });
+    }
+
+    var result = await DeletePoiAsync(connectionString, uploadDirectory, poiId);
+    return result switch
+    {
+        DeletePoiResult.Deleted => Results.Ok(new { id }),
+        DeletePoiResult.NotFound => Results.NotFound(),
+        _ => Results.Problem("Delete failed.")
+    };
+});
+
+// Legacy endpoints for older mobile build.
+app.MapGet("/api/shops", async (HttpContext context) =>
+{
+    await TryEnsureAdbReverseAsync();
+    var requestedLang = NormalizeLanguageOrFallback(context.Request.Query["lang"].ToString(), supportedLanguageSet);
+    var items = await GetPoisForMobileAsync(connectionString, requestedLang);
+    var legacy = items.Select(x => new ShopDto
+    {
+        Id = x.Id,
+        LangCode = x.LangCode,
+        Latitude = x.Latitude,
+        Longitude = x.Longitude,
+        RadiusMeters = x.RadiusMeters,
+        ImageUrl = x.ImageUrl,
+        AudioUrl = x.AudioUrl,
+        ShopName = x.Name,
+        Description = x.Description,
+        TtsText = x.TtsText
+    }).ToList();
+    return Results.Ok(legacy);
+});
+
+app.MapGet("/api/shops/{id}", async (HttpContext context, string id) =>
+{
+    await TryEnsureAdbReverseAsync();
+    if (string.IsNullOrWhiteSpace(id))
+    {
+        return Results.BadRequest(new { error = "Missing id." });
+    }
+
+    var requestedLang = NormalizeLanguageOrFallback(context.Request.Query["lang"].ToString(), supportedLanguageSet);
+    await using var connection = await OpenConnectionAsync(connectionString);
+    if (!TryParsePoiId(id, out var poiId))
+    {
+        return Results.BadRequest(new { error = "Invalid id." });
+    }
+
+    var item = await GetPoiForMobileAsync(connection, poiId, requestedLang);
+    if (item is null)
+    {
+        return Results.NotFound();
+    }
+
+    return Results.Ok(new ShopDto
+    {
+        Id = item.Id,
+        LangCode = item.LangCode,
+        Latitude = item.Latitude,
+        Longitude = item.Longitude,
+        RadiusMeters = item.RadiusMeters,
+        ImageUrl = item.ImageUrl,
+        AudioUrl = item.AudioUrl,
+        ShopName = item.Name,
+        Description = item.Description,
+        TtsText = item.TtsText
+    });
 });
 
 app.MapPost("/api/shops/upsert", async (ShopUpsertJsonRequest request) =>
@@ -271,18 +455,29 @@ app.MapPost("/api/shops/upsert", async (ShopUpsertJsonRequest request) =>
         return Results.BadRequest(new { error = "Radius (m) phai lon hon 0." });
     }
 
-    var id = string.IsNullOrWhiteSpace(request.Id)
-        ? Guid.NewGuid().ToString("N")
-        : request.Id.Trim();
+    long? poiId = null;
+    if (!string.IsNullOrWhiteSpace(request.Id))
+    {
+        if (TryParsePoiId(request.Id, out var parsed))
+        {
+            poiId = parsed;
+        }
+    }
 
-    await using var connection = new SqliteConnection(connectionString);
-    await connection.OpenAsync();
+    var langCode = NormalizeAppLanguageCode(request.LangCode) ?? "vi";
+    if (!supportedLanguageSet.Contains(langCode))
+    {
+        langCode = "vi";
+    }
+
+    await using var connection = await OpenConnectionAsync(connectionString);
 
     var currentAudioUrl = string.Empty;
     var currentImageUrl = string.Empty;
-    await using (var oldAudioCommand = new SqliteCommand("SELECT audio_url, image_url FROM pois WHERE id = $id;", connection))
+    if (poiId is not null)
     {
-        oldAudioCommand.Parameters.AddWithValue("$id", id);
+        await using var oldAudioCommand = new SqliteCommand("SELECT audio_url, image_url FROM pois WHERE id = $id;", connection);
+        oldAudioCommand.Parameters.AddWithValue("$id", poiId.Value);
         await using var reader = await oldAudioCommand.ExecuteReaderAsync();
         if (await reader.ReadAsync())
         {
@@ -297,65 +492,54 @@ app.MapPost("/api/shops/upsert", async (ShopUpsertJsonRequest request) =>
         return Results.BadRequest(new { error = "POI dang co audio file. Hay xoa audio truoc khi nhap TTS." });
     }
 
-    var mapLink = $"https://maps.google.com/?q={request.Latitude},{request.Longitude}";
+    var mapLink = $"https://maps.google.com/?q={request.Latitude.ToString(CultureInfo.InvariantCulture)},{request.Longitude.ToString(CultureInfo.InvariantCulture)}";
     await using var transaction = await connection.BeginTransactionAsync();
-    await UpsertPoiAsync(connection, transaction, id, request.Latitude, request.Longitude, request.RadiusMeters, mapLink, currentImageUrl, currentAudioUrl);
+    var savedId = await UpsertPoiCoreAsync(connection, transaction, new PoiCoreUpsert
+    {
+        Id = poiId,
+        Latitude = request.Latitude,
+        Longitude = request.Longitude,
+        RadiusMeters = request.RadiusMeters,
+        Priority = 0,
+        MapLink = mapLink,
+        ImageUrl = currentImageUrl,
+        AudioUrl = currentAudioUrl,
+        IsActive = true
+    });
     await UpsertTranslationAsync(
         connection,
         transaction,
-        id,
+        savedId,
+        langCode,
         request.ShopName.Trim(),
         request.Description?.Trim() ?? string.Empty,
-        finalTtsText);
+        finalTtsText,
+        audioUrl: string.Empty);
     await transaction.CommitAsync();
 
-    return Results.Ok(new { id });
+    return Results.Ok(new { id = savedId.ToString(CultureInfo.InvariantCulture) });
 });
 
 app.MapDelete("/api/shops/{id}", async (string id) =>
 {
     await TryEnsureAdbReverseAsync();
-    await using var connection = new SqliteConnection(connectionString);
-    await connection.OpenAsync();
-    await using var transaction = await connection.BeginTransactionAsync();
-    var oldAudioUrl = string.Empty;
-    var oldImageUrl = string.Empty;
-
-    await using (var loadAssets = new SqliteCommand("SELECT audio_url, image_url FROM pois WHERE id = $id;", connection))
+    if (string.IsNullOrWhiteSpace(id))
     {
-        loadAssets.Transaction = (SqliteTransaction)transaction;
-        loadAssets.Parameters.AddWithValue("$id", id);
-        await using var reader = await loadAssets.ExecuteReaderAsync();
-        if (await reader.ReadAsync())
-        {
-            oldAudioUrl = reader.IsDBNull(0) ? string.Empty : reader.GetString(0);
-            oldImageUrl = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
-        }
+        return Results.BadRequest(new { error = "Missing id." });
     }
 
-    await using (var deleteTranslations = new SqliteCommand("DELETE FROM poi_translations WHERE poi_id = $id;", connection))
+    if (!TryParsePoiId(id, out var poiId))
     {
-        deleteTranslations.Transaction = (SqliteTransaction)transaction;
-        deleteTranslations.Parameters.AddWithValue("$id", id);
-        await deleteTranslations.ExecuteNonQueryAsync();
+        return Results.BadRequest(new { error = "Invalid id." });
     }
 
-    int affected;
-    await using (var deletePoi = new SqliteCommand("DELETE FROM pois WHERE id = $id;", connection))
+    var result = await DeletePoiAsync(connectionString, uploadDirectory, poiId);
+    return result switch
     {
-        deletePoi.Transaction = (SqliteTransaction)transaction;
-        deletePoi.Parameters.AddWithValue("$id", id);
-        affected = await deletePoi.ExecuteNonQueryAsync();
-    }
-
-    await transaction.CommitAsync();
-    if (affected > 0)
-    {
-        TryDeleteUploadedFile(uploadDirectory, oldAudioUrl);
-        TryDeleteUploadedFile(uploadDirectory, oldImageUrl);
-    }
-
-    return affected == 0 ? Results.NotFound() : Results.NoContent();
+        DeletePoiResult.Deleted => Results.Ok(new { id }),
+        DeletePoiResult.NotFound => Results.NotFound(),
+        _ => Results.Problem("Delete failed.")
+    };
 });
 
 app.Run();
@@ -397,48 +581,22 @@ async Task TryEnsureAdbReverseAsync()
     }
 }
 
-static bool TryParseGps(string raw, out double latitude, out double longitude)
+static string NormalizeLanguageOrFallback(string? requested, HashSet<string> supportedLanguageSet)
 {
-    latitude = 0;
-    longitude = 0;
-
-    if (string.IsNullOrWhiteSpace(raw))
-    {
-        return false;
-    }
-
-    var parts = raw.Split(',', StringSplitOptions.TrimEntries);
-    if (parts.Length != 2)
-    {
-        return false;
-    }
-
-    if (!double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out latitude)
-        || !double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out longitude))
-    {
-        return false;
-    }
-
-    if (latitude is < -90 or > 90 || longitude is < -180 or > 180)
-    {
-        return false;
-    }
-
-    return true;
+    var normalized = NormalizeAppLanguageCode(requested) ?? "vi";
+    return supportedLanguageSet.Contains(normalized) ? normalized : "vi";
 }
 
-static bool ParseBooleanForm(Microsoft.Extensions.Primitives.StringValues values)
+static bool TryParsePoiId(string? raw, out long poiId)
 {
-    var raw = values.ToString();
+    poiId = 0;
     if (string.IsNullOrWhiteSpace(raw))
     {
         return false;
     }
 
-    return raw.Equals("1", StringComparison.OrdinalIgnoreCase)
-        || raw.Equals("true", StringComparison.OrdinalIgnoreCase)
-        || raw.Equals("on", StringComparison.OrdinalIgnoreCase)
-        || raw.Equals("yes", StringComparison.OrdinalIgnoreCase);
+    return long.TryParse(raw.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out poiId)
+           && poiId > 0;
 }
 
 static void TryDeleteUploadedFile(string uploadDirectory, string? assetUrl)
@@ -478,91 +636,680 @@ static void TryDeleteUploadedFile(string uploadDirectory, string? assetUrl)
     }
 }
 
-static async Task UpsertPoiAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, string id, double latitude, double longitude, double radiusMeters, string mapLink, string imageUrl, string audioUrl)
-{
-    const string sql = """
-        INSERT INTO pois (id, latitude, longitude, radius_meters, priority, map_link, image_url, audio_url, is_active)
-        VALUES ($id, $latitude, $longitude, $radius, 0, $map_link, $image_url, $audio_url, 1)
-        ON CONFLICT(id) DO UPDATE SET
-            latitude = excluded.latitude,
-            longitude = excluded.longitude,
-            radius_meters = excluded.radius_meters,
-            map_link = excluded.map_link,
-            image_url = excluded.image_url,
-            audio_url = excluded.audio_url;
-        """;
-
-    await using var command = new SqliteCommand(sql, connection);
-    command.Transaction = (SqliteTransaction)transaction;
-    command.Parameters.AddWithValue("$id", id);
-    command.Parameters.AddWithValue("$latitude", latitude);
-    command.Parameters.AddWithValue("$longitude", longitude);
-    command.Parameters.AddWithValue("$radius", radiusMeters);
-    command.Parameters.AddWithValue("$map_link", mapLink);
-    command.Parameters.AddWithValue("$image_url", imageUrl ?? string.Empty);
-    command.Parameters.AddWithValue("$audio_url", audioUrl ?? string.Empty);
-    await command.ExecuteNonQueryAsync();
-}
-
-static async Task UpsertTranslationAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, string id, string shopName, string description, string ttsText)
-{
-    const string sql = """
-        INSERT INTO poi_translations (poi_id, lang_code, name, description, tts_text)
-        VALUES ($id, 'vi', $name, $description, $tts_text)
-        ON CONFLICT(poi_id, lang_code) DO UPDATE SET
-            name = excluded.name,
-            description = excluded.description,
-            tts_text = excluded.tts_text;
-        """;
-
-    await using var command = new SqliteCommand(sql, connection);
-    command.Transaction = (SqliteTransaction)transaction;
-    command.Parameters.AddWithValue("$id", id);
-    command.Parameters.AddWithValue("$name", shopName);
-    command.Parameters.AddWithValue("$description", description ?? string.Empty);
-    command.Parameters.AddWithValue("$tts_text", ttsText ?? string.Empty);
-    await command.ExecuteNonQueryAsync();
-}
-
 static async Task InitializeDatabaseAsync(string connectionString)
 {
     await using var connection = new SqliteConnection(connectionString);
     await connection.OpenAsync();
+    await using (var pragma = new SqliteCommand("PRAGMA foreign_keys = ON;", connection))
+    {
+        await pragma.ExecuteNonQueryAsync();
+    }
 
-    const string sql = """
+    const string sql = @"
         CREATE TABLE IF NOT EXISTS pois (
-            id TEXT PRIMARY KEY,
-            latitude REAL NOT NULL,
-            longitude REAL NOT NULL,
-            radius_meters REAL NOT NULL,
-            priority INTEGER NOT NULL,
-            map_link TEXT NOT NULL DEFAULT '',
-            image_url TEXT NOT NULL DEFAULT '',
-            audio_url TEXT NOT NULL DEFAULT '',
-            is_active INTEGER NOT NULL DEFAULT 1
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            latitude REAL,
+            longitude REAL,
+            radius_meters REAL,
+            priority INTEGER,
+            map_link TEXT,
+            image_url TEXT,
+            audio_url TEXT,
+            is_active INTEGER
         );
 
         CREATE TABLE IF NOT EXISTS poi_translations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            poi_id TEXT NOT NULL,
-            lang_code TEXT NOT NULL,
-            name TEXT NOT NULL,
-            description TEXT NOT NULL DEFAULT '',
-            tts_text TEXT NOT NULL DEFAULT '',
-            UNIQUE(poi_id, lang_code),
+            poi_id INTEGER,
+            lang_code TEXT,
+            name TEXT,
+            description TEXT,
+            tts_text TEXT,
+            audio_url TEXT,
             FOREIGN KEY(poi_id) REFERENCES pois(id) ON DELETE CASCADE
         );
-        """;
+        ";
 
     await using (var command = new SqliteCommand(sql, connection))
     {
         await command.ExecuteNonQueryAsync();
     }
+
+    // Best-effort migration for existing databases.
+    try
+    {
+        await using var migrate = new SqliteCommand("ALTER TABLE poi_translations ADD COLUMN audio_url TEXT NOT NULL DEFAULT '';", connection);
+        await migrate.ExecuteNonQueryAsync();
+    }
+    catch
+    {
+        // Ignore when the column already exists.
+    }
+
+    // Ensure unique per poi/lang for upsert behavior (dedupe first if needed).
+    try
+    {
+        await using (var dedupe = new SqliteCommand("""
+            DELETE FROM poi_translations
+            WHERE id NOT IN (
+                SELECT MIN(id)
+                FROM poi_translations
+                GROUP BY poi_id, lang_code
+            );
+            """, connection))
+        {
+            await dedupe.ExecuteNonQueryAsync();
+        }
+
+        await using (var createIndex = new SqliteCommand("CREATE UNIQUE INDEX IF NOT EXISTS ux_poi_translations_poi_lang ON poi_translations(poi_id, lang_code);", connection))
+        {
+            await createIndex.ExecuteNonQueryAsync();
+        }
+    }
+    catch
+    {
+        // Best-effort only. If index cannot be created, translation upserts may fail.
+    }
+}
+
+static async Task<SqliteConnection> OpenConnectionAsync(string connectionString)
+{
+    var connection = new SqliteConnection(connectionString);
+    await connection.OpenAsync();
+    await using var pragma = new SqliteCommand("PRAGMA foreign_keys = ON;", connection);
+    await pragma.ExecuteNonQueryAsync();
+    return connection;
+}
+
+static async Task<List<PoiMobileDto>> GetPoisForMobileAsync(string connectionString, string requestedLang)
+{
+    await using var connection = await OpenConnectionAsync(connectionString);
+
+    const string sql = @"
+        SELECT
+            p.id,
+            p.latitude,
+            p.longitude,
+            p.radius_meters,
+            p.priority,
+            p.map_link,
+            p.image_url,
+            p.audio_url,
+            COALESCE(NULLIF(t_req.name, ''), t_vi.name, '') AS name,
+            COALESCE(NULLIF(t_req.description, ''), t_vi.description, '') AS description,
+            COALESCE(NULLIF(t_req.tts_text, ''), NULLIF(t_req.description, ''), NULLIF(t_vi.tts_text, ''), t_vi.description, '') AS tts_text,
+            COALESCE(NULLIF(t_req.audio_url, ''), NULLIF(t_vi.audio_url, ''), '') AS audio_lang
+        FROM pois p
+        LEFT JOIN poi_translations t_req ON p.id = t_req.poi_id AND t_req.lang_code = $lang_code
+        LEFT JOIN poi_translations t_vi ON p.id = t_vi.poi_id AND t_vi.lang_code = 'vi'
+        WHERE p.is_active = 1
+        ORDER BY p.priority DESC, p.id ASC;
+        ";
+
+    var result = new List<PoiMobileDto>();
+    await using var command = new SqliteCommand(sql, connection);
+    command.Parameters.AddWithValue("$lang_code", requestedLang);
+    await using var reader = await command.ExecuteReaderAsync();
+    while (await reader.ReadAsync())
+    {
+        var coreAudioUrl = reader.IsDBNull(7) ? string.Empty : reader.GetString(7);
+        var translatedAudioUrl = reader.IsDBNull(11) ? string.Empty : reader.GetString(11);
+        result.Add(new PoiMobileDto
+        {
+            Id = reader.GetInt64(0).ToString(CultureInfo.InvariantCulture),
+            LangCode = requestedLang,
+            Latitude = reader.GetDouble(1),
+            Longitude = reader.GetDouble(2),
+            RadiusMeters = reader.GetDouble(3),
+            Priority = reader.GetInt32(4),
+            MapLink = reader.IsDBNull(5) ? string.Empty : reader.GetString(5),
+            ImageUrl = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
+            AudioUrl = !string.IsNullOrWhiteSpace(translatedAudioUrl) ? translatedAudioUrl : coreAudioUrl,
+            Name = reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
+            Description = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
+            TtsText = reader.IsDBNull(10) ? string.Empty : reader.GetString(10),
+        });
+    }
+
+    return result;
+}
+
+static async Task<List<PoiAdminListItemDto>> GetPoisForAdminListAsync(string connectionString)
+{
+    await using var connection = await OpenConnectionAsync(connectionString);
+
+    const string sql = @"
+        SELECT
+            p.id,
+            p.latitude,
+            p.longitude,
+            p.radius_meters,
+            p.priority,
+            p.map_link,
+            p.image_url,
+            p.audio_url,
+            p.is_active,
+            COALESCE(NULLIF(t_vi.name, ''), '') AS name_vi
+        FROM pois p
+        LEFT JOIN poi_translations t_vi ON p.id = t_vi.poi_id AND t_vi.lang_code = 'vi'
+        ORDER BY p.priority DESC, p.id ASC;
+        ";
+
+    var result = new List<PoiAdminListItemDto>();
+    await using var command = new SqliteCommand(sql, connection);
+    await using var reader = await command.ExecuteReaderAsync();
+    while (await reader.ReadAsync())
+    {
+        result.Add(new PoiAdminListItemDto
+        {
+            Id = reader.GetInt64(0).ToString(CultureInfo.InvariantCulture),
+            Latitude = reader.GetDouble(1),
+            Longitude = reader.GetDouble(2),
+            RadiusMeters = reader.GetDouble(3),
+            Priority = reader.GetInt32(4),
+            MapLink = reader.IsDBNull(5) ? string.Empty : reader.GetString(5),
+            ImageUrl = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
+            AudioUrl = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
+            IsActive = reader.GetInt32(8) != 0,
+            NameVi = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
+        });
+    }
+
+    return result;
+}
+
+static async Task<PoiMobileDto?> GetPoiForMobileAsync(SqliteConnection connection, long id, string requestedLang)
+{
+    const string sql = @"
+        SELECT
+            p.id,
+            p.latitude,
+            p.longitude,
+            p.radius_meters,
+            p.priority,
+            p.map_link,
+            p.image_url,
+            p.audio_url,
+            COALESCE(NULLIF(t_req.name, ''), t_vi.name, '') AS name,
+            COALESCE(NULLIF(t_req.description, ''), t_vi.description, '') AS description,
+            COALESCE(NULLIF(t_req.tts_text, ''), NULLIF(t_req.description, ''), NULLIF(t_vi.tts_text, ''), t_vi.description, '') AS tts_text,
+            COALESCE(NULLIF(t_req.audio_url, ''), NULLIF(t_vi.audio_url, ''), '') AS audio_lang
+        FROM pois p
+        LEFT JOIN poi_translations t_req ON p.id = t_req.poi_id AND t_req.lang_code = $lang_code
+        LEFT JOIN poi_translations t_vi ON p.id = t_vi.poi_id AND t_vi.lang_code = 'vi'
+        WHERE p.id = $id;
+        ";
+
+    await using var command = new SqliteCommand(sql, connection);
+    command.Parameters.AddWithValue("$id", id);
+    command.Parameters.AddWithValue("$lang_code", requestedLang);
+    await using var reader = await command.ExecuteReaderAsync();
+    if (!await reader.ReadAsync())
+    {
+        return null;
+    }
+
+    var coreAudioUrl = reader.IsDBNull(7) ? string.Empty : reader.GetString(7);
+    var translatedAudioUrl = reader.IsDBNull(11) ? string.Empty : reader.GetString(11);
+    return new PoiMobileDto
+    {
+        Id = reader.GetInt64(0).ToString(CultureInfo.InvariantCulture),
+        LangCode = requestedLang,
+        Latitude = reader.GetDouble(1),
+        Longitude = reader.GetDouble(2),
+        RadiusMeters = reader.GetDouble(3),
+        Priority = reader.GetInt32(4),
+        MapLink = reader.IsDBNull(5) ? string.Empty : reader.GetString(5),
+        ImageUrl = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
+        AudioUrl = !string.IsNullOrWhiteSpace(translatedAudioUrl) ? translatedAudioUrl : coreAudioUrl,
+        Name = reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
+        Description = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
+        TtsText = reader.IsDBNull(10) ? string.Empty : reader.GetString(10),
+    };
+}
+
+static async Task<PoiAdminDto?> GetPoiAdminAsync(SqliteConnection connection, long id)
+{
+    const string coreSql = @"
+        SELECT id, latitude, longitude, radius_meters, priority, map_link, image_url, audio_url, is_active
+        FROM pois
+        WHERE id = $id;
+        ";
+
+    PoiAdminDto? core = null;
+    await using (var command = new SqliteCommand(coreSql, connection))
+    {
+        command.Parameters.AddWithValue("$id", id);
+        await using var reader = await command.ExecuteReaderAsync();
+        if (!await reader.ReadAsync())
+        {
+            return null;
+        }
+
+        core = new PoiAdminDto
+        {
+            Id = reader.GetInt64(0).ToString(CultureInfo.InvariantCulture),
+            Latitude = reader.GetDouble(1),
+            Longitude = reader.GetDouble(2),
+            RadiusMeters = reader.GetDouble(3),
+            Priority = reader.GetInt32(4),
+            MapLink = reader.IsDBNull(5) ? string.Empty : reader.GetString(5),
+            ImageUrl = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
+            AudioUrl = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
+            IsActive = reader.GetInt32(8) != 0,
+        };
+    }
+
+    const string translationSql = @"
+        SELECT lang_code, name, description, tts_text, audio_url
+        FROM poi_translations
+        WHERE poi_id = $id
+        ORDER BY lang_code ASC;
+        ";
+
+    var translations = new List<PoiTranslationDto>();
+    await using (var command = new SqliteCommand(translationSql, connection))
+    {
+        command.Parameters.AddWithValue("$id", id);
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            translations.Add(new PoiTranslationDto
+            {
+                LangCode = reader.IsDBNull(0) ? "vi" : reader.GetString(0),
+                Name = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                Description = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+                TtsText = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+                AudioUrl = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
+            });
+        }
+    }
+
+    core.Translations = translations;
+    return core;
+}
+
+static async Task<long> UpsertPoiCoreAsync(SqliteConnection connection, System.Data.Common.DbTransaction transaction, PoiCoreUpsert request)
+{
+    if (request.Id is null)
+    {
+        const string insertSql = @"
+            INSERT INTO pois (latitude, longitude, radius_meters, priority, map_link, image_url, audio_url, is_active)
+            VALUES ($latitude, $longitude, $radius, $priority, $map_link, $image_url, $audio_url, $is_active);
+            SELECT last_insert_rowid();
+            ";
+
+        await using var insert = new SqliteCommand(insertSql, connection);
+        insert.Transaction = (SqliteTransaction)transaction;
+        insert.Parameters.AddWithValue("$latitude", request.Latitude);
+        insert.Parameters.AddWithValue("$longitude", request.Longitude);
+        insert.Parameters.AddWithValue("$radius", request.RadiusMeters);
+        insert.Parameters.AddWithValue("$priority", request.Priority);
+        insert.Parameters.AddWithValue("$map_link", request.MapLink);
+        insert.Parameters.AddWithValue("$image_url", request.ImageUrl ?? string.Empty);
+        insert.Parameters.AddWithValue("$audio_url", request.AudioUrl ?? string.Empty);
+        insert.Parameters.AddWithValue("$is_active", request.IsActive ? 1 : 0);
+        var raw = await insert.ExecuteScalarAsync();
+        return Convert.ToInt64(raw, CultureInfo.InvariantCulture);
+    }
+
+    const string upsertSql = @"
+        INSERT INTO pois (id, latitude, longitude, radius_meters, priority, map_link, image_url, audio_url, is_active)
+        VALUES ($id, $latitude, $longitude, $radius, $priority, $map_link, $image_url, $audio_url, $is_active)
+        ON CONFLICT(id) DO UPDATE SET
+            latitude = excluded.latitude,
+            longitude = excluded.longitude,
+            radius_meters = excluded.radius_meters,
+            priority = excluded.priority,
+            map_link = excluded.map_link,
+            image_url = excluded.image_url,
+            audio_url = excluded.audio_url,
+            is_active = excluded.is_active;
+        ";
+
+    await using var command = new SqliteCommand(upsertSql, connection);
+    command.Transaction = (SqliteTransaction)transaction;
+    command.Parameters.AddWithValue("$id", request.Id.Value);
+    command.Parameters.AddWithValue("$latitude", request.Latitude);
+    command.Parameters.AddWithValue("$longitude", request.Longitude);
+    command.Parameters.AddWithValue("$radius", request.RadiusMeters);
+    command.Parameters.AddWithValue("$priority", request.Priority);
+    command.Parameters.AddWithValue("$map_link", request.MapLink);
+    command.Parameters.AddWithValue("$image_url", request.ImageUrl ?? string.Empty);
+    command.Parameters.AddWithValue("$audio_url", request.AudioUrl ?? string.Empty);
+    command.Parameters.AddWithValue("$is_active", request.IsActive ? 1 : 0);
+    await command.ExecuteNonQueryAsync();
+    return request.Id.Value;
+}
+
+static async Task UpsertTranslationAsync(
+    SqliteConnection connection,
+    System.Data.Common.DbTransaction transaction,
+    long poiId,
+    string langCode,
+    string name,
+    string description,
+    string ttsText,
+    string audioUrl)
+{
+    const string sql = @"
+        INSERT INTO poi_translations (poi_id, lang_code, name, description, tts_text, audio_url)
+        VALUES ($id, $lang_code, $name, $description, $tts_text, $audio_url)
+        ON CONFLICT(poi_id, lang_code) DO UPDATE SET
+            name = excluded.name,
+            description = excluded.description,
+            tts_text = excluded.tts_text,
+            audio_url = excluded.audio_url;
+        ";
+
+    await using var command = new SqliteCommand(sql, connection);
+    command.Transaction = (SqliteTransaction)transaction;
+    command.Parameters.AddWithValue("$id", poiId);
+    command.Parameters.AddWithValue("$lang_code", string.IsNullOrWhiteSpace(langCode) ? "vi" : langCode.Trim());
+    command.Parameters.AddWithValue("$name", name ?? string.Empty);
+    command.Parameters.AddWithValue("$description", description ?? string.Empty);
+    command.Parameters.AddWithValue("$tts_text", ttsText ?? string.Empty);
+    command.Parameters.AddWithValue("$audio_url", audioUrl ?? string.Empty);
+    await command.ExecuteNonQueryAsync();
+}
+
+static async Task<DeletePoiResult> DeletePoiAsync(string connectionString, string uploadDirectory, long id)
+{
+    await using var connection = await OpenConnectionAsync(connectionString);
+    await using var transaction = await connection.BeginTransactionAsync();
+
+    var assetsToDelete = new List<string>();
+    const string selectAssets = "SELECT image_url, audio_url FROM pois WHERE id = $id;";
+    await using (var cmd = new SqliteCommand(selectAssets, connection))
+    {
+        cmd.Transaction = (SqliteTransaction)transaction;
+        cmd.Parameters.AddWithValue("$id", id);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        if (!await reader.ReadAsync())
+        {
+            return DeletePoiResult.NotFound;
+        }
+
+        if (!reader.IsDBNull(0))
+        {
+            assetsToDelete.Add(reader.GetString(0));
+        }
+
+        if (!reader.IsDBNull(1))
+        {
+            assetsToDelete.Add(reader.GetString(1));
+        }
+    }
+
+    const string selectTranslationAudio = "SELECT audio_url FROM poi_translations WHERE poi_id = $id;";
+    await using (var cmd = new SqliteCommand(selectTranslationAudio, connection))
+    {
+        cmd.Transaction = (SqliteTransaction)transaction;
+        cmd.Parameters.AddWithValue("$id", id);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            if (!reader.IsDBNull(0))
+            {
+                assetsToDelete.Add(reader.GetString(0));
+            }
+        }
+    }
+
+    const string deletePoiSql = "DELETE FROM pois WHERE id = $id;";
+    int affected;
+    await using (var cmd = new SqliteCommand(deletePoiSql, connection))
+    {
+        cmd.Transaction = (SqliteTransaction)transaction;
+        cmd.Parameters.AddWithValue("$id", id);
+        affected = await cmd.ExecuteNonQueryAsync();
+    }
+
+    await transaction.CommitAsync();
+
+    if (affected <= 0)
+    {
+        return DeletePoiResult.NotFound;
+    }
+
+    foreach (var asset in assetsToDelete.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase))
+    {
+        TryDeleteUploadedFile(uploadDirectory, asset);
+    }
+
+    return DeletePoiResult.Deleted;
+}
+
+static string? NormalizeAppLanguageCode(string? languageCode)
+{
+    if (string.IsNullOrWhiteSpace(languageCode))
+    {
+        return null;
+    }
+
+    var trimmed = languageCode.Trim().Replace('_', '-');
+    var parts = trimmed.Split('-', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    if (parts.Length == 0)
+    {
+        return null;
+    }
+
+    return parts[0].ToLowerInvariant();
+}
+
+static async Task<(string Name, string Description, string TtsText)> TranslatePoiContentAsync(
+    string apiKey,
+    string sourceLangCode,
+    string targetLangCode,
+    string name,
+    string description,
+    string ttsText)
+{
+    var sourceValues = new[] { name ?? string.Empty, description ?? string.Empty, ttsText ?? string.Empty };
+    var sourceIndexes = new List<int>();
+    var textsToTranslate = new List<string>();
+
+    for (var i = 0; i < sourceValues.Length; i++)
+    {
+        if (!string.IsNullOrWhiteSpace(sourceValues[i]))
+        {
+            sourceIndexes.Add(i);
+            textsToTranslate.Add(sourceValues[i]);
+        }
+    }
+
+    if (textsToTranslate.Count == 0)
+    {
+        return (string.Empty, string.Empty, string.Empty);
+    }
+
+    var translatedTexts = await TranslateTextsAsync(apiKey, sourceLangCode, targetLangCode, textsToTranslate);
+    if (translatedTexts.Count != textsToTranslate.Count)
+    {
+        throw new InvalidOperationException($"Cloud Translation response mismatch for target '{targetLangCode}'.");
+    }
+
+    var result = new[] { string.Empty, string.Empty, string.Empty };
+    for (var i = 0; i < sourceIndexes.Count; i++)
+    {
+        result[sourceIndexes[i]] = translatedTexts[i];
+    }
+
+    return (result[0], result[1], result[2]);
+}
+
+static async Task<List<string>> TranslateTextsAsync(
+    string apiKey,
+    string sourceLangCode,
+    string targetLangCode,
+    IReadOnlyList<string> texts)
+{
+    if (string.IsNullOrWhiteSpace(apiKey))
+    {
+        throw new InvalidOperationException("Google Cloud Translation API key is missing.");
+    }
+
+    if (texts.Count == 0)
+    {
+        return [];
+    }
+
+    var formFields = new List<KeyValuePair<string, string>>
+    {
+        new("source", sourceLangCode),
+        new("target", targetLangCode),
+        new("format", "text")
+    };
+    foreach (var text in texts)
+    {
+        formFields.Add(new KeyValuePair<string, string>("q", text));
+    }
+
+    var endpoint = $"https://translation.googleapis.com/language/translate/v2?key={Uri.EscapeDataString(apiKey)}";
+    using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
+    {
+        Content = new FormUrlEncodedContent(formFields)
+    };
+    using var httpClient = new HttpClient();
+    using var response = await httpClient.SendAsync(request);
+    var body = await response.Content.ReadAsStringAsync();
+    if (!response.IsSuccessStatusCode)
+    {
+        throw new InvalidOperationException($"Cloud Translation API error ({(int)response.StatusCode}): {body}");
+    }
+
+    using var doc = JsonDocument.Parse(body);
+    if (!doc.RootElement.TryGetProperty("data", out var data)
+        || !data.TryGetProperty("translations", out var translationsElement)
+        || translationsElement.ValueKind != JsonValueKind.Array)
+    {
+        throw new InvalidOperationException("Cloud Translation API response format is invalid.");
+    }
+
+    var translated = new List<string>(translationsElement.GetArrayLength());
+    foreach (var item in translationsElement.EnumerateArray())
+    {
+        var text = item.TryGetProperty("translatedText", out var translatedTextElement)
+            ? translatedTextElement.GetString() ?? string.Empty
+            : string.Empty;
+        translated.Add(WebUtility.HtmlDecode(text));
+    }
+
+    return translated;
+}
+
+enum DeletePoiResult
+{
+    Unknown = 0,
+    NotFound = 1,
+    Deleted = 2
+}
+
+sealed class SupportedLanguage
+{
+    public required string Code { get; init; }
+    public required string Label { get; init; }
+
+    public static IReadOnlyList<SupportedLanguage> CreateDefaults()
+        =>
+        [
+            new SupportedLanguage { Code = "vi", Label = "Tiếng Việt (vi)" },
+            new SupportedLanguage { Code = "en", Label = "English (en)" },
+            new SupportedLanguage { Code = "zh", Label = "中文 (zh)" },
+            new SupportedLanguage { Code = "ja", Label = "日本語 (ja)" },
+            new SupportedLanguage { Code = "ru", Label = "Русский (ru)" },
+            new SupportedLanguage { Code = "ko", Label = "한국어 (ko)" },
+        ];
+}
+
+sealed class PoiMobileDto
+{
+    public string Id { get; set; } = string.Empty;
+    public string LangCode { get; set; } = "vi";
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string TtsText { get; set; } = string.Empty;
+    public double Latitude { get; set; }
+    public double Longitude { get; set; }
+    public double RadiusMeters { get; set; }
+    public int Priority { get; set; }
+    public string MapLink { get; set; } = string.Empty;
+    public string ImageUrl { get; set; } = string.Empty;
+    public string AudioUrl { get; set; } = string.Empty;
+}
+
+sealed class PoiAdminListItemDto
+{
+    public string Id { get; set; } = string.Empty;
+    public double Latitude { get; set; }
+    public double Longitude { get; set; }
+    public double RadiusMeters { get; set; }
+    public int Priority { get; set; }
+    public string MapLink { get; set; } = string.Empty;
+    public string ImageUrl { get; set; } = string.Empty;
+    public string AudioUrl { get; set; } = string.Empty;
+    public bool IsActive { get; set; }
+    public string NameVi { get; set; } = string.Empty;
+}
+
+sealed class PoiTranslationDto
+{
+    public string LangCode { get; set; } = "vi";
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string TtsText { get; set; } = string.Empty;
+    public string AudioUrl { get; set; } = string.Empty;
+}
+
+sealed class PoiAdminDto
+{
+    public string Id { get; set; } = string.Empty;
+    public double Latitude { get; set; }
+    public double Longitude { get; set; }
+    public double RadiusMeters { get; set; } = 40;
+    public int Priority { get; set; }
+    public string MapLink { get; set; } = string.Empty;
+    public string ImageUrl { get; set; } = string.Empty;
+    public string AudioUrl { get; set; } = string.Empty;
+    public bool IsActive { get; set; } = true;
+    public List<PoiTranslationDto> Translations { get; set; } = [];
+}
+
+sealed class PoiAdminUpsertRequest
+{
+    public string? Id { get; set; }
+    public double Latitude { get; set; }
+    public double Longitude { get; set; }
+    public double RadiusMeters { get; set; } = 40;
+    public int Priority { get; set; }
+    public string? MapLink { get; set; }
+    public string? ImageUrl { get; set; }
+    public string? AudioUrl { get; set; }
+    public bool IsActive { get; set; } = true;
+    public string? SourceLangCode { get; set; }
+    public string? SourceName { get; set; }
+    public string? SourceDescription { get; set; }
+    public string? SourceTtsText { get; set; }
+    public List<PoiTranslationDto>? Translations { get; set; }
+}
+
+sealed class PoiCoreUpsert
+{
+    public required long? Id { get; init; }
+    public required double Latitude { get; init; }
+    public required double Longitude { get; init; }
+    public required double RadiusMeters { get; init; }
+    public required int Priority { get; init; }
+    public required string MapLink { get; init; }
+    public required string ImageUrl { get; init; }
+    public required string AudioUrl { get; init; }
+    public required bool IsActive { get; init; }
 }
 
 sealed class ShopDto
 {
     public string Id { get; set; } = string.Empty;
+    public string LangCode { get; set; } = "vi";
     public string ShopName { get; set; } = string.Empty;
     public double Latitude { get; set; }
     public double Longitude { get; set; }
@@ -576,6 +1323,7 @@ sealed class ShopDto
 sealed class ShopUpsertJsonRequest
 {
     public string? Id { get; set; }
+    public string? LangCode { get; set; }
     public string ShopName { get; set; } = string.Empty;
     public double Latitude { get; set; }
     public double Longitude { get; set; }

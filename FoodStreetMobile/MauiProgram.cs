@@ -35,11 +35,15 @@ public static class MauiProgram
         builder.Services.AddSingleton<PoiRepository>();
         builder.Services.AddSingleton<AppDatabase>();
         builder.Services.AddSingleton<PoiSyncService>();
+        builder.Services.AddSingleton<AppLanguageService>();
         builder.Services.AddSingleton<GeofenceEngine>();
         builder.Services.AddSingleton<NarrationEngine>();
         builder.Services.AddSingleton<LocationTracker>();
         builder.Services.AddSingleton<MainViewModel>();
+        builder.Services.AddSingleton<ProfileViewModel>();
+        builder.Services.AddSingleton<HomePage>();
         builder.Services.AddSingleton<MainPage>();
+        builder.Services.AddSingleton<ProfilePage>();
         builder.Services.AddSingleton<AppShell>();
 
 #if DEBUG

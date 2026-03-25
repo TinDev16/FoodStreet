@@ -1,29 +1,46 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:loc="clr-namespace:FoodStreetMobile.Localization"
              x:Class="FoodStreetMobile.ProfilePage"
              BackgroundColor="#F2F2F2"
-             Title="Cá nhân">
+             Title="{loc:Translate Key=Profile_Title}">
 
-    <Grid>
-        <Border Margin="20"
-                Padding="24"
-                BackgroundColor="White"
-                Stroke="#EFE4DB"
-                StrokeShape="RoundRectangle 20">
-            <VerticalStackLayout Spacing="8"
-                                 VerticalOptions="Center"
-                                 HorizontalOptions="Center">
-                <Label Text="Tài khoản"
-                       FontSize="28"
-                       FontAttributes="Bold"
-                       TextColor="#2C1C19"
-                       HorizontalTextAlignment="Center" />
-                <Label Text="Nội dung cá nhân sẽ được cập nhật sau."
-                       FontSize="16"
-                       TextColor="#8E7A6D"
-                       HorizontalTextAlignment="Center" />
-            </VerticalStackLayout>
-        </Border>
-    </Grid>
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="16">
+            <Border Padding="24"
+                    BackgroundColor="White"
+                    Stroke="#EFE4DB"
+                    StrokeShape="RoundRectangle 20">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="{loc:Translate Key=Profile_AccountHeader}"
+                           FontSize="28"
+                           FontAttributes="Bold"
+                           TextColor="#2C1C19"
+                           HorizontalTextAlignment="Center" />
+                    <Label Text="{loc:Translate Key=Profile_AccountHint}"
+                           FontSize="16"
+                           TextColor="#8E7A6D"
+                           HorizontalTextAlignment="Center" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Padding="18"
+                    BackgroundColor="White"
+                    Stroke="#EFE4DB"
+                    StrokeShape="RoundRectangle 18">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="{loc:Translate Key=Profile_LanguageLabel}"
+                           FontSize="16"
+                           FontAttributes="Bold"
+                           TextColor="#2C1C19" />
+
+                    <Picker ItemsSource="{Binding Languages}"
+                            ItemDisplayBinding="{Binding Label}"
+                            SelectedItem="{Binding SelectedLanguage}" />
+                </VerticalStackLayout>
+            </Border>
+        </VerticalStackLayout>
+    </ScrollView>
 </ContentPage>
+

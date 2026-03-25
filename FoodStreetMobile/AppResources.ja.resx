@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <data name="Profile_Title" xml:space="preserve">
+    <value>プロフィール</value>
+  </data>
+  <data name="Profile_AccountHeader" xml:space="preserve">
+    <value>アカウント</value>
+  </data>
+  <data name="Profile_AccountHint" xml:space="preserve">
+    <value>個人情報は後ほど更新されます。</value>
+  </data>
+  <data name="Profile_LanguageLabel" xml:space="preserve">
+    <value>言語</value>
+  </data>
+
+  <data name="Main_ExploreVinhKhanh" xml:space="preserve">
+    <value>ヴィン・カインを探索</value>
+  </data>
+  <data name="Main_SearchPlaceholder" xml:space="preserve">
+    <value>場所や料理を検索...</value>
+  </data>
+  <data name="Main_SheetNoPlaceSelected" xml:space="preserve">
+    <value>場所が選択されていません</value>
+  </data>
+  <data name="Main_SheetHintSelectPlace" xml:space="preserve">
+    <value>キーワードを入力して場所を選択してください。</value>
+  </data>
+  <data name="Main_Volume" xml:space="preserve">
+    <value>音量</value>
+  </data>
+  <data name="Main_Directions" xml:space="preserve">
+    <value>ルート</value>
+  </data>
+  <data name="Main_PlayAudio" xml:space="preserve">
+    <value>音声再生</value>
+  </data>
+  <data name="Main_Save" xml:space="preserve">
+    <value>保存</value>
+  </data>
+  <data name="Main_Share" xml:space="preserve">
+    <value>共有</value>
+  </data>
+
+  <data name="Home_HeaderTitle" xml:space="preserve">
+    <value>ヴィン・カイン</value>
+  </data>
+  <data name="Home_HeaderSubtitle" xml:space="preserve">
+    <value>屋台グルメの楽園</value>
+  </data>
+  <data name="Home_SearchPlaceholder" xml:space="preserve">
+    <value>料理やお店を検索...</value>
+  </data>
+  <data name="Home_CategoriesTitle" xml:space="preserve">
+    <value>カテゴリ</value>
+  </data>
+  <data name="Home_ViewAll" xml:space="preserve">
+    <value>すべて見る →</value>
+  </data>
+  <data name="Home_CategoryPhoBun" xml:space="preserve">
+    <value>フォー &amp; 麺</value>
+  </data>
+  <data name="Home_CategoryBanhMi" xml:space="preserve">
+    <value>バインミー</value>
+  </data>
+  <data name="Home_CategoryCom" xml:space="preserve">
+    <value>ご飯</value>
+  </data>
+  <data name="Home_CategoryCoffee" xml:space="preserve">
+    <value>コーヒー</value>
+  </data>
+  <data name="Home_CategoryDessert" xml:space="preserve">
+    <value>デザート</value>
+  </data>
+  <data name="Home_CategoryDrinks" xml:space="preserve">
+    <value>ドリンク</value>
+  </data>
+  <data name="Home_FeaturedTitle" xml:space="preserve">
+    <value>おすすめ</value>
+  </data>
+  <data name="Home_RatingLocation" xml:space="preserve">
+    <value>4.8 · ヴィン・カイン</value>
+  </data>
+  <data name="Home_PromoToday" xml:space="preserve">
+    <value>🎉 本日の特典</value>
+  </data>
+  <data name="Home_PromoDiscount" xml:space="preserve">
+    <value>初回注文 20% OFF</value>
+  </data>
+  <data name="Home_PromoValidUntil" xml:space="preserve">
+    <value>28/02 まで有効</value>
+  </data>
+  <data name="Home_PromoUseNow" xml:space="preserve">
+    <value>今すぐ使う</value>
+  </data>
+  <data name="Main_RadiusFallbackMeters" xml:space="preserve">
+    <value>半径: {0} m</value>
+  </data>
+  <data name="Main_DistanceMetersFormat" xml:space="preserve">
+    <value>距離: {0} m</value>
+  </data>
+  <data name="Home_FeaturedItem1" xml:space="preserve">
+    <value>Oc Dao</value>
+  </data>
+  <data name="Home_FeaturedItem2" xml:space="preserve">
+    <value>Pizza 4P's</value>
+  </data>
+  <data name="Home_FeaturedItem3" xml:space="preserve">
+    <value>Bun Thit Nuong Co Lien</value>
+  </data>
+  <data name="Home_FeaturedItem4" xml:space="preserve">
+    <value>Lau Thai Mama</value>
+  </data>
+</root>

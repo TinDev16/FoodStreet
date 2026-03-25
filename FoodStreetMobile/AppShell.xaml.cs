@@ -2,7 +2,7 @@ namespace FoodStreetMobile;
 
 public partial class AppShell : Shell
 {
-    public AppShell(MainPage mainPage)
+    public AppShell(MainPage mainPage, HomePage homePage, ProfilePage profilePage)
     {
         InitializeComponent();
         FlyoutBehavior = FlyoutBehavior.Disabled;
@@ -17,7 +17,7 @@ public partial class AppShell : Shell
                 new ShellContent
                 {
                     Route = "HomePage",
-                    Content = new HomePage()
+                    Content = homePage
                 }
             }
         });
@@ -43,7 +43,7 @@ public partial class AppShell : Shell
                 new ShellContent
                 {
                     Route = "ProfilePage",
-                    Content = new ProfilePage()
+                    Content = profilePage
                 }
             }
         });

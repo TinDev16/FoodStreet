@@ -2,8 +2,9 @@ namespace FoodStreetMobile;
 
 public partial class ProfilePage : ContentPage
 {
-    public ProfilePage()
+    public ProfilePage(ViewModels.ProfileViewModel viewModel)
     {
         InitializeComponent();
+        BindingContext = viewModel;
     }
 }

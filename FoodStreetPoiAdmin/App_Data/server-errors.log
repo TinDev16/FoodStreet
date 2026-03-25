@@ -1,0 +1,69 @@
+-----
+2026-03-20T00:29:43.9959445+07:00
+Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 20: 'datatype mismatch'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteNonQuery()
+   at System.Data.Common.DbCommand.ExecuteNonQueryAsync(CancellationToken cancellationToken)
+--- End of stack trace from previous location ---
+   at Program.<<Main>$>g__UpsertPoiCoreAsync|0_23(SqliteConnection connection, DbTransaction transaction, PoiCoreUpsert request) in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 745
+   at Program.<<Main>$>g__UpsertPoiCoreAsync|0_23(SqliteConnection connection, DbTransaction transaction, PoiCoreUpsert request) in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 745
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__8>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 172
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__8>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 200
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__8>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 200
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.<>c__DisplayClass102_2.<<HandleRequestBodyAndCompileRequestDelegateForJson>b__2>d.MoveNext()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__2>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 38
+-----
+2026-03-20T00:31:32.5191176+07:00
+Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 20: 'datatype mismatch'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteNonQuery()
+   at System.Data.Common.DbCommand.ExecuteNonQueryAsync(CancellationToken cancellationToken)
+--- End of stack trace from previous location ---
+   at Program.<<Main>$>g__UpsertPoiCoreAsync|0_23(SqliteConnection connection, DbTransaction transaction, PoiCoreUpsert request) in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 745
+   at Program.<<Main>$>g__UpsertPoiCoreAsync|0_23(SqliteConnection connection, DbTransaction transaction, PoiCoreUpsert request) in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 745
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__8>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 172
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__8>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 200
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__8>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 200
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.<>c__DisplayClass102_2.<<HandleRequestBodyAndCompileRequestDelegateForJson>b__2>d.MoveNext()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__2>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 38
+-----
+2026-03-20T00:31:45.4294272+07:00
+Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 20: 'datatype mismatch'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteNonQuery()
+   at System.Data.Common.DbCommand.ExecuteNonQueryAsync(CancellationToken cancellationToken)
+--- End of stack trace from previous location ---
+   at Program.<<Main>$>g__UpsertPoiCoreAsync|0_23(SqliteConnection connection, DbTransaction transaction, PoiCoreUpsert request) in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 745
+   at Program.<<Main>$>g__UpsertPoiCoreAsync|0_23(SqliteConnection connection, DbTransaction transaction, PoiCoreUpsert request) in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 745
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__8>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 172
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__8>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 200
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__8>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 200
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.<>c__DisplayClass102_2.<<HandleRequestBodyAndCompileRequestDelegateForJson>b__2>d.MoveNext()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__2>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 38

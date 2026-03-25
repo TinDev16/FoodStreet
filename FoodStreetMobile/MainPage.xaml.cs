@@ -1,4 +1,5 @@
 ﻿using FoodStreetMobile.ViewModels;
+using FoodStreetMobile.Services;
 using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.ApplicationModel.DataTransfer;
 using Microsoft.Maui.Controls.Maps;
@@ -89,6 +90,7 @@ public partial class MainPage : ContentPage
     private bool _ttsIsPlaying;
     private bool _isTtsSeeking;
     private Locale? _preferredTtsLocale;
+    private string? _preferredTtsLocaleLanguage;
 
     private bool _sheetInitialized;
     private double _sheetExpandedTranslation;
@@ -118,17 +120,31 @@ public partial class MainPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        EnsureBottomSheetLayout();
-        await EnsureUserLocationEnabledAsync();
-        await _viewModel.InitializeAsync();
-        _ = ShowStatusBannerForOneSecondAsync();
-
-        if (_viewModel.Pois.Count == 0)
+        try
         {
-            await DisplayAlertAsync(
-                "Chua co POI",
-                $"{_viewModel.StatusText}\nNeu ban dung Android emulator, thu HOST = http://10.0.2.2:5187",
-                "OK");
+            EnsureBottomSheetLayout();
+            await EnsureUserLocationEnabledAsync();
+            await _viewModel.InitializeAsync();
+            _ = ShowStatusBannerForOneSecondAsync();
+
+            if (_viewModel.Pois.Count == 0)
+            {
+                await DisplayAlertAsync(
+                    "Chua co POI",
+                    $"{_viewModel.StatusText}\nNeu ban dung Android emulator, thu HOST = http://10.0.2.2:5187",
+                    "OK");
+            }
+        }
+        catch (Exception ex)
+        {
+            Services.CrashLogger.Write("MainPage.OnAppearing", ex);
+            try
+            {
+                await DisplayAlertAsync("Loi", ex.Message, "OK");
+            }
+            catch
+            {
+            }
         }
     }
 
@@ -196,8 +212,8 @@ public partial class MainPage : ContentPage
             _activePoiPin = new Pin
             {
                 Label = string.IsNullOrWhiteSpace(active.Name)
-                    ? "POI (Đang gần)"
-                    : $"{active.Name.Trim()} (Đang gần)",
+                    ? "POI"
+                    : active.Name.Trim(),
                 Address = $"{active.Latitude.ToString(CultureInfo.InvariantCulture)}, {active.Longitude.ToString(CultureInfo.InvariantCulture)}",
                 Type = PinType.Place,
                 Location = new MauiLocation(active.Latitude, active.Longitude)
@@ -624,7 +640,7 @@ public partial class MainPage : ContentPage
         var parameters = new List<string>
         {
             $"input={Uri.EscapeDataString(query)}",
-            "language=vi",
+            $"language={Uri.EscapeDataString(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName)}",
             "types=establishment|geocode",
             $"key={Uri.EscapeDataString(GoogleMapsApiKey)}"
         };
@@ -691,7 +707,7 @@ public partial class MainPage : ContentPage
         var parameters = new List<string>
         {
             $"address={Uri.EscapeDataString(query)}",
-            "language=vi",
+            $"language={Uri.EscapeDataString(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName)}",
             $"key={Uri.EscapeDataString(GoogleMapsApiKey)}"
         };
 
@@ -757,7 +773,7 @@ public partial class MainPage : ContentPage
         var parameters = new List<string>
         {
             $"place_id={Uri.EscapeDataString(placeId)}",
-            "language=vi",
+            $"language={Uri.EscapeDataString(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName)}",
             "fields=name,formatted_address,geometry,photos",
             $"key={Uri.EscapeDataString(GoogleMapsApiKey)}"
         };
@@ -1102,10 +1118,12 @@ public partial class MainPage : ContentPage
                 }
 
                 var label = BuildCompactPoiName(pin.Label);
-                if (!_androidPoiIconCache.TryGetValue(label, out var icon))
+                var isActivePoiPin = ReferenceEquals(pin, _activePoiPin);
+                var iconCacheKey = isActivePoiPin ? $"active::{label}" : $"normal::{label}";
+                if (!_androidPoiIconCache.TryGetValue(iconCacheKey, out var icon))
                 {
-                    icon = BuildAndroidPoiMarkerIcon(label);
-                    _androidPoiIconCache[label] = icon;
+                    icon = BuildAndroidPoiMarkerIcon(label, isActivePoiPin);
+                    _androidPoiIconCache[iconCacheKey] = icon;
                 }
 
                 var iconApplied = TryApplyAndroidMarkerIcon(pin.MarkerId, icon);
@@ -1194,7 +1212,7 @@ public partial class MainPage : ContentPage
         return trimmed.Length <= 20 ? trimmed : $"{trimmed[..19]}…";
     }
 
-    private static AndroidBitmapDescriptor BuildAndroidPoiMarkerIcon(string label)
+    private static AndroidBitmapDescriptor BuildAndroidPoiMarkerIcon(string label, bool isHighlighted)
     {
         const float textSizePx = 24f;
         const float paddingHorizontalPx = 14f;
@@ -1227,8 +1245,10 @@ public partial class MainPage : ContentPage
         var bubblePaint = new Android.Graphics.Paint(Android.Graphics.PaintFlags.AntiAlias) { Color = Android.Graphics.Color.ParseColor("#FFF7ED") };
         var strokePaint = new Android.Graphics.Paint(Android.Graphics.PaintFlags.AntiAlias)
         {
-            Color = Android.Graphics.Color.ParseColor("#FDBA74"),
-            StrokeWidth = 2f
+            Color = isHighlighted
+                ? Android.Graphics.Color.ParseColor("#2563EB")
+                : Android.Graphics.Color.ParseColor("#FDBA74"),
+            StrokeWidth = isHighlighted ? 3f : 2f
         };
         strokePaint.SetStyle(Android.Graphics.Paint.Style.Stroke);
 
@@ -1258,6 +1278,18 @@ public partial class MainPage : ContentPage
         };
         iconStroke.SetStyle(Android.Graphics.Paint.Style.Stroke);
         canvas.DrawRoundRect(iconRect, 6f, 6f, iconStroke);
+
+        if (isHighlighted)
+        {
+            var activeIconStroke = new Android.Graphics.Paint(Android.Graphics.PaintFlags.AntiAlias)
+            {
+                Color = Android.Graphics.Color.ParseColor("#2563EB"),
+                StrokeWidth = 3f
+            };
+            activeIconStroke.SetStyle(Android.Graphics.Paint.Style.Stroke);
+            var activeIconRect = new Android.Graphics.RectF(iconLeft - 2f, iconTop - 2f, iconRight + 2f, iconBottom + 2f);
+            canvas.DrawRoundRect(activeIconRect, 8f, 8f, activeIconStroke);
+        }
 
         var shopLine = new Android.Graphics.Paint(Android.Graphics.PaintFlags.AntiAlias)
         {
@@ -1509,8 +1541,19 @@ public partial class MainPage : ContentPage
         PlayAudioButton.IsEnabled = !string.IsNullOrWhiteSpace(poi.AudioUrl) || hasNarration;
         HideAudioPlayer();
         SheetTitleLabel.Text = poi.Name;
-        var description = string.IsNullOrWhiteSpace(poi.Description) ? $"Ban kinh {Math.Round(poi.RadiusMeters)} m" : poi.Description;
-        var distanceText = poi.DistanceMeters > 0 ? $"\nKhoang cach: {Math.Round(poi.DistanceMeters)} m" : string.Empty;
+        var description = string.IsNullOrWhiteSpace(poi.Description)
+            ? string.Format(
+                CultureInfo.CurrentCulture,
+                AppResources.ResourceManager.GetString("Main_RadiusFallbackMeters", CultureInfo.CurrentUICulture) ?? "Radius: {0} m",
+                Math.Round(poi.RadiusMeters))
+            : poi.Description;
+
+        var distanceText = poi.DistanceMeters > 0
+            ? "\n" + string.Format(
+                CultureInfo.CurrentCulture,
+                AppResources.ResourceManager.GetString("Main_DistanceMetersFormat", CultureInfo.CurrentUICulture) ?? "Distance: {0} m",
+                Math.Round(poi.DistanceMeters))
+            : string.Empty;
         SheetAddressLabel.Text = description + distanceText;
         SheetImage.Source = string.IsNullOrWhiteSpace(poi.ImageUrl)
             ? ImageSource.FromFile("dotnet_bot.png")
@@ -1743,7 +1786,8 @@ public partial class MainPage : ContentPage
         _ttsWordIndex = 0;
         _ttsSegmentIndex = 0;
         _ttsElapsedSeconds = 0;
-        TtsProgressSlider.Maximum = Math.Max(1, Math.Max(_ttsWords.Count, narration.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length) * TtsSecondsPerWord);
+        var totalUnits = CountTtsUnits(narration);
+        TtsProgressSlider.Maximum = Math.Max(1, Math.Max(_ttsWords.Count, totalUnits) * TtsSecondsPerWord);
         TtsProgressSlider.Value = 0;
         TtsPlayerContainer.IsVisible = true;
         TtsVolumeSlider.Value = Math.Clamp(TtsVolumeSlider.Value, 0, 1);
@@ -1771,7 +1815,7 @@ public partial class MainPage : ContentPage
             }
             catch
             {
-                ShowAudioPlayerHtml(BuildTtsPlayerHtml(narration));
+                ShowAudioPlayerHtml(BuildTtsPlayerHtml(narration, ResolvePreferredTtsLanguageTag()));
                 return;
             }
         }
@@ -1799,7 +1843,7 @@ public partial class MainPage : ContentPage
             catch
             {
                 // Final fallback for environments with broken native TTS.
-                ShowAudioPlayerHtml(BuildTtsPlayerHtml(narration));
+                ShowAudioPlayerHtml(BuildTtsPlayerHtml(narration, ResolvePreferredTtsLanguageTag()));
             }
         }
     }
@@ -1896,7 +1940,7 @@ public partial class MainPage : ContentPage
             return;
         }
 
-        _ttsWords.AddRange(narration.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        _ttsWords.AddRange(SplitTtsUnits(narration));
 
         var sb = new StringBuilder();
         var runningWordCount = 0;
@@ -1922,7 +1966,17 @@ public partial class MainPage : ContentPage
 
     private static bool IsTtsBoundary(char ch)
     {
-        return ch == '.' || ch == '\n' || ch == '\r';
+        return ch == '.'
+               || ch == '!'
+               || ch == '?'
+               || ch == ';'
+               || ch == ':'
+               || ch == '。'
+               || ch == '！'
+               || ch == '？'
+               || ch == '；'
+               || ch == '\n'
+               || ch == '\r';
     }
 
     private bool TryAddTtsSegment(string raw, ref int runningWordCount)
@@ -1933,20 +1987,59 @@ public partial class MainPage : ContentPage
             return false;
         }
 
-        var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (words.Length == 0)
+        var units = CountTtsUnits(text);
+        if (units == 0)
         {
             return false;
         }
 
-        runningWordCount += words.Length;
+        runningWordCount += units;
         _ttsSegments.Add(new TtsSegment
         {
             Text = text,
-            WordCount = words.Length,
+            WordCount = units,
             EndWordIndex = runningWordCount
         });
         return true;
+    }
+
+    private static List<string> SplitTtsUnits(string text)
+    {
+        var normalized = (text ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return [];
+        }
+
+        if (ContainsCjkCharacter(normalized) && !normalized.Any(char.IsWhiteSpace))
+        {
+            return normalized
+                .Where(ch => !char.IsWhiteSpace(ch))
+                .Select(ch => ch.ToString())
+                .ToList();
+        }
+
+        return normalized
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
+    }
+
+    private static int CountTtsUnits(string text) => SplitTtsUnits(text).Count;
+
+    private static bool ContainsCjkCharacter(string text)
+    {
+        foreach (var ch in text)
+        {
+            if ((ch >= '\u4E00' && ch <= '\u9FFF')
+                || (ch >= '\u3400' && ch <= '\u4DBF')
+                || (ch >= '\uF900' && ch <= '\uFAFF')
+                || (ch >= '\u3040' && ch <= '\u30FF'))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void RecalculateTtsSegmentIndex()
@@ -1966,19 +2059,45 @@ public partial class MainPage : ContentPage
 
     private async Task<Locale?> ResolvePreferredTtsLocaleAsync()
     {
-        if (_preferredTtsLocale is not null)
+        var language = AppLanguageService.NormalizeLanguageCode(_viewModel.CurrentLanguage) ?? "en";
+        if (_preferredTtsLocaleLanguage is not null
+            && _preferredTtsLocale is not null
+            && string.Equals(_preferredTtsLocaleLanguage, language, StringComparison.OrdinalIgnoreCase))
         {
             return _preferredTtsLocale;
         }
 
+        _preferredTtsLocaleLanguage = language;
+
         try
         {
             var locales = await TextToSpeech.Default.GetLocalesAsync();
-            _preferredTtsLocale = locales
-                .FirstOrDefault(l => string.Equals(l.Language, "vi", StringComparison.OrdinalIgnoreCase)
-                                     && string.Equals(l.Country, "VN", StringComparison.OrdinalIgnoreCase))
-                ?? locales.FirstOrDefault(l => string.Equals(l.Language, "vi", StringComparison.OrdinalIgnoreCase))
-                ?? locales.FirstOrDefault();
+
+            var country = language switch
+            {
+                "vi" => "VN",
+                "en" => "US",
+                _ => null
+            };
+
+            Locale? best = null;
+            if (!string.IsNullOrWhiteSpace(country))
+            {
+                best = locales.FirstOrDefault(l =>
+                    string.Equals(l.Language, language, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(l.Country, country, StringComparison.OrdinalIgnoreCase));
+            }
+
+            best ??= locales.FirstOrDefault(l => string.Equals(l.Language, language, StringComparison.OrdinalIgnoreCase));
+
+            // Device does not support requested language -> fallback to English.
+            best ??= locales.FirstOrDefault(l =>
+                        string.Equals(l.Language, "en", StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(l.Country, "US", StringComparison.OrdinalIgnoreCase))
+                    ?? locales.FirstOrDefault(l => string.Equals(l.Language, "en", StringComparison.OrdinalIgnoreCase))
+                    ?? locales.FirstOrDefault();
+
+            _preferredTtsLocale = best;
         }
         catch
         {
@@ -2160,9 +2279,25 @@ public partial class MainPage : ContentPage
         return html.Replace("__AUDIO_URL__", safeUrl);
     }
 
-    private static string BuildTtsPlayerHtml(string narration)
+    private string ResolvePreferredTtsLanguageTag()
+    {
+        var language = AppLanguageService.NormalizeLanguageCode(_viewModel.CurrentLanguage) ?? "en";
+        return language switch
+        {
+            "vi" => "vi-VN",
+            "en" => "en-US",
+            "zh" => "zh-CN",
+            "ja" => "ja-JP",
+            "ko" => "ko-KR",
+            "ru" => "ru-RU",
+            _ => "en-US"
+        };
+    }
+
+    private static string BuildTtsPlayerHtml(string narration, string languageTag)
     {
         var safeJsonText = JsonSerializer.Serialize(narration);
+        var safeLanguageTag = JsonSerializer.Serialize(string.IsNullOrWhiteSpace(languageTag) ? "en-US" : languageTag);
         var html = """
 <!DOCTYPE html>
 <html>
@@ -2197,7 +2332,14 @@ public partial class MainPage : ContentPage
   <div class="note">TTS player (mô phỏng tiến trình)</div>
   <script>
     const fullText = __TTS_TEXT_JSON__;
-    const words = (fullText || '').trim().split(/\s+/).filter(Boolean);
+    const languageTag = __LANG_TAG_JSON__;
+    const tokenize = (text) => {
+      const normalized = (text || '').trim();
+      if (!normalized) return [];
+      if (/\s/.test(normalized)) return normalized.split(/\s+/).filter(Boolean);
+      return Array.from(normalized).filter(ch => !/\s/.test(ch));
+    };
+    const words = tokenize(fullText);
     const secPerWord = 0.42;
     const skipWords = Math.round(10 / secPerWord);
     const totalSeconds = Math.max(1, words.length * secPerWord);
@@ -2250,7 +2392,7 @@ public partial class MainPage : ContentPage
       const slice = words.slice(currentWord).join(' ');
       if (!slice) { playing = false; paused = false; refreshUi(); return; }
       utterance = new SpeechSynthesisUtterance(slice);
-      utterance.lang = 'vi-VN';
+      utterance.lang = languageTag || 'en-US';
       utterance.volume = parseFloat(volume.value || '0.8');
       segmentStartWord = currentWord;
       utterance.onend = () => { playing = false; paused = false; currentWord = words.length; stopTicker(); refreshUi(); };
@@ -2298,7 +2440,9 @@ public partial class MainPage : ContentPage
 </body>
 </html>
 """;
-        return html.Replace("__TTS_TEXT_JSON__", safeJsonText);
+        return html
+            .Replace("__TTS_TEXT_JSON__", safeJsonText)
+            .Replace("__LANG_TAG_JSON__", safeLanguageTag);
     }
 
     private async void OnShareClicked(object? sender, EventArgs e)
@@ -2340,7 +2484,7 @@ public partial class MainPage : ContentPage
             $"origin={origin.Latitude.ToString(CultureInfo.InvariantCulture)},{origin.Longitude.ToString(CultureInfo.InvariantCulture)}",
             $"destination={destination.Latitude.ToString(CultureInfo.InvariantCulture)},{destination.Longitude.ToString(CultureInfo.InvariantCulture)}",
             "mode=driving",
-            "language=vi",
+            $"language={Uri.EscapeDataString(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName)}",
             $"key={Uri.EscapeDataString(GoogleMapsApiKey)}"
         };
 
@@ -2494,8 +2638,3 @@ public partial class MainPage : ContentPage
         _routePolyline = null;
     }
 }
-
-
-
-
-
