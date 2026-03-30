@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,13 +25,21 @@ var dbPath = Path.Combine(dataDirectory, "poi-admin.db3");
 var connectionString = $"Data Source={dbPath}";
 var adbReverseSync = new object();
 var lastAdbReverseAttemptUtc = DateTimeOffset.MinValue;
+var cloudflaredSync = new object();
+Process? cloudflaredProcess = null;
+var cloudflaredLogPath = Path.Combine(dataDirectory, "cloudflared-quick.log");
+var cloudflaredExecutablePath = ResolveCloudflaredExecutablePath();
+string? cloudflaredQuickTunnelUrl = null;
 
 var supportedLanguages = SupportedLanguage.CreateDefaults();
 var supportedLanguageSet = supportedLanguages.Select(x => x.Code).ToHashSet(StringComparer.OrdinalIgnoreCase);
+var configuredPublicBaseUrl = NormalizePublicBaseUrl(
+    Environment.GetEnvironmentVariable("POI_PUBLIC_BASE_URL")
+    ?? Environment.GetEnvironmentVariable("PUBLIC_BASE_URL"));
 var translationApiKey = Environment.GetEnvironmentVariable("GOOGLE_TRANSLATE_API_KEY")?.Trim();
 if (string.IsNullOrWhiteSpace(translationApiKey))
 {
-    translationApiKey = "";
+    translationApiKey = "AIzaSyBe6oYZg8K70gk2HdDWo5n9UcqzIG2WqJo";
 }
 
 await InitializeDatabaseAsync(connectionString);
@@ -73,6 +82,23 @@ app.Use(async (context, next) =>
 });
 
 app.MapGet("/api/languages", () => Results.Ok(supportedLanguages));
+
+app.MapGet("/api/public/base-url", (HttpContext context) =>
+{
+    var baseUrl = ResolvePublicBaseUrl(context, configuredPublicBaseUrl, out var error);
+    if (!string.IsNullOrWhiteSpace(error))
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    return Results.Ok(new { baseUrl });
+});
+
+app.MapPost("/api/cloudflared/quick-tunnel", async () =>
+{
+    var quickUrl = await EnsureQuickTunnelUrlAsync("http://localhost:5187");
+    return Results.Ok(new { baseUrl = quickUrl });
+});
 
 app.MapPost("/api/uploads", async (HttpContext context) =>
 {
@@ -187,6 +213,95 @@ app.MapGet("/api/pois/{id}/localized", async (HttpContext context, string id) =>
 
     var item = await GetPoiForMobileAsync(connection, poiId, requestedLang);
     return item is null ? Results.NotFound() : Results.Ok(item);
+});
+
+app.MapGet("/api/public/pois/{id}", async (HttpContext context, string id) =>
+{
+    await TryEnsureAdbReverseAsync();
+    if (string.IsNullOrWhiteSpace(id))
+    {
+        return Results.BadRequest(new { error = "Missing id." });
+    }
+
+    var requestedLang = NormalizeLanguageOrFallback(context.Request.Query["lang"].ToString(), supportedLanguageSet);
+    await using var connection = await OpenConnectionAsync(connectionString);
+    if (!TryParsePoiId(id, out var poiId))
+    {
+        return Results.BadRequest(new { error = "Invalid id." });
+    }
+
+    var item = await GetPoiForPublicAsync(connection, poiId, requestedLang);
+    return item is null ? Results.NotFound() : Results.Ok(item);
+});
+
+app.MapGet("/api/pois/{id}/public-link", async (HttpContext context, string id) =>
+{
+    await TryEnsureAdbReverseAsync();
+    if (!TryParsePoiId(id, out var poiId))
+    {
+        return Results.BadRequest(new { error = "Invalid id." });
+    }
+
+    await using var connection = await OpenConnectionAsync(connectionString);
+    var core = await GetPoiAdminAsync(connection, poiId);
+    if (core is null)
+    {
+        return Results.NotFound();
+    }
+
+    var lang = NormalizeAppLanguageCode(context.Request.Query["lang"].ToString());
+    var baseUrl = ResolvePublicBaseUrl(context, configuredPublicBaseUrl, out var error);
+    if (!string.IsNullOrWhiteSpace(error))
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    var publicUrl = BuildPublicPoiUrl(baseUrl, poiId, lang);
+    return Results.Ok(new { id = poiId.ToString(CultureInfo.InvariantCulture), url = publicUrl, baseUrl });
+});
+
+app.MapGet("/api/pois/{id}/qr.png", async (HttpContext context, string id) =>
+{
+    await TryEnsureAdbReverseAsync();
+    if (!TryParsePoiId(id, out var poiId))
+    {
+        return Results.BadRequest(new { error = "Invalid id." });
+    }
+
+    await using var connection = await OpenConnectionAsync(connectionString);
+    var core = await GetPoiAdminAsync(connection, poiId);
+    if (core is null)
+    {
+        return Results.NotFound();
+    }
+
+    var lang = NormalizeAppLanguageCode(context.Request.Query["lang"].ToString());
+    var rawSize = context.Request.Query["size"].ToString();
+    var size = 512;
+    if (!string.IsNullOrWhiteSpace(rawSize) && int.TryParse(rawSize, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedSize))
+    {
+        size = Math.Clamp(parsedSize, 256, 2048);
+    }
+
+    var download = string.Equals(context.Request.Query["download"], "1", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(context.Request.Query["download"], "true", StringComparison.OrdinalIgnoreCase);
+
+    var baseUrl = ResolvePublicBaseUrl(context, configuredPublicBaseUrl, out var error);
+    if (!string.IsNullOrWhiteSpace(error))
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    var publicUrl = BuildPublicPoiUrl(baseUrl, poiId, lang);
+    var pngBytes = await RenderQrPngAsync(publicUrl, size, context.RequestAborted);
+
+    if (download)
+    {
+        var fileName = $"poi-{poiId}.png";
+        return Results.File(pngBytes, "image/png", fileName);
+    }
+
+    return Results.File(pngBytes, "image/png");
 });
 
 app.MapPost("/api/pois", async (PoiAdminUpsertRequest request) =>
@@ -599,6 +714,327 @@ static bool TryParsePoiId(string? raw, out long poiId)
            && poiId > 0;
 }
 
+static string ResolvePublicBaseUrl(HttpContext context, string? configuredPublicBaseUrl, out string? error)
+{
+    error = null;
+    var requestedBaseUrlRaw = context.Request.Query["baseUrl"].ToString();
+    if (!string.IsNullOrWhiteSpace(requestedBaseUrlRaw))
+    {
+        var requestedBaseUrl = NormalizePublicBaseUrl(requestedBaseUrlRaw);
+        if (string.IsNullOrWhiteSpace(requestedBaseUrl))
+        {
+            error = "Invalid baseUrl. Use full http(s) URL, for example: https://abc.trycloudflare.com";
+            return string.Empty;
+        }
+
+        return requestedBaseUrl;
+    }
+
+    if (!string.IsNullOrWhiteSpace(configuredPublicBaseUrl))
+    {
+        return configuredPublicBaseUrl;
+    }
+
+    var fallback = $"{context.Request.Scheme}://{context.Request.Host.ToUriComponent()}{context.Request.PathBase.ToUriComponent()}".TrimEnd('/');
+    if (IsLocalUrl(fallback))
+    {
+        error = "Public URL dang la localhost. Vui long nhap Cloudflare Tunnel URL hoac bam 'Lay tunnel URL'.";
+        return string.Empty;
+    }
+
+    return fallback;
+}
+
+static string? NormalizePublicBaseUrl(string? raw)
+{
+    if (string.IsNullOrWhiteSpace(raw))
+    {
+        return null;
+    }
+
+    if (!Uri.TryCreate(raw.Trim(), UriKind.Absolute, out var uri))
+    {
+        return null;
+    }
+
+    if (!string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+    {
+        return null;
+    }
+
+    var builder = new UriBuilder(uri)
+    {
+        Query = string.Empty,
+        Fragment = string.Empty
+    };
+
+    var normalized = builder.Uri.ToString().TrimEnd('/');
+    return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
+}
+
+static string BuildPublicPoiUrl(string publicBaseUrl, long poiId, string? langCode)
+{
+    var safeBase = (publicBaseUrl ?? string.Empty).TrimEnd('/');
+    if (string.IsNullOrWhiteSpace(safeBase))
+    {
+        throw new InvalidOperationException("Public base URL is empty.");
+    }
+
+    var queryParts = new List<string>
+    {
+        $"id={Uri.EscapeDataString(poiId.ToString(CultureInfo.InvariantCulture))}"
+    };
+    if (!string.IsNullOrWhiteSpace(langCode))
+    {
+        queryParts.Add($"lang={Uri.EscapeDataString(langCode)}");
+    }
+
+    return $"{safeBase}/poi.html?{string.Join("&", queryParts)}";
+}
+
+static bool IsLocalUrl(string? rawUrl)
+{
+    if (string.IsNullOrWhiteSpace(rawUrl))
+    {
+        return false;
+    }
+
+    if (!Uri.TryCreate(rawUrl, UriKind.Absolute, out var uri))
+    {
+        return false;
+    }
+
+    var host = (uri.Host ?? string.Empty).Trim().ToLowerInvariant();
+    return host is "localhost" or "127.0.0.1" or "::1";
+}
+
+static async Task<byte[]> RenderQrPngAsync(string content, int size, CancellationToken cancellationToken)
+{
+    if (string.IsNullOrWhiteSpace(content))
+    {
+        throw new InvalidOperationException("QR content is empty.");
+    }
+
+    using var httpClient = new HttpClient
+    {
+        Timeout = TimeSpan.FromSeconds(25)
+    };
+
+    var endpoint = $"https://quickchart.io/qr?format=png&ecLevel=M&margin=2&size={size.ToString(CultureInfo.InvariantCulture)}&text={Uri.EscapeDataString(content)}";
+    using var response = await httpClient.GetAsync(endpoint, cancellationToken);
+    if (!response.IsSuccessStatusCode)
+    {
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        throw new InvalidOperationException($"QR generation failed ({(int)response.StatusCode}): {body}");
+    }
+
+    return await response.Content.ReadAsByteArrayAsync(cancellationToken);
+}
+
+async Task<string> EnsureQuickTunnelUrlAsync(string localUrl)
+{
+    if (string.IsNullOrWhiteSpace(localUrl) || !Uri.TryCreate(localUrl, UriKind.Absolute, out _))
+    {
+        throw new InvalidOperationException("Invalid local URL for quick tunnel.");
+    }
+
+    var existedUrl = cloudflaredQuickTunnelUrl;
+    if (string.IsNullOrWhiteSpace(existedUrl))
+    {
+        existedUrl = ReadQuickTunnelUrlFromLog(cloudflaredLogPath);
+    }
+    if (!string.IsNullOrWhiteSpace(existedUrl))
+    {
+        cloudflaredQuickTunnelUrl = existedUrl;
+        return existedUrl;
+    }
+
+    lock (cloudflaredSync)
+    {
+        if (cloudflaredProcess is not null && !cloudflaredProcess.HasExited)
+        {
+            // keep waiting for URL in logfile
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(cloudflaredExecutablePath) || !File.Exists(cloudflaredExecutablePath))
+            {
+                cloudflaredExecutablePath = ResolveCloudflaredExecutablePath();
+            }
+
+            if (string.IsNullOrWhiteSpace(cloudflaredExecutablePath) || !File.Exists(cloudflaredExecutablePath))
+            {
+                throw new InvalidOperationException("Khong tim thay cloudflared.exe. Hay cai dat cloudflared hoac dat bien moi truong CLOUDFLARED_PATH.");
+            }
+
+            try
+            {
+                if (File.Exists(cloudflaredLogPath))
+                {
+                    File.Delete(cloudflaredLogPath);
+                }
+            }
+            catch
+            {
+            }
+
+            var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = cloudflaredExecutablePath,
+                    Arguments = $"tunnel --url {localUrl} --no-autoupdate --logfile \"{cloudflaredLogPath}\" --loglevel info",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                }
+            };
+
+            process.OutputDataReceived += (_, args) =>
+            {
+                var parsedUrl = ExtractQuickTunnelUrl(args.Data);
+                if (!string.IsNullOrWhiteSpace(parsedUrl))
+                {
+                    cloudflaredQuickTunnelUrl = parsedUrl;
+                }
+            };
+
+            process.ErrorDataReceived += (_, args) =>
+            {
+                var parsedUrl = ExtractQuickTunnelUrl(args.Data);
+                if (!string.IsNullOrWhiteSpace(parsedUrl))
+                {
+                    cloudflaredQuickTunnelUrl = parsedUrl;
+                }
+            };
+
+            if (!process.Start())
+            {
+                throw new InvalidOperationException("Khong the khoi chay cloudflared.");
+            }
+
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            cloudflaredProcess = process;
+        }
+    }
+
+    for (var i = 0; i < 30; i++)
+    {
+        await Task.Delay(500);
+        var url = cloudflaredQuickTunnelUrl;
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            url = ReadQuickTunnelUrlFromLog(cloudflaredLogPath);
+        }
+        if (!string.IsNullOrWhiteSpace(url))
+        {
+            cloudflaredQuickTunnelUrl = url;
+            return url;
+        }
+    }
+
+    throw new InvalidOperationException("Cloudflared da chay nhung khong doc duoc URL tunnel. Vui long thu lai hoac nhap URL tunnel thu cong.");
+}
+
+static string ResolveCloudflaredExecutablePath()
+{
+    var fromEnv = Environment.GetEnvironmentVariable("CLOUDFLARED_PATH")?.Trim();
+    if (!string.IsNullOrWhiteSpace(fromEnv) && File.Exists(fromEnv))
+    {
+        return fromEnv;
+    }
+
+    var wherePath = TryFindCloudflaredUsingWhere();
+    if (!string.IsNullOrWhiteSpace(wherePath) && File.Exists(wherePath))
+    {
+        return wherePath;
+    }
+
+    var candidates = new[]
+    {
+        @"C:\Program Files (x86)\cloudflared\cloudflared.exe",
+        @"C:\Program Files\cloudflared\cloudflared.exe",
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "cloudflared", "cloudflared.exe"),
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "cloudflared.exe"),
+    };
+
+    foreach (var candidate in candidates.Where(x => !string.IsNullOrWhiteSpace(x)))
+    {
+        if (File.Exists(candidate))
+        {
+            return candidate;
+        }
+    }
+
+    return string.Empty;
+}
+
+static string TryFindCloudflaredUsingWhere()
+{
+    try
+    {
+        using var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = "where",
+                Arguments = "cloudflared",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            }
+        };
+        if (!process.Start())
+        {
+            return string.Empty;
+        }
+
+        var output = process.StandardOutput.ReadToEnd();
+        process.WaitForExit(2000);
+        var firstLine = output
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .FirstOrDefault();
+        return firstLine ?? string.Empty;
+    }
+    catch
+    {
+        return string.Empty;
+    }
+}
+
+static string ReadQuickTunnelUrlFromLog(string logPath)
+{
+    if (!File.Exists(logPath))
+    {
+        return string.Empty;
+    }
+
+    try
+    {
+        var content = File.ReadAllText(logPath);
+        return ExtractQuickTunnelUrl(content);
+    }
+    catch
+    {
+        return string.Empty;
+    }
+}
+
+static string ExtractQuickTunnelUrl(string? text)
+{
+    if (string.IsNullOrWhiteSpace(text))
+    {
+        return string.Empty;
+    }
+
+    var match = Regex.Match(text, @"https://[a-z0-9-]+\.trycloudflare\.com", RegexOptions.IgnoreCase);
+    return match.Success ? match.Value : string.Empty;
+}
+
 static void TryDeleteUploadedFile(string uploadDirectory, string? assetUrl)
 {
     if (string.IsNullOrWhiteSpace(assetUrl))
@@ -838,6 +1274,56 @@ static async Task<PoiMobileDto?> GetPoiForMobileAsync(SqliteConnection connectio
         LEFT JOIN poi_translations t_req ON p.id = t_req.poi_id AND t_req.lang_code = $lang_code
         LEFT JOIN poi_translations t_vi ON p.id = t_vi.poi_id AND t_vi.lang_code = 'vi'
         WHERE p.id = $id;
+        ";
+
+    await using var command = new SqliteCommand(sql, connection);
+    command.Parameters.AddWithValue("$id", id);
+    command.Parameters.AddWithValue("$lang_code", requestedLang);
+    await using var reader = await command.ExecuteReaderAsync();
+    if (!await reader.ReadAsync())
+    {
+        return null;
+    }
+
+    var coreAudioUrl = reader.IsDBNull(7) ? string.Empty : reader.GetString(7);
+    var translatedAudioUrl = reader.IsDBNull(11) ? string.Empty : reader.GetString(11);
+    return new PoiMobileDto
+    {
+        Id = reader.GetInt64(0).ToString(CultureInfo.InvariantCulture),
+        LangCode = requestedLang,
+        Latitude = reader.GetDouble(1),
+        Longitude = reader.GetDouble(2),
+        RadiusMeters = reader.GetDouble(3),
+        Priority = reader.GetInt32(4),
+        MapLink = reader.IsDBNull(5) ? string.Empty : reader.GetString(5),
+        ImageUrl = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
+        AudioUrl = !string.IsNullOrWhiteSpace(translatedAudioUrl) ? translatedAudioUrl : coreAudioUrl,
+        Name = reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
+        Description = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
+        TtsText = reader.IsDBNull(10) ? string.Empty : reader.GetString(10),
+    };
+}
+
+static async Task<PoiMobileDto?> GetPoiForPublicAsync(SqliteConnection connection, long id, string requestedLang)
+{
+    const string sql = @"
+        SELECT
+            p.id,
+            p.latitude,
+            p.longitude,
+            p.radius_meters,
+            p.priority,
+            p.map_link,
+            p.image_url,
+            p.audio_url,
+            COALESCE(NULLIF(t_req.name, ''), t_vi.name, '') AS name,
+            COALESCE(NULLIF(t_req.description, ''), t_vi.description, '') AS description,
+            COALESCE(NULLIF(t_req.tts_text, ''), NULLIF(t_req.description, ''), NULLIF(t_vi.tts_text, ''), t_vi.description, '') AS tts_text,
+            COALESCE(NULLIF(t_req.audio_url, ''), NULLIF(t_vi.audio_url, ''), '') AS audio_lang
+        FROM pois p
+        LEFT JOIN poi_translations t_req ON p.id = t_req.poi_id AND t_req.lang_code = $lang_code
+        LEFT JOIN poi_translations t_vi ON p.id = t_vi.poi_id AND t_vi.lang_code = 'vi'
+        WHERE p.id = $id AND p.is_active = 1;
         ";
 
     await using var command = new SqliteCommand(sql, connection);

@@ -191,6 +191,8 @@ public sealed class PoiSyncService
                 var response = await _httpClient.DeleteAsync(endpoint);
                 if (response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
+                    var connection = await _database.GetConnectionAsync();
+                    await connection.ExecuteAsync("UPDATE pois SET is_active = 0 WHERE id = ?;", id);
                     _lastSuccessfulBaseUrl = baseUrl;
                     LastError = null;
                     return true;
@@ -215,7 +217,6 @@ public sealed class PoiSyncService
     private async Task ApplyRemoteDataAsync(string baseUrl, string requestedLang, IReadOnlyList<PoiSyncDto> pois)
     {
         var connection = await _database.GetConnectionAsync();
-        await connection.ExecuteAsync("UPDATE pois SET is_active = 0;");
 
         foreach (var poi in pois)
         {

@@ -54,6 +54,13 @@
     <value>分享</value>
   </data>
 
+  <data name="Main_NowPlaying" xml:space="preserve">
+    <value>正在播放</value>
+  </data>
+  <data name="Main_PlaybackQueue" xml:space="preserve">
+    <value>播放队列</value>
+  </data>
+
   <data name="Home_HeaderTitle" xml:space="preserve">
     <value>永庆</value>
   </data>

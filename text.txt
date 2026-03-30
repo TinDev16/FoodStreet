@@ -42,3 +42,47 @@ adb reverse --list
     Nếu POI có AudioUrl: dựng HTML audio player và phát trong WebView (FoodStreetMobile/MainPage.xaml.cs:243, player template ở FoodStreetMobile/MainPage.xaml.cs:2072).
     Nếu không có AudioUrl: lấy text để đọc (Narration ưu tiên, fallback Description) (FoodStreetMobile/MainPage.xaml.cs:1859) rồi chạy TTS player (FoodStreetMobile/MainPage.xaml.cs:1738) → chia segment và gọi TextToSpeech.Default.SpeakAsync theo từng đoạn (FoodStreetMobile/MainPage.xaml.cs:1807), có fallback sang HTML TTS player nếu native TTS lỗi (FoodStreetMobile/MainPage.xaml.cs:1802).
     Ghi chú nhanh: có NarrationEngine (FoodStreetMobile/Services/NarrationEngine.cs:19) hỗ trợ cooldown + mở audio bằng Launcher.OpenAsync (FoodStreetMobile/Services/NarrationEngine.cs:74), nhưng luồng auto-play hiện tại đang phát qua MainPage (WebView/TTS), không đi qua NarrationEngine.
+
+
+
+Cơ chế hàng đợi (queue) cho POI audio playback
+
+1. UI hiển thị
+
+Khi có POI đang phát, hiển thị một panel gồm:
+
+Thông tin POI đang phát (current playing)
+Tên POI
+Tiến trình phát (progress bar / thời gian)
+Danh sách hàng đợi (queue)
+Chỉ hiển thị tối đa 1 POI đang chờ
+Hiển thị tên + khoảng cách (optional)
+2. Luồng hoạt động
+Trường hợp 1: Đang phát POI A
+Khi user đi vào bán kính POI B
+→ Thêm POI B vào queue
+Trường hợp 2: Queue đã có POI (B), user vào POI C
+Nếu POI B chưa được phát
+→ Xóa B khỏi queue
+→ Thay bằng POI C
+
+👉 Nghĩa là:
+
+Queue luôn chỉ giữ 1 POI mới nhất chưa phát
+
+Trường hợp 3: POI hiện tại phát xong
+Nếu queue có POI
+→ Lấy POI trong queue ra phát
+→ Xóa khỏi queue
+Nếu không có
+→ Dừng
+Trường hợp 4: User rời khỏi vùng POI đang phát
+(OPTIONAL - tùy bạn)
+Có thể:
+Tiếp tục phát (recommended)
+Hoặc dừng (nâng cao hơn)
+3. Nguyên tắc quan trọng
+Chỉ 1 POI được phát tại 1 thời điểm
+Queue tối đa 1 phần tử
+POI mới luôn ghi đè POI cũ trong queue
+Không được interrupt POI đang phát (trừ khi bạn muốn nâng cấp)

@@ -6,11 +6,25 @@
   const listHintEl = $("#listHint");
   const createBtn = $("#createBtn");
   const resetBtn = $("#resetBtn");
+  const generateQrBtn = $("#generateQrBtn");
   const sourceLangSelect = $("#sourceLang");
+  const qrDialogEl = $("#qrDialog");
+  const qrLangSelect = $("#qrLang");
+  const qrBaseUrlEl = $("#qrBaseUrl");
+  const qrDetectTunnelBtn = $("#qrDetectTunnelBtn");
+  const qrPublicUrlEl = $("#qrPublicUrl");
+  const qrPreviewImageEl = $("#qrPreviewImage");
+  const qrCopyBtn = $("#qrCopyBtn");
+  const qrDownloadBtn = $("#qrDownloadBtn");
 
   const state = {
     languages: [],
     selectedSourceLang: "vi",
+    qr: {
+      poiId: "",
+      lang: "vi",
+      baseUrl: "",
+    },
     current: {
       id: "",
       coreImageUrl: "",
@@ -53,6 +67,31 @@
     const res = await fetch(url, { method: "DELETE", headers: { Accept: "application/json" } });
     if (!res.ok) throw new Error(await safeError(res));
     return res.json().catch(() => ({}));
+  };
+
+  const apiPost = async (url) => {
+    const res = await fetch(url, { method: "POST", headers: { Accept: "application/json" } });
+    if (!res.ok) throw new Error(await safeError(res));
+    return res.json();
+  };
+
+  const buildQrImageUrl = (poiId, langCode, download = false) => {
+    const qs = new URLSearchParams();
+    if (langCode) qs.set("lang", langCode);
+    const baseUrl = (state.qr.baseUrl || "").trim();
+    if (baseUrl) qs.set("baseUrl", baseUrl);
+    qs.set("size", "640");
+    if (download) qs.set("download", "1");
+    return `/api/pois/${encodeURIComponent(poiId)}/qr.png?${qs.toString()}`;
+  };
+
+  const buildPublicLinkUrl = async (poiId, langCode) => {
+    const qs = new URLSearchParams();
+    if (langCode) qs.set("lang", langCode);
+    const baseUrl = (state.qr.baseUrl || "").trim();
+    if (baseUrl) qs.set("baseUrl", baseUrl);
+    const data = await apiGet(`/api/pois/${encodeURIComponent(poiId)}/public-link?${qs.toString()}`);
+    return data?.url || "";
   };
 
   const ensureTranslationState = (langCode) => {
@@ -162,6 +201,7 @@
         <td class="mono">${escapeHtml(String(item.priority))}</td>
         <td>${item.isActive ? "YES" : ""}</td>
         <td>
+          <button type="button" class="secondary" data-action="qr" data-id="${escapeAttr(item.id)}">Tao QR</button>
           <button type="button" class="secondary" data-action="edit" data-id="${escapeAttr(item.id)}">Sua</button>
           <button type="button" class="danger" data-action="del" data-id="${escapeAttr(item.id)}">Xoa</button>
         </td>
@@ -335,6 +375,19 @@
 
     createBtn.addEventListener("click", () => resetForm());
     resetBtn.addEventListener("click", () => resetForm());
+    generateQrBtn?.addEventListener("click", async () => {
+      const currentId = (state.current.id || formEl.elements.namedItem("id").value || "").trim();
+      if (!currentId) {
+        setStatus("Hay luu hoac chon POI trong danh sach truoc khi tao QR.", true);
+        return;
+      }
+
+      try {
+        await openQrDialog(currentId);
+      } catch (err) {
+        setStatus(err?.message || String(err), true);
+      }
+    });
 
     rowsEl.addEventListener("click", async (e) => {
       const btn = e.target?.closest("button[data-action]");
@@ -344,7 +397,9 @@
       if (!id) return;
 
       try {
-        if (action === "edit") {
+        if (action === "qr") {
+          await openQrDialog(id);
+        } else if (action === "edit") {
           await loadPoi(id);
         } else if (action === "del") {
           if (!confirm(`Xoa POI #${id}?`)) return;
@@ -356,6 +411,51 @@
         }
       } catch (err) {
         setStatus(err?.message || String(err), true);
+      }
+    });
+
+    qrLangSelect.addEventListener("change", async () => {
+      if (!state.qr.poiId) return;
+      state.qr.lang = qrLangSelect.value || "vi";
+      await refreshQrDialog();
+    });
+
+    qrBaseUrlEl?.addEventListener("change", async () => {
+      state.qr.baseUrl = (qrBaseUrlEl.value || "").trim();
+      localStorage.setItem("poiPublicBaseUrl", state.qr.baseUrl);
+      if (!state.qr.poiId) return;
+      await refreshQrDialog();
+    });
+
+    qrDetectTunnelBtn?.addEventListener("click", async () => {
+      setStatus("Dang lay URL Cloudflare Tunnel...");
+      try {
+        const data = await apiPost("/api/cloudflared/quick-tunnel");
+        state.qr.baseUrl = (data?.baseUrl || "").trim();
+        if (qrBaseUrlEl) {
+          qrBaseUrlEl.value = state.qr.baseUrl;
+        }
+        localStorage.setItem("poiPublicBaseUrl", state.qr.baseUrl);
+        if (state.qr.poiId) {
+          await refreshQrDialog();
+        }
+        setStatus("Da lay URL tunnel.");
+      } catch (err) {
+        setStatus(err?.message || String(err), true);
+      }
+    });
+
+    qrCopyBtn.addEventListener("click", async () => {
+      const text = (qrPublicUrlEl.value || "").trim();
+      if (!text) return;
+
+      try {
+        await navigator.clipboard.writeText(text);
+        setStatus("Da copy public URL.");
+      } catch {
+        qrPublicUrlEl.focus();
+        qrPublicUrlEl.select();
+        setStatus("Khong the copy tu dong. Ban co the copy thu cong.");
       }
     });
 
@@ -394,6 +494,66 @@
     resetForm();
     await loadList();
     setStatus("");
+  };
+
+  const refreshQrDialog = async () => {
+    const poiId = state.qr.poiId;
+    const langCode = state.qr.lang || "vi";
+    const publicUrl = await buildPublicLinkUrl(poiId, langCode);
+
+    qrPublicUrlEl.value = publicUrl;
+    qrPreviewImageEl.src = buildQrImageUrl(poiId, langCode, false);
+    qrDownloadBtn.href = buildQrImageUrl(poiId, langCode, true);
+    qrDownloadBtn.setAttribute("download", `poi-${poiId}.png`);
+  };
+
+  const openQrDialog = async (poiId) => {
+    if (!qrDialogEl || !poiId) return;
+
+    if (!state.languages.length) {
+      state.languages = await apiGet("/api/languages");
+    }
+
+    if (!qrLangSelect.options.length) {
+      for (const lang of state.languages) {
+        const opt = document.createElement("option");
+        opt.value = lang.code;
+        opt.textContent = lang.label;
+        qrLangSelect.appendChild(opt);
+      }
+    }
+
+    state.qr.poiId = String(poiId);
+    state.qr.lang = state.selectedSourceLang || "vi";
+    if (!state.qr.baseUrl) {
+      const fromStorage = (localStorage.getItem("poiPublicBaseUrl") || "").trim();
+      if (fromStorage) {
+        state.qr.baseUrl = fromStorage;
+      } else {
+        try {
+          const baseInfo = await apiGet("/api/public/base-url");
+          state.qr.baseUrl = (baseInfo?.baseUrl || "").trim();
+        } catch {
+          state.qr.baseUrl = "";
+        }
+      }
+    }
+
+    qrLangSelect.value = state.qr.lang;
+    if (qrBaseUrlEl) {
+      qrBaseUrlEl.value = state.qr.baseUrl || "";
+    }
+    qrPreviewImageEl.removeAttribute("src");
+    qrPublicUrlEl.value = "";
+
+    qrDialogEl.showModal();
+    setStatus("Dang tao QR...");
+    try {
+      await refreshQrDialog();
+      setStatus("");
+    } catch (err) {
+      setStatus(err?.message || String(err), true);
+    }
   };
 
   init().catch((err) => setStatus(err?.message || String(err), true));

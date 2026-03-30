@@ -79,6 +79,17 @@ button {
 }
 button.secondary { background: #6b7280; }
 button.danger { background: #dc2626; }
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+  padding: 8px 12px;
+  text-decoration: none;
+}
 .checkbox {
   display: flex;
   align-items: center;
@@ -102,6 +113,34 @@ th, td {
 .small { font-size: 12px; }
 #status { min-height: 18px; }
 #status.error { color: #b91c1c; }
+
+.qr-dialog {
+  border: 0;
+  border-radius: 12px;
+  padding: 0;
+  width: min(540px, calc(100vw - 24px));
+}
+.qr-dialog::backdrop { background: rgba(0, 0, 0, .45); }
+.qr-panel { padding: 14px; }
+.qr-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.qr-preview-wrap {
+  margin-top: 12px;
+  display: grid;
+  place-items: center;
+}
+#qrPreviewImage {
+  width: min(100%, 320px);
+  aspect-ratio: 1/1;
+  object-fit: contain;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #fff;
+}
 
 @media (max-width: 980px) {
   .layout { grid-template-columns: 1fr; }

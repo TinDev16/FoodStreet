@@ -3,12 +3,22 @@
 - Chỉnh lại tên các danh mục, dùng tên chung
 (Kết quả tìm kiếm dưới dạng hightight POI || Chỉ hiển thị POI)
 
+
 2. map
 - hightight POI gần nhất
 - Hiển thị kết qảu sau khi Tìm kiếm
 - Cải thiện UI đẹp, thân thiện hơn
+- hiển thị nhiều hình ảnh của POI (admin có thể thêm nhiều file ảnh)
+- QR hiển thị 
 
-PRD
-Đa ngôn ngữ 
-QR
-Pháp
+3. admin
+- chọn địa điểm để thêm POI, chỉ cần chọn hệ thống tự lấy lat/lon
+- cải thiện giao diện web admin, web public url 
+
+
+
+Pháp, Đức
+
+
+hãy check lại xem có giới hạn hay xung dột code gì không:
+- hiện tại đang có 3 POI, tôi thêm 1 POI mới thì app xóa POI đầu tiên

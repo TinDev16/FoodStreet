@@ -136,18 +136,19 @@
                     Padding="16,10,16,18"
                     StrokeShape="RoundRectangle 20,20,0,0"
                     TranslationY="1000">
-                <Border.GestureRecognizers>
-                    <PanGestureRecognizer PanUpdated="OnBottomSheetPanUpdated" />
-                </Border.GestureRecognizers>
                 <Grid RowDefinitions="Auto,*" RowSpacing="10">
                     <Grid>
+                        <Grid.GestureRecognizers>
+                            <PanGestureRecognizer PanUpdated="OnBottomSheetPanUpdated" />
+                        </Grid.GestureRecognizers>
                         <BoxView WidthRequest="52"
                                  HeightRequest="5"
                                  Color="#DCCFC4"
                                  CornerRadius="3"
                                  HorizontalOptions="Center" />
                     </Grid>
-                    <ScrollView Grid.Row="1">
+                    <ScrollView Grid.Row="1"
+                                VerticalScrollBarVisibility="Always">
                         <VerticalStackLayout Spacing="10">
                             <Image x:Name="SheetImage"
                                    HeightRequest="138"
@@ -169,6 +170,7 @@
                                     Stroke="#FED7AA"
                                     StrokeShape="RoundRectangle 12">
                                 <WebView x:Name="AudioPlayerWebView"
+                                         Navigating="OnAudioPlayerWebViewNavigating"
                                          HeightRequest="190" />
                             </Border>
                             <Border x:Name="TtsPlayerContainer"
@@ -237,7 +239,7 @@
                                     </Grid>
                                 </VerticalStackLayout>
                             </Border>
-<Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="8">
+                            <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="8">
                                 <Button Text="{loc:Translate Key=Main_Directions}"
                                         BackgroundColor="#E07A5F"
                                         TextColor="White"
@@ -264,6 +266,67 @@
                                         CornerRadius="14"
                                         Clicked="OnShareClicked" />
                             </Grid>
+                            <Border x:Name="PlaybackQueuePanel"
+                                    Padding="12,10"
+                                    BackgroundColor="#FFF7ED"
+                                    Stroke="#FED7AA"
+                                    StrokeShape="RoundRectangle 14"
+                                    IsVisible="False">
+                                <VerticalStackLayout Spacing="6">
+                                    <Label Text="{loc:Translate Key=Main_NowPlaying}"
+                                           FontSize="11"
+                                           TextColor="#9A3412" />
+                                    <Label x:Name="CurrentPlayingNameLabel"
+                                           Text="--"
+                                           FontSize="14"
+                                           FontAttributes="Bold"
+                                           TextColor="#7C2D12"
+                                           LineBreakMode="TailTruncation" />
+                                    <Grid ColumnDefinitions="Auto,*,Auto"
+                                          ColumnSpacing="8">
+                                        <Label x:Name="CurrentPlayingTimeLabel"
+                                               Text="00:00"
+                                               VerticalOptions="Center"
+                                               FontSize="11"
+                                               TextColor="#7C2D12" />
+                                        <ProgressBar x:Name="CurrentPlayingProgressBar"
+                                                     Grid.Column="1"
+                                                     Progress="0"
+                                                     HeightRequest="6"
+                                                     VerticalOptions="Center"
+                                                     ProgressColor="#E07A5F"
+                                                     BackgroundColor="#FDE7D7" />
+                                        <Label x:Name="CurrentPlayingDurationLabel"
+                                               Grid.Column="2"
+                                               Text="00:00"
+                                               VerticalOptions="Center"
+                                               FontSize="11"
+                                               TextColor="#7C2D12" />
+                                    </Grid>
+                                    <Border x:Name="QueueInfoBorder"
+                                            IsVisible="False"
+                                            Padding="8,6"
+                                            BackgroundColor="#FFFFFF"
+                                            Stroke="#FDE7D7"
+                                            StrokeShape="RoundRectangle 10">
+                                        <VerticalStackLayout Spacing="2">
+                                            <Label Text="{loc:Translate Key=Main_PlaybackQueue}"
+                                                   FontSize="11"
+                                                   TextColor="#9A3412" />
+                                            <Label x:Name="QueuedPoiNameLabel"
+                                                   Text="--"
+                                                   FontSize="13"
+                                                   TextColor="#7C2D12"
+                                                   LineBreakMode="TailTruncation" />
+                                            <Label x:Name="QueuedPoiDistanceLabel"
+                                                   Text=""
+                                                   FontSize="11"
+                                                   TextColor="#9A3412"
+                                                   IsVisible="False" />
+                                        </VerticalStackLayout>
+                                    </Border>
+                                </VerticalStackLayout>
+                            </Border>
                         </VerticalStackLayout>
                     </ScrollView>
                 </Grid>

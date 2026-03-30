@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FoodStreet POI</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/poi.css" />
+</head>
+<body>
+  <main class="poi-layout">
+    <section class="card poi-card">
+      <header class="poi-top">
+        <h1 id="poiName">POI</h1>
+        <label class="poi-lang">
+          <span>Ngon ngu</span>
+          <select id="langSelect"></select>
+        </label>
+      </header>
+
+      <p id="poiDesc" class="poi-desc"></p>
+
+      <img id="poiImage" class="poi-image" alt="POI image" hidden />
+
+      <div class="poi-actions">
+        <button type="button" id="speakBtn">Nghe TTS</button>
+        <button type="button" id="stopBtn" class="secondary">Dung</button>
+        <a id="mapBtn" class="button-link" target="_blank" rel="noopener">Xem vi tri</a>
+        <button type="button" id="routeBtn" class="secondary">Chi duong</button>
+      </div>
+
+      <audio id="audioPlayer" controls hidden></audio>
+      <p id="poiStatus" class="small muted"></p>
+    </section>
+
+    <section class="card poi-card">
+      <h2>Ban do</h2>
+      <iframe id="mapFrame" title="POI map"></iframe>
+    </section>
+  </main>
+
+  <script src="/poi.js"></script>
+</body>
+</html>

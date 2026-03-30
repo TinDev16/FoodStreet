@@ -94,6 +94,7 @@
 
         <div class="actions">
           <button type="submit">Save</button>
+          <button type="button" id="generateQrBtn" class="secondary">Tao QR POI dang chon</button>
           <button type="button" id="resetBtn" class="secondary">Reset</button>
         </div>
             </form>
@@ -122,6 +123,35 @@
     </section>
   </main>
 
-  <script src="/app.js"></script>
+  <dialog id="qrDialog" class="qr-dialog">
+    <form method="dialog" class="qr-panel">
+      <header class="qr-header">
+        <h3>QR POI</h3>
+        <button type="submit" class="secondary">Dong</button>
+      </header>
+      <p class="small muted">Quet ma de mo trang thong tin POI (TTS, vi tri, chi duong).</p>
+      <label>Ngon ngu mac dinh
+        <select id="qrLang"></select>
+      </label>
+      <label>Cloudflare Tunnel URL
+        <input id="qrBaseUrl" type="url" placeholder="https://your-tunnel.trycloudflare.com" />
+      </label>
+      <div class="actions">
+        <button type="button" id="qrDetectTunnelBtn" class="secondary">Lay tunnel URL</button>
+      </div>
+      <label>Public URL
+        <input id="qrPublicUrl" type="text" readonly />
+      </label>
+      <div class="qr-preview-wrap">
+        <img id="qrPreviewImage" alt="POI QR code" />
+      </div>
+      <div class="actions">
+        <button type="button" id="qrCopyBtn" class="secondary">Copy URL</button>
+        <a id="qrDownloadBtn" class="button-link" href="#" download>Tai QR PNG</a>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/app.js?v=20260330-qr4"></script>
 </body>
 </html>

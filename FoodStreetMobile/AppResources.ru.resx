@@ -54,6 +54,13 @@
     <value>Поделиться</value>
   </data>
 
+  <data name="Main_NowPlaying" xml:space="preserve">
+    <value>Сейчас играет</value>
+  </data>
+  <data name="Main_PlaybackQueue" xml:space="preserve">
+    <value>Очередь воспроизведения</value>
+  </data>
+
   <data name="Home_HeaderTitle" xml:space="preserve">
     <value>Винькхань</value>
   </data>

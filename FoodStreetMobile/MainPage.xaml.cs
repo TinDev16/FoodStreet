@@ -23,6 +23,14 @@ namespace FoodStreetMobile;
 
 public partial class MainPage : ContentPage
 {
+    private enum PlaybackSourceKind
+    {
+        None = 0,
+        AudioWeb = 1,
+        TtsNative = 2,
+        TtsWeb = 3
+    }
+
     private sealed class SearchPlaceResult
     {
         public required string Name { get; init; }
@@ -91,6 +99,12 @@ public partial class MainPage : ContentPage
     private bool _isTtsSeeking;
     private Locale? _preferredTtsLocale;
     private string? _preferredTtsLocaleLanguage;
+    private PoiViewModel? _currentPlaybackPoi;
+    private PoiViewModel? _queuedPlaybackPoi;
+    private PlaybackSourceKind _currentPlaybackSource = PlaybackSourceKind.None;
+    private double _currentPlaybackElapsedSeconds;
+    private double _currentPlaybackDurationSeconds = 1;
+    private bool _isAdvancingQueue;
 
     private bool _sheetInitialized;
     private double _sheetExpandedTranslation;
@@ -169,6 +183,7 @@ public partial class MainPage : ContentPage
             _selectedSearchResult = null;
             _lastRouteSummary = null;
             PlayAudioButton.IsEnabled = false;
+            ResetPlaybackQueueState();
             HideAudioPlayer();
 
             foreach (var poi in pois)
@@ -252,23 +267,10 @@ public partial class MainPage : ContentPage
             _selectedPoi = poi;
             _selectedSearchResult = null;
             _lastRouteSummary = null;
-            PlayAudioButton.IsEnabled = !string.IsNullOrWhiteSpace(poi.AudioUrl) || !string.IsNullOrWhiteSpace(poi.Narration);
-            UpdateBottomSheetContent(poi);
+            PlayAudioButton.IsEnabled = HasPlayableAudio(poi);
+            UpdateBottomSheetContent(poi, resetPlayerState: false);
             await ShowSheetPartialAsync();
-
-            if (!string.IsNullOrWhiteSpace(poi.AudioUrl)
-                && Uri.TryCreate(poi.AudioUrl, UriKind.Absolute, out var audioUri))
-            {
-                ShowAudioPlayerHtml(BuildAudioPlayerHtml(audioUri.ToString()));
-                return;
-            }
-
-            var narration = ResolveNarrationForPlayback(poi);
-            if (!string.IsNullOrWhiteSpace(narration))
-            {
-                await StartTtsPlayerAsync(narration);
-                return;
-            }
+            await RequestAutoPlaybackAsync(poi);
         });
     }
 
@@ -1508,7 +1510,10 @@ public partial class MainPage : ContentPage
             _selectedPoi = null;
             _selectedSearchResult = null;
             PlayAudioButton.IsEnabled = false;
-            HideAudioPlayer();
+            if (_currentPlaybackPoi is null)
+            {
+                HideAudioPlayer(resetPlaybackQueueState: true);
+            }
             await AnimateBottomSheetToAsync(_sheetHiddenTranslation, 170, Easing.CubicIn);
             return;
         }
@@ -1525,7 +1530,7 @@ public partial class MainPage : ContentPage
     private void UpdateBottomSheetContent(SearchPlaceResult result)
     {
         PlayAudioButton.IsEnabled = false;
-        HideAudioPlayer();
+        ResetBottomSheetPlayerUiForSelection();
         SheetTitleLabel.Text = result.Name;
         SheetAddressLabel.Text = string.IsNullOrWhiteSpace(_lastRouteSummary)
             ? result.Address
@@ -1535,11 +1540,21 @@ public partial class MainPage : ContentPage
             : ImageSource.FromUri(new Uri(result.ImageUrl));
     }
 
-    private void UpdateBottomSheetContent(PoiViewModel poi)
+    private void UpdateBottomSheetContent(PoiViewModel poi, bool resetPlayerState = true)
     {
         var hasNarration = !string.IsNullOrWhiteSpace(ResolveNarrationForPlayback(poi));
         PlayAudioButton.IsEnabled = !string.IsNullOrWhiteSpace(poi.AudioUrl) || hasNarration;
-        HideAudioPlayer();
+        if (resetPlayerState)
+        {
+            if (IsSamePoi(poi, _currentPlaybackPoi))
+            {
+                RestoreBottomSheetPlayerUiForCurrentPlayback();
+            }
+            else
+            {
+                ResetBottomSheetPlayerUiForSelection();
+            }
+        }
         SheetTitleLabel.Text = poi.Name;
         var description = string.IsNullOrWhiteSpace(poi.Description)
             ? string.Format(
@@ -1715,26 +1730,235 @@ public partial class MainPage : ContentPage
             return;
         }
 
-        if (!string.IsNullOrWhiteSpace(_selectedPoi.AudioUrl))
+        if (!HasPlayableAudio(_selectedPoi))
         {
-            if (!Uri.TryCreate(_selectedPoi.AudioUrl, UriKind.Absolute, out var audioUri))
+            await DisplayAlertAsync("Thong bao", "POI nay chua co audio hoac noi dung thuyet minh.", "OK");
+            return;
+        }
+
+        await StartPoiPlaybackAsync(_selectedPoi, allowInterrupt: true);
+    }
+
+    private async Task RequestAutoPlaybackAsync(PoiViewModel poi)
+    {
+        if (!HasPlayableAudio(poi))
+        {
+            return;
+        }
+
+        if (IsSamePoi(_currentPlaybackPoi, poi))
+        {
+            RefreshPlaybackQueuePanel();
+            return;
+        }
+
+        if (_currentPlaybackPoi is not null)
+        {
+            _queuedPlaybackPoi = poi;
+            RefreshPlaybackQueuePanel();
+            return;
+        }
+
+        await StartPoiPlaybackAsync(poi, allowInterrupt: false);
+    }
+
+    private async Task StartPoiPlaybackAsync(PoiViewModel poi, bool allowInterrupt)
+    {
+        if (!HasPlayableAudio(poi))
+        {
+            return;
+        }
+
+        if (allowInterrupt && _currentPlaybackPoi is not null && !IsSamePoi(_currentPlaybackPoi, poi))
+        {
+            StopCurrentPlaybackOnly();
+            _queuedPlaybackPoi = null;
+        }
+
+        _currentPlaybackPoi = poi;
+        _currentPlaybackElapsedSeconds = 0;
+        _currentPlaybackDurationSeconds = 1;
+        RefreshPlaybackQueuePanel();
+
+        if (!string.IsNullOrWhiteSpace(poi.AudioUrl))
+        {
+            if (!Uri.TryCreate(poi.AudioUrl, UriKind.Absolute, out var audioUri))
             {
-                await DisplayAlertAsync("Thong bao", "Audio URL cua POI khong hop le.", "OK");
+                if (allowInterrupt)
+                {
+                    await DisplayAlertAsync("Thong bao", "Audio URL cua POI khong hop le.", "OK");
+                }
+
+                await HandleCurrentPlaybackCompletedAsync();
                 return;
             }
 
+            _currentPlaybackSource = PlaybackSourceKind.AudioWeb;
             ShowAudioPlayerHtml(BuildAudioPlayerHtml(audioUri.ToString()));
             return;
         }
 
-        var narration = ResolveNarrationForPlayback(_selectedPoi);
-        if (!string.IsNullOrWhiteSpace(narration))
+        var narration = ResolveNarrationForPlayback(poi);
+        if (string.IsNullOrWhiteSpace(narration))
         {
-            await StartTtsPlayerAsync(narration);
+            await HandleCurrentPlaybackCompletedAsync();
             return;
         }
 
-        await DisplayAlertAsync("Thong bao", "POI nay chua co audio hoac noi dung thuyet minh.", "OK");
+        _currentPlaybackSource = PlaybackSourceKind.TtsNative;
+        await StartTtsPlayerAsync(narration);
+    }
+
+    private async Task HandleCurrentPlaybackCompletedAsync()
+    {
+        if (_isAdvancingQueue)
+        {
+            return;
+        }
+
+        _isAdvancingQueue = true;
+        try
+        {
+            _currentPlaybackPoi = null;
+            _currentPlaybackSource = PlaybackSourceKind.None;
+            _currentPlaybackElapsedSeconds = 0;
+            _currentPlaybackDurationSeconds = 1;
+            RefreshPlaybackQueuePanel();
+
+            if (_queuedPlaybackPoi is null)
+            {
+                return;
+            }
+
+            var nextPoi = _queuedPlaybackPoi;
+            _queuedPlaybackPoi = null;
+            RefreshPlaybackQueuePanel();
+            await StartPoiPlaybackAsync(nextPoi, allowInterrupt: true);
+        }
+        finally
+        {
+            _isAdvancingQueue = false;
+        }
+    }
+
+    private void ResetPlaybackQueueState()
+    {
+        _currentPlaybackPoi = null;
+        _queuedPlaybackPoi = null;
+        _currentPlaybackSource = PlaybackSourceKind.None;
+        _currentPlaybackElapsedSeconds = 0;
+        _currentPlaybackDurationSeconds = 1;
+        RefreshPlaybackQueuePanel();
+    }
+
+    private void StopCurrentPlaybackOnly()
+    {
+        HideAudioPlayer(resetPlaybackQueueState: false, stopPlayback: true, clearWebSource: true);
+    }
+
+    private static bool HasPlayableAudio(PoiViewModel poi)
+    {
+        var narration = ResolveNarrationForPlayback(poi);
+        return !string.IsNullOrWhiteSpace(poi.AudioUrl) || !string.IsNullOrWhiteSpace(narration);
+    }
+
+    private static bool IsSamePoi(PoiViewModel? left, PoiViewModel? right)
+    {
+        if (left is null || right is null)
+        {
+            return false;
+        }
+
+        return string.Equals(left.Id, right.Id, StringComparison.Ordinal);
+    }
+
+    private void RefreshPlaybackQueuePanel()
+    {
+        PlaybackQueuePanel.IsVisible = _currentPlaybackPoi is not null;
+        if (_currentPlaybackPoi is null)
+        {
+            QueueInfoBorder.IsVisible = false;
+            CurrentPlayingNameLabel.Text = "--";
+            CurrentPlayingProgressBar.Progress = 0;
+            CurrentPlayingTimeLabel.Text = "00:00";
+            CurrentPlayingDurationLabel.Text = "00:00";
+            return;
+        }
+
+        CurrentPlayingNameLabel.Text = _currentPlaybackPoi.Name;
+        var safeDuration = Math.Max(1, _currentPlaybackDurationSeconds);
+        var progress = Math.Clamp(_currentPlaybackElapsedSeconds / safeDuration, 0, 1);
+        CurrentPlayingProgressBar.Progress = progress;
+        CurrentPlayingTimeLabel.Text = FormatTime(_currentPlaybackElapsedSeconds);
+        CurrentPlayingDurationLabel.Text = FormatTime(safeDuration);
+
+        QueueInfoBorder.IsVisible = _queuedPlaybackPoi is not null;
+        if (_queuedPlaybackPoi is null)
+        {
+            QueuedPoiNameLabel.Text = "--";
+            QueuedPoiDistanceLabel.IsVisible = false;
+            QueuedPoiDistanceLabel.Text = string.Empty;
+            return;
+        }
+
+        QueuedPoiNameLabel.Text = _queuedPlaybackPoi.Name;
+        if (_queuedPlaybackPoi.DistanceMeters > 0)
+        {
+            QueuedPoiDistanceLabel.Text = $"{Math.Round(_queuedPlaybackPoi.DistanceMeters)} m";
+            QueuedPoiDistanceLabel.IsVisible = true;
+        }
+        else
+        {
+            QueuedPoiDistanceLabel.IsVisible = false;
+            QueuedPoiDistanceLabel.Text = string.Empty;
+        }
+    }
+
+    private void UpdatePlaybackProgress(double elapsedSeconds, double durationSeconds)
+    {
+        _currentPlaybackElapsedSeconds = Math.Max(0, elapsedSeconds);
+        _currentPlaybackDurationSeconds = Math.Max(1, durationSeconds);
+        RefreshPlaybackQueuePanel();
+    }
+
+    private void ResetBottomSheetPlayerUiForSelection()
+    {
+        if (_currentPlaybackPoi is null)
+        {
+            HideAudioPlayer(resetPlaybackQueueState: false, stopPlayback: true, clearWebSource: true);
+            return;
+        }
+
+        // There is active playback in background: clear current sheet player UI only
+        // so a newly selected POI starts from a clean "not started" visual state.
+        HideAudioPlayer(resetPlaybackQueueState: false, stopPlayback: false, clearWebSource: false);
+    }
+
+    private void RestoreBottomSheetPlayerUiForCurrentPlayback()
+    {
+        if (_currentPlaybackPoi is null)
+        {
+            ResetBottomSheetPlayerUiForSelection();
+            return;
+        }
+
+        switch (_currentPlaybackSource)
+        {
+            case PlaybackSourceKind.TtsNative:
+                AudioPlayerContainer.IsVisible = false;
+                TtsPlayerContainer.IsVisible = true;
+                TtsPlayPauseButton.Text = _ttsIsPlaying ? "⏸" : "▶";
+                RefreshTtsUi();
+                break;
+            case PlaybackSourceKind.AudioWeb:
+            case PlaybackSourceKind.TtsWeb:
+                TtsPlayerContainer.IsVisible = false;
+                AudioPlayerContainer.IsVisible = true;
+                break;
+            default:
+                ResetBottomSheetPlayerUiForSelection();
+                break;
+        }
     }
 
     private void ShowAudioPlayerHtml(string html)
@@ -1748,18 +1972,110 @@ public partial class MainPage : ContentPage
         };
     }
 
-    private void HideAudioPlayer()
+    private void HideAudioPlayer(
+        bool resetPlaybackQueueState = false,
+        bool stopPlayback = true,
+        bool clearWebSource = true)
     {
-        StopTtsPlayback();
+        if (stopPlayback)
+        {
+            StopTtsPlayback();
+        }
         TtsPlayerContainer.IsVisible = false;
-        TtsPlayPauseButton.Text = "▶";
-        TtsProgressSlider.Value = 0;
-        TtsProgressSlider.Maximum = 1;
-        TtsCurrentTimeLabel.Text = "00:00";
-        TtsDurationLabel.Text = "00:00";
+        if (stopPlayback)
+        {
+            TtsPlayPauseButton.Text = "▶";
+            TtsProgressSlider.Value = 0;
+            TtsProgressSlider.Maximum = 1;
+            TtsCurrentTimeLabel.Text = "00:00";
+            TtsDurationLabel.Text = "00:00";
+        }
 
         AudioPlayerContainer.IsVisible = false;
-        AudioPlayerWebView.Source = null;
+        if (clearWebSource)
+        {
+            AudioPlayerWebView.Source = null;
+        }
+
+        if (resetPlaybackQueueState)
+        {
+            ResetPlaybackQueueState();
+        }
+    }
+
+    private void OnAudioPlayerWebViewNavigating(object? sender, WebNavigatingEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(e.Url) || !e.Url.StartsWith("foodstreet://player", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        e.Cancel = true;
+        HandlePlayerWebCallback(e.Url);
+    }
+
+    private void HandlePlayerWebCallback(string rawUrl)
+    {
+        if (!Uri.TryCreate(rawUrl, UriKind.Absolute, out var uri))
+        {
+            return;
+        }
+
+        var values = ParseQuery(uri.Query);
+        values.TryGetValue("event", out var eventName);
+        var current = ParseDouble(values, "current");
+        var duration = ParseDouble(values, "duration");
+
+        if (_currentPlaybackSource is PlaybackSourceKind.AudioWeb or PlaybackSourceKind.TtsWeb)
+        {
+            UpdatePlaybackProgress(current, duration);
+        }
+
+        if (string.Equals(eventName, "ended", StringComparison.OrdinalIgnoreCase))
+        {
+            _ = HandleCurrentPlaybackCompletedAsync();
+        }
+    }
+
+    private static Dictionary<string, string> ParseQuery(string query)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return result;
+        }
+
+        var span = query.AsSpan();
+        if (span.Length > 0 && span[0] == '?')
+        {
+            span = span[1..];
+        }
+
+        foreach (var segment in span.ToString().Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var pair = segment.Split('=', 2);
+            var key = Uri.UnescapeDataString(pair[0]);
+            var value = pair.Length == 2 ? Uri.UnescapeDataString(pair[1]) : string.Empty;
+            if (!string.IsNullOrWhiteSpace(key))
+            {
+                result[key] = value;
+            }
+        }
+
+        return result;
+    }
+
+    private static double ParseDouble(IReadOnlyDictionary<string, string> values, string key)
+    {
+        if (!values.TryGetValue(key, out var raw)
+            || !double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
+            || double.IsNaN(parsed)
+            || double.IsInfinity(parsed))
+        {
+            return 0;
+        }
+
+        return parsed;
     }
 
     private void InitializeTtsPlayer()
@@ -1780,7 +2096,7 @@ public partial class MainPage : ContentPage
 
     private async Task StartTtsPlayerAsync(string narration)
     {
-        HideAudioPlayer();
+        HideAudioPlayer(resetPlaybackQueueState: false);
         BuildTtsSegments(narration);
 
         _ttsWordIndex = 0;
@@ -1811,10 +2127,12 @@ public partial class MainPage : ContentPage
                 RefreshTtsUi();
                 _ttsIsPlaying = false;
                 TtsPlayPauseButton.Text = "▶";
+                await HandleCurrentPlaybackCompletedAsync();
                 return;
             }
             catch
             {
+                _currentPlaybackSource = PlaybackSourceKind.TtsWeb;
                 ShowAudioPlayerHtml(BuildTtsPlayerHtml(narration, ResolvePreferredTtsLanguageTag()));
                 return;
             }
@@ -1839,10 +2157,12 @@ public partial class MainPage : ContentPage
                 await TextToSpeech.Default.SpeakAsync(narration, options, CancellationToken.None);
                 _ttsElapsedSeconds = TtsProgressSlider.Maximum;
                 RefreshTtsUi();
+                await HandleCurrentPlaybackCompletedAsync();
             }
             catch
             {
                 // Final fallback for environments with broken native TTS.
+                _currentPlaybackSource = PlaybackSourceKind.TtsWeb;
                 ShowAudioPlayerHtml(BuildTtsPlayerHtml(narration, ResolvePreferredTtsLanguageTag()));
             }
         }
@@ -1896,6 +2216,7 @@ public partial class MainPage : ContentPage
             {
                 _ttsElapsedSeconds = TtsProgressSlider.Maximum;
                 RefreshTtsUi();
+                _ = HandleCurrentPlaybackCompletedAsync();
             }
         }
     }
@@ -1928,6 +2249,10 @@ public partial class MainPage : ContentPage
 
         TtsCurrentTimeLabel.Text = FormatTime(_ttsElapsedSeconds);
         TtsDurationLabel.Text = FormatTime(TtsProgressSlider.Maximum);
+        if (_currentPlaybackSource == PlaybackSourceKind.TtsNative)
+        {
+            UpdatePlaybackProgress(_ttsElapsedSeconds, TtsProgressSlider.Maximum);
+        }
     }
 
     private void BuildTtsSegments(string narration)
@@ -2229,6 +2554,8 @@ public partial class MainPage : ContentPage
     const dur = document.getElementById('dur');
     const progress = document.getElementById('progress');
     const volume = document.getElementById('volume');
+    let lastSentAt = 0;
+    let lastSentAt = 0;
 
     const fmt = (s) => {{
       if (!isFinite(s)) return '00:00';
@@ -2236,6 +2563,15 @@ public partial class MainPage : ContentPage
       const ss = Math.floor(s % 60);
       return String(m).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
     }};
+
+    function notify(eventName) {{
+      const now = Date.now();
+      if (eventName === 'timeupdate' && now - lastSentAt < 250) return;
+      if (eventName === 'timeupdate') lastSentAt = now;
+      const current = Number.isFinite(a.currentTime) ? a.currentTime : 0;
+      const duration = Number.isFinite(a.duration) ? a.duration : 0;
+      window.location.href = `foodstreet://player?event=${{encodeURIComponent(eventName)}}&current=${{encodeURIComponent(current)}}&duration=${{encodeURIComponent(duration)}}`;
+    }}
 
     function toggle() {{
       if (a.paused) {{
@@ -2253,20 +2589,23 @@ public partial class MainPage : ContentPage
       progress.max = Math.max(1, a.duration || 1);
       dur.textContent = fmt(a.duration || 0);
       a.volume = parseFloat(volume.value);
+       notify('loadedmetadata');
       a.play().catch(() => {{ }});
     }});
 
-    a.addEventListener('play', () => btn.textContent = '⏸');
-    a.addEventListener('pause', () => btn.textContent = '▶');
-    a.addEventListener('ended', () => btn.textContent = '▶');
+    a.addEventListener('play', () => {{ btn.textContent = '⏸'; notify('play'); }});
+    a.addEventListener('pause', () => {{ btn.textContent = '▶'; notify('pause'); }});
+    a.addEventListener('ended', () => {{ btn.textContent = '▶'; notify('ended'); }});
     a.addEventListener('timeupdate', () => {{
       progress.value = a.currentTime || 0;
       cur.textContent = fmt(a.currentTime || 0);
+      notify('timeupdate');
     }});
 
     progress.addEventListener('input', () => {{
       a.currentTime = parseFloat(progress.value);
       cur.textContent = fmt(a.currentTime || 0);
+      notify('seek');
     }});
 
     volume.addEventListener('input', () => {{
@@ -2364,6 +2703,14 @@ public partial class MainPage : ContentPage
       return String(m).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
     };
 
+    function notify(eventName) {
+      const now = Date.now();
+      if (eventName === 'timeupdate' && now - lastSentAt < 250) return;
+      if (eventName === 'timeupdate') lastSentAt = now;
+      const seconds = Math.min(totalSeconds, currentWord * secPerWord);
+      window.location.href = `foodstreet://player?event=${encodeURIComponent(eventName)}&current=${encodeURIComponent(seconds)}&duration=${encodeURIComponent(totalSeconds)}`;
+    }
+
     function refreshUi() {
       const seconds = Math.min(totalSeconds, currentWord * secPerWord);
       progress.max = totalSeconds;
@@ -2371,6 +2718,7 @@ public partial class MainPage : ContentPage
       cur.textContent = fmt(seconds);
       dur.textContent = fmt(totalSeconds);
       btn.textContent = paused || !playing ? '▶' : '⏸';
+      notify('timeupdate');
     }
 
     function stopTicker() {
@@ -2395,31 +2743,32 @@ public partial class MainPage : ContentPage
       utterance.lang = languageTag || 'en-US';
       utterance.volume = parseFloat(volume.value || '0.8');
       segmentStartWord = currentWord;
-      utterance.onend = () => { playing = false; paused = false; currentWord = words.length; stopTicker(); refreshUi(); };
+      utterance.onend = () => { playing = false; paused = false; currentWord = words.length; stopTicker(); refreshUi(); notify('ended'); };
       playing = true;
       paused = false;
       speechSynthesis.speak(utterance);
       startTicker();
       refreshUi();
+      notify('play');
     }
 
     function toggle() {
       if (!('speechSynthesis' in window) || words.length === 0) return;
       if (!playing) { playFromCurrent(); return; }
-      if (!paused) { speechSynthesis.pause(); paused = true; refreshUi(); return; }
-      speechSynthesis.resume(); paused = false; refreshUi();
+      if (!paused) { speechSynthesis.pause(); paused = true; refreshUi(); notify('pause'); return; }
+      speechSynthesis.resume(); paused = false; refreshUi(); notify('play');
     }
 
     function skip(sec) {
       const step = Math.round(Math.abs(sec) / secPerWord);
       currentWord = sec < 0 ? Math.max(0, currentWord - step) : Math.min(words.length, currentWord + step);
-      if (playing) { playFromCurrent(); } else { refreshUi(); }
+      if (playing) { playFromCurrent(); } else { refreshUi(); notify('seek'); }
     }
 
     progress.addEventListener('input', () => {
       const sec = parseFloat(progress.value || '0');
       currentWord = Math.min(words.length, Math.max(0, Math.round(sec / secPerWord)));
-      if (playing) { playFromCurrent(); } else { refreshUi(); }
+      if (playing) { playFromCurrent(); } else { refreshUi(); notify('seek'); }
     });
 
     volume.addEventListener('input', () => {
