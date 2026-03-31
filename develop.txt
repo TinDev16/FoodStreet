@@ -19,6 +19,3 @@
 
 Pháp, Đức
 
-
-hãy check lại xem có giới hạn hay xung dột code gì không:
-- hiện tại đang có 3 POI, tôi thêm 1 POI mới thì app xóa POI đầu tiên
