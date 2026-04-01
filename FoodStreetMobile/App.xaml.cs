@@ -1,13 +1,17 @@
+using Microsoft.Maui.ApplicationModel;
+
 namespace FoodStreetMobile;
 
 public partial class App : Application
 {
     private readonly AppShell _appShell;
+    private readonly Services.DeepLinkService _deepLinkService;
 
-    public App(AppShell appShell, Services.AppLanguageService languageService)
+    public App(AppShell appShell, Services.AppLanguageService languageService, Services.DeepLinkService deepLinkService)
     {
         InitializeComponent();
         _appShell = appShell;
+        _deepLinkService = deepLinkService;
         Services.CrashLogger.Initialize();
         languageService.Initialize();
     }
@@ -15,5 +19,29 @@ public partial class App : Application
     protected override Window CreateWindow(IActivationState? activationState)
     {
         return new Window(_appShell);
+    }
+
+    protected override void OnAppLinkRequestReceived(Uri uri)
+    {
+        base.OnAppLinkRequestReceived(uri);
+
+        if (!_deepLinkService.TryQueueFromUri(uri))
+        {
+            return;
+        }
+
+        MainThread.BeginInvokeOnMainThread(async () =>
+        {
+            try
+            {
+                if (Shell.Current is not null)
+                {
+                    await Shell.Current.GoToAsync("//MainPage");
+                }
+            }
+            catch
+            {
+            }
+        });
     }
 }

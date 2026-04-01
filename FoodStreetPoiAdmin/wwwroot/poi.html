@@ -1,44 +1,76 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>FoodStreet POI</title>
-  <link rel="stylesheet" href="/styles.css" />
-  <link rel="stylesheet" href="/poi.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>FoodStreet - Khám phá điểm đến</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/poi.css">
 </head>
 <body>
-  <main class="poi-layout">
-    <section class="card poi-card">
-      <header class="poi-top">
-        <h1 id="poiName">POI</h1>
-        <label class="poi-lang">
-          <span>Ngon ngu</span>
-          <select id="langSelect"></select>
-        </label>
-      </header>
+  <!-- Thanh thông báo cài app -->
+  <div id="appInstallPrompt" class="app-install-prompt" hidden>
+    <div class="app-install-card">
+      <div class="app-install-icon">📱</div>
+      <div class="app-install-content">
+        <strong>Trải nghiệm tốt hơn với App FoodStreet</strong>
+        <p>Xem POI trên bản đồ, nhận thông báo và nhiều tính năng hấp dẫn</p>
+        <div class="app-install-actions">
+          <button id="openAppBtn" class="btn-primary btn-sm">Mở App</button>
+          <button id="dismissInstallPromptBtn" class="btn-outline btn-sm">Để sau</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
-      <p id="poiDesc" class="poi-desc"></p>
+  <main class="poi-container">
+    <!-- Thông tin POI chính -->
+    <div class="poi-card main-card">
+      <div class="card-header">
+        <h1 id="poiName">Đang tải...</h1>
+        <div class="lang-selector">
+          <label for="langSelect">🌐 Ngôn ngữ</label>
+          <select id="langSelect" class="lang-dropdown"></select>
+        </div>
+      </div>
 
-      <img id="poiImage" class="poi-image" alt="POI image" hidden />
+      <div class="poi-media">
+        <img id="poiImage" class="poi-image" alt="Hình ảnh địa điểm" hidden>
+        <div class="poi-status-badge" id="poiStatusBadge"></div>
+      </div>
 
-      <div class="poi-actions">
-        <button type="button" id="speakBtn">Nghe TTS</button>
-        <button type="button" id="stopBtn" class="secondary">Dung</button>
-        <a id="mapBtn" class="button-link" target="_blank" rel="noopener">Xem vi tri</a>
-        <button type="button" id="routeBtn" class="secondary">Chi duong</button>
+      <div class="poi-description">
+        <p id="poiDesc" class="desc-text"></p>
+      </div>
+
+      <div class="action-group">
+        <button id="speakBtn" class="btn-primary">
+          <span>🔊</span> Nghe giới thiệu
+        </button>
+        <button id="stopBtn" class="btn-outline">
+          <span>⏹️</span> Dừng
+        </button>
+        <a id="mapBtn" class="btn-outline" target="_blank" rel="noopener noreferrer">
+          <span>🗺️</span> Xem bản đồ
+        </a>
+        <button id="routeBtn" class="btn-secondary">
+          <span>🚶</span> Chỉ đường
+        </button>
       </div>
 
       <audio id="audioPlayer" controls hidden></audio>
-      <p id="poiStatus" class="small muted"></p>
-    </section>
+      <div id="poiStatus" class="status-message"></div>
+    </div>
 
-    <section class="card poi-card">
-      <h2>Ban do</h2>
-      <iframe id="mapFrame" title="POI map"></iframe>
-    </section>
+    <!-- Bản đồ -->
+    <div class="poi-card map-card">
+      <h2>📍 Vị trí trên bản đồ</h2>
+      <div class="map-wrapper">
+        <iframe id="mapFrame" title="Bản đồ POI" loading="lazy"></iframe>
+      </div>
+    </div>
   </main>
 
-  <script src="/poi.js"></script>
+  <script src="/poi.js?v=20260401-app-handoff"></script>
 </body>
 </html>

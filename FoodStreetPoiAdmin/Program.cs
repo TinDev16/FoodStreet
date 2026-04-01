@@ -30,6 +30,8 @@ Process? cloudflaredProcess = null;
 var cloudflaredLogPath = Path.Combine(dataDirectory, "cloudflared-quick.log");
 var cloudflaredExecutablePath = ResolveCloudflaredExecutablePath();
 string? cloudflaredQuickTunnelUrl = null;
+var quickTunnelLocalUrl = "http://localhost:5187";
+var autoStartQuickTunnel = IsQuickTunnelAutoStartEnabled();
 
 var supportedLanguages = SupportedLanguage.CreateDefaults();
 var supportedLanguageSet = supportedLanguages.Select(x => x.Code).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -83,10 +85,10 @@ app.Use(async (context, next) =>
 
 app.MapGet("/api/languages", () => Results.Ok(supportedLanguages));
 
-app.MapGet("/api/public/base-url", (HttpContext context) =>
+app.MapGet("/api/public/base-url", async (HttpContext context) =>
 {
-    var baseUrl = ResolvePublicBaseUrl(context, configuredPublicBaseUrl, out var error);
-    if (!string.IsNullOrWhiteSpace(error))
+    var (baseUrl, error) = await ResolvePublicBaseUrlForRequestAsync(context);
+    if (!string.IsNullOrWhiteSpace(error) || string.IsNullOrWhiteSpace(baseUrl))
     {
         return Results.BadRequest(new { error });
     }
@@ -96,7 +98,8 @@ app.MapGet("/api/public/base-url", (HttpContext context) =>
 
 app.MapPost("/api/cloudflared/quick-tunnel", async () =>
 {
-    var quickUrl = await EnsureQuickTunnelUrlAsync("http://localhost:5187");
+    var quickUrl = await EnsureQuickTunnelUrlAsync(quickTunnelLocalUrl);
+    configuredPublicBaseUrl = quickUrl;
     return Results.Ok(new { baseUrl = quickUrl });
 });
 
@@ -250,8 +253,8 @@ app.MapGet("/api/pois/{id}/public-link", async (HttpContext context, string id) 
     }
 
     var lang = NormalizeAppLanguageCode(context.Request.Query["lang"].ToString());
-    var baseUrl = ResolvePublicBaseUrl(context, configuredPublicBaseUrl, out var error);
-    if (!string.IsNullOrWhiteSpace(error))
+    var (baseUrl, error) = await ResolvePublicBaseUrlForRequestAsync(context);
+    if (!string.IsNullOrWhiteSpace(error) || string.IsNullOrWhiteSpace(baseUrl))
     {
         return Results.BadRequest(new { error });
     }
@@ -286,8 +289,8 @@ app.MapGet("/api/pois/{id}/qr.png", async (HttpContext context, string id) =>
     var download = string.Equals(context.Request.Query["download"], "1", StringComparison.OrdinalIgnoreCase)
                    || string.Equals(context.Request.Query["download"], "true", StringComparison.OrdinalIgnoreCase);
 
-    var baseUrl = ResolvePublicBaseUrl(context, configuredPublicBaseUrl, out var error);
-    if (!string.IsNullOrWhiteSpace(error))
+    var (baseUrl, error) = await ResolvePublicBaseUrlForRequestAsync(context);
+    if (!string.IsNullOrWhiteSpace(error) || string.IsNullOrWhiteSpace(baseUrl))
     {
         return Results.BadRequest(new { error });
     }
@@ -657,6 +660,47 @@ app.MapDelete("/api/shops/{id}", async (string id) =>
     };
 });
 
+app.Lifetime.ApplicationStarted.Register(() =>
+{
+    if (!autoStartQuickTunnel)
+    {
+        return;
+    }
+
+    _ = Task.Run(async () =>
+    {
+        try
+        {
+            var quickUrl = await EnsureQuickTunnelUrlAsync(quickTunnelLocalUrl);
+            configuredPublicBaseUrl = quickUrl;
+            Console.WriteLine($"[Cloudflared] Quick tunnel ready: {quickUrl}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Cloudflared] Auto-start quick tunnel failed: {ex.Message}");
+        }
+    });
+});
+
+app.Lifetime.ApplicationStopping.Register(() =>
+{
+    lock (cloudflaredSync)
+    {
+        if (cloudflaredProcess is null || cloudflaredProcess.HasExited)
+        {
+            return;
+        }
+
+        try
+        {
+            cloudflaredProcess.Kill(entireProcessTree: true);
+        }
+        catch
+        {
+        }
+    }
+});
+
 app.Run();
 
 async Task TryEnsureAdbReverseAsync()
@@ -714,9 +758,9 @@ static bool TryParsePoiId(string? raw, out long poiId)
            && poiId > 0;
 }
 
-static string ResolvePublicBaseUrl(HttpContext context, string? configuredPublicBaseUrl, out string? error)
+async Task<(string? BaseUrl, string? Error)> ResolvePublicBaseUrlForRequestAsync(HttpContext context)
 {
-    error = null;
+    var error = default(string);
     var requestedBaseUrlRaw = context.Request.Query["baseUrl"].ToString();
     if (!string.IsNullOrWhiteSpace(requestedBaseUrlRaw))
     {
@@ -724,25 +768,40 @@ static string ResolvePublicBaseUrl(HttpContext context, string? configuredPublic
         if (string.IsNullOrWhiteSpace(requestedBaseUrl))
         {
             error = "Invalid baseUrl. Use full http(s) URL, for example: https://abc.trycloudflare.com";
-            return string.Empty;
+            return (null, error);
         }
 
-        return requestedBaseUrl;
+        return (requestedBaseUrl, null);
     }
 
     if (!string.IsNullOrWhiteSpace(configuredPublicBaseUrl))
     {
-        return configuredPublicBaseUrl;
+        return (configuredPublicBaseUrl, null);
     }
 
     var fallback = $"{context.Request.Scheme}://{context.Request.Host.ToUriComponent()}{context.Request.PathBase.ToUriComponent()}".TrimEnd('/');
     if (IsLocalUrl(fallback))
     {
+        if (autoStartQuickTunnel)
+        {
+            try
+            {
+                var quickUrl = await EnsureQuickTunnelUrlAsync(quickTunnelLocalUrl);
+                configuredPublicBaseUrl = quickUrl;
+                return (quickUrl, null);
+            }
+            catch (Exception ex)
+            {
+                error = $"Khong the tu dong lay Cloudflare tunnel URL: {ex.Message}";
+                return (null, error);
+            }
+        }
+
         error = "Public URL dang la localhost. Vui long nhap Cloudflare Tunnel URL hoac bam 'Lay tunnel URL'.";
-        return string.Empty;
+        return (null, error);
     }
 
-    return fallback;
+    return (fallback, null);
 }
 
 static string? NormalizePublicBaseUrl(string? raw)
@@ -839,17 +898,6 @@ async Task<string> EnsureQuickTunnelUrlAsync(string localUrl)
         throw new InvalidOperationException("Invalid local URL for quick tunnel.");
     }
 
-    var existedUrl = cloudflaredQuickTunnelUrl;
-    if (string.IsNullOrWhiteSpace(existedUrl))
-    {
-        existedUrl = ReadQuickTunnelUrlFromLog(cloudflaredLogPath);
-    }
-    if (!string.IsNullOrWhiteSpace(existedUrl))
-    {
-        cloudflaredQuickTunnelUrl = existedUrl;
-        return existedUrl;
-    }
-
     lock (cloudflaredSync)
     {
         if (cloudflaredProcess is not null && !cloudflaredProcess.HasExited)
@@ -870,6 +918,7 @@ async Task<string> EnsureQuickTunnelUrlAsync(string localUrl)
 
             try
             {
+                cloudflaredQuickTunnelUrl = null;
                 if (File.Exists(cloudflaredLogPath))
                 {
                     File.Delete(cloudflaredLogPath);
@@ -1033,6 +1082,21 @@ static string ExtractQuickTunnelUrl(string? text)
 
     var match = Regex.Match(text, @"https://[a-z0-9-]+\.trycloudflare\.com", RegexOptions.IgnoreCase);
     return match.Success ? match.Value : string.Empty;
+}
+
+static bool IsQuickTunnelAutoStartEnabled()
+{
+    var raw = Environment.GetEnvironmentVariable("POI_AUTO_START_CLOUDFLARE_TUNNEL");
+    if (string.IsNullOrWhiteSpace(raw))
+    {
+        return true;
+    }
+
+    var normalized = raw.Trim();
+    return !string.Equals(normalized, "0", StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(normalized, "false", StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(normalized, "off", StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(normalized, "no", StringComparison.OrdinalIgnoreCase);
 }
 
 static void TryDeleteUploadedFile(string uploadDirectory, string? assetUrl)

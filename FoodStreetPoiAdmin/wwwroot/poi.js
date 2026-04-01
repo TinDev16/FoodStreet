@@ -12,13 +12,19 @@
   const routeBtnEl = $("#routeBtn");
   const audioPlayerEl = $("#audioPlayer");
   const statusEl = $("#poiStatus");
+  const appInstallPromptEl = $("#appInstallPrompt");
+  const openAppBtnEl = $("#openAppBtn");
+  const dismissInstallPromptBtnEl = $("#dismissInstallPromptBtn");
 
   const state = {
     poiId: "",
     lang: "vi",
     languages: [],
     poi: null,
+    appHandOffDone: false,
   };
+
+  const INSTALL_PROMPT_DISABLED_KEY = "poiDisableAppInstallPrompt";
 
   const setStatus = (text) => {
     statusEl.textContent = text || "";
@@ -58,6 +64,77 @@
     params.set("destination", `${lat},${lon}`);
     if (origin) params.set("origin", origin);
     return `https://www.google.com/maps/dir/?${params.toString()}`;
+  };
+
+  const buildAppDeepLinkUrl = (poiId, langCode) => {
+    const params = new URLSearchParams();
+    params.set("id", String(poiId || "").trim());
+    if (langCode) {
+      params.set("lang", toLangCode(langCode));
+    }
+    return `foodstreet://open-poi?${params.toString()}`;
+  };
+
+  const shouldDisableInstallPrompt = () =>
+    localStorage.getItem(INSTALL_PROMPT_DISABLED_KEY) === "1";
+
+  const hideInstallPrompt = () => {
+    if (appInstallPromptEl) {
+      appInstallPromptEl.hidden = true;
+    }
+  };
+
+  const showInstallPrompt = () => {
+    if (appInstallPromptEl) {
+      appInstallPromptEl.hidden = false;
+    }
+  };
+
+  const tryOpenAppDeepLink = async (deepLinkUrl) => {
+    if (!deepLinkUrl) return false;
+
+    return new Promise((resolve) => {
+      let completed = false;
+      const finish = (opened) => {
+        if (completed) return;
+        completed = true;
+        document.removeEventListener("visibilitychange", onVisibilityChange);
+        window.removeEventListener("pagehide", onPageHide);
+        resolve(Boolean(opened));
+      };
+
+      const onVisibilityChange = () => {
+        if (document.visibilityState === "hidden") {
+          finish(true);
+        }
+      };
+
+      const onPageHide = () => finish(true);
+
+      document.addEventListener("visibilitychange", onVisibilityChange, { once: true });
+      window.addEventListener("pagehide", onPageHide, { once: true });
+
+      window.location.href = deepLinkUrl;
+      window.setTimeout(() => finish(document.visibilityState === "hidden"), 1600);
+    });
+  };
+
+  const initAppHandOff = async () => {
+    if (state.appHandOffDone || !state.poiId) {
+      return;
+    }
+
+    state.appHandOffDone = true;
+    hideInstallPrompt();
+
+    if (shouldDisableInstallPrompt()) {
+      return;
+    }
+
+    const opened = await tryOpenAppDeepLink(buildAppDeepLinkUrl(state.poiId, state.lang));
+    if (!opened) {
+      showInstallPrompt();
+    }
   };
 
   const stopSpeaking = () => {
@@ -188,6 +265,15 @@
         { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
       );
     });
+
+    openAppBtnEl?.addEventListener("click", async () => {
+      await tryOpenAppDeepLink(buildAppDeepLinkUrl(state.poiId, state.lang));
+    });
+
+    dismissInstallPromptBtnEl?.addEventListener("click", () => {
+      localStorage.setItem(INSTALL_PROMPT_DISABLED_KEY, "1");
+      hideInstallPrompt();
+    });
   };
 
   const init = async () => {
@@ -195,6 +281,7 @@
     state.poiId = (search.get("id") || "").trim();
     state.lang = toLangCode(search.get("lang") || "vi");
 
+    await initAppHandOff();
     await initLanguages();
     initEvents();
     await fetchAndRenderPoi();

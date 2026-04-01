@@ -525,18 +525,15 @@
 
     state.qr.poiId = String(poiId);
     state.qr.lang = state.selectedSourceLang || "vi";
-    if (!state.qr.baseUrl) {
-      const fromStorage = (localStorage.getItem("poiPublicBaseUrl") || "").trim();
-      if (fromStorage) {
-        state.qr.baseUrl = fromStorage;
-      } else {
-        try {
-          const baseInfo = await apiGet("/api/public/base-url");
-          state.qr.baseUrl = (baseInfo?.baseUrl || "").trim();
-        } catch {
-          state.qr.baseUrl = "";
-        }
+    try {
+      const baseInfo = await apiGet("/api/public/base-url");
+      state.qr.baseUrl = (baseInfo?.baseUrl || "").trim();
+      if (state.qr.baseUrl) {
+        localStorage.setItem("poiPublicBaseUrl", state.qr.baseUrl);
       }
+    } catch {
+      const fromStorage = (localStorage.getItem("poiPublicBaseUrl") || "").trim();
+      state.qr.baseUrl = fromStorage || "";
     }
 
     qrLangSelect.value = state.qr.lang;

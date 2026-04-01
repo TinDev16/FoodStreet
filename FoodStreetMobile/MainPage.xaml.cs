@@ -68,6 +68,7 @@ public partial class MainPage : ContentPage
     private static readonly HttpClient HttpClient = new();
 
     private readonly MainViewModel _viewModel;
+    private readonly DeepLinkService _deepLinkService;
     private readonly List<SearchPlaceResult> _searchResults = new();
 
     private bool _hasCenteredOnUser;
@@ -116,10 +117,11 @@ public partial class MainPage : ContentPage
     private const double MapMarginUpdateThresholdPx = 3;
     private const int MapMarginUpdateMinIntervalMs = 16;
 
-    public MainPage(MainViewModel viewModel)
+    public MainPage(MainViewModel viewModel, DeepLinkService deepLinkService)
     {
         InitializeComponent();
         _viewModel = viewModel;
+        _deepLinkService = deepLinkService;
         BindingContext = _viewModel;
 
         _viewModel.PoisLoaded += OnPoisLoaded;
@@ -127,6 +129,7 @@ public partial class MainPage : ContentPage
         _viewModel.UserLocationChanged += OnUserLocationChanged;
         _viewModel.AutoPlayPoiRequested += OnAutoPlayPoiRequested;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        _deepLinkService.PendingPoiLinkQueued += OnPendingPoiLinkQueued;
         SizeChanged += OnPageSizeChanged;
         InitializeTtsPlayer();
     }
@@ -139,6 +142,7 @@ public partial class MainPage : ContentPage
             EnsureBottomSheetLayout();
             await EnsureUserLocationEnabledAsync();
             await _viewModel.InitializeAsync();
+            await TryOpenPendingDeepLinkAsync();
             _ = ShowStatusBannerForOneSecondAsync();
 
             if (_viewModel.Pois.Count == 0)
@@ -271,6 +275,55 @@ public partial class MainPage : ContentPage
             UpdateBottomSheetContent(poi, resetPlayerState: false);
             await ShowSheetPartialAsync();
             await RequestAutoPlaybackAsync(poi);
+        });
+    }
+
+    private async Task TryOpenPendingDeepLinkAsync()
+    {
+        if (!_deepLinkService.TryTakePendingPoiLink(out var pending) || pending is null)
+        {
+            return;
+        }
+
+        PoiViewModel? poi = null;
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            poi = _viewModel.Pois.FirstOrDefault(x => string.Equals(x.Id, pending.PoiId, StringComparison.OrdinalIgnoreCase));
+            if (poi is not null)
+            {
+                break;
+            }
+
+            await _viewModel.RefreshFromServerAsync();
+        }
+
+        if (poi is null)
+        {
+            await DisplayAlertAsync("Thong bao", $"Khong tim thay POI id={pending.PoiId}.", "OK");
+            return;
+        }
+
+        _selectedPoi = poi;
+        _selectedSearchResult = null;
+        _lastRouteSummary = null;
+        ClearRoute();
+        PlayAudioButton.IsEnabled = HasPlayableAudio(poi);
+        UpdateBottomSheetContent(poi, resetPlayerState: false);
+        MoveMapToPreserveZoom(poi.Latitude, poi.Longitude);
+        await ShowSheetExpandedAsync();
+    }
+
+    private void OnPendingPoiLinkQueued()
+    {
+        MainThread.BeginInvokeOnMainThread(async () =>
+        {
+            try
+            {
+                await TryOpenPendingDeepLinkAsync();
+            }
+            catch
+            {
+            }
         });
     }
 
@@ -1435,6 +1488,12 @@ public partial class MainPage : ContentPage
     {
         EnsureBottomSheetLayout();
         await AnimateBottomSheetToAsync(_sheetPartialTranslation, 220, Easing.CubicOut);
+    }
+
+    private async Task ShowSheetExpandedAsync()
+    {
+        EnsureBottomSheetLayout();
+        await AnimateBottomSheetToAsync(_sheetExpandedTranslation, 220, Easing.CubicOut);
     }
 
     private async Task AnimateBottomSheetToAsync(double targetTranslation, uint duration, Easing easing)
