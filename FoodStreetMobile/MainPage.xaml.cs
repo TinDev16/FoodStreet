@@ -1,5 +1,6 @@
-﻿using FoodStreetMobile.ViewModels;
+using FoodStreetMobile.ViewModels;
 using FoodStreetMobile.Services;
+using FoodStreetMobile.Models;
 using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.ApplicationModel.DataTransfer;
 using Microsoft.Maui.Controls.Maps;
@@ -12,6 +13,7 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Collections.ObjectModel;
 using MauiLocation = Microsoft.Maui.Devices.Sensors.Location;
 #if ANDROID
 using AndroidMarker = Android.Gms.Maps.Model.Marker;
@@ -29,18 +31,6 @@ public partial class MainPage : ContentPage
         AudioWeb = 1,
         TtsNative = 2,
         TtsWeb = 3
-    }
-
-    private sealed class SearchPlaceResult
-    {
-        public required string Name { get; init; }
-        public required string Address { get; init; }
-        public double Latitude { get; init; }
-        public double Longitude { get; init; }
-        public double Importance { get; init; }
-        public string? ImageUrl { get; init; }
-        public string? PlaceId { get; init; }
-        public bool HasCoordinates => Latitude is >= -90 and <= 90 && Longitude is >= -180 and <= 180;
     }
 
     private sealed class DirectionsResult
@@ -68,8 +58,9 @@ public partial class MainPage : ContentPage
     private static readonly HttpClient HttpClient = new();
 
     private readonly MainViewModel _viewModel;
+    private readonly PlaceSearchService _placeSearchService;
     private readonly DeepLinkService _deepLinkService;
-    private readonly List<SearchPlaceResult> _searchResults = new();
+    private readonly ObservableCollection<SearchPlaceResult> _searchResults = new();
 
     private bool _hasCenteredOnUser;
     private bool _isLocationSetupDone;
@@ -106,6 +97,7 @@ public partial class MainPage : ContentPage
     private double _currentPlaybackElapsedSeconds;
     private double _currentPlaybackDurationSeconds = 1;
     private bool _isAdvancingQueue;
+    private bool _isAutoPlaySubscriptionActive;
 
     private bool _sheetInitialized;
     private double _sheetExpandedTranslation;
@@ -117,19 +109,22 @@ public partial class MainPage : ContentPage
     private const double MapMarginUpdateThresholdPx = 3;
     private const int MapMarginUpdateMinIntervalMs = 16;
 
-    public MainPage(MainViewModel viewModel, DeepLinkService deepLinkService)
+    public MainPage(MainViewModel viewModel, PlaceSearchService placeSearchService, DeepLinkService deepLinkService)
     {
         InitializeComponent();
         _viewModel = viewModel;
+        _placeSearchService = placeSearchService;
         _deepLinkService = deepLinkService;
         BindingContext = _viewModel;
+        SearchResultsView.ItemsSource = _searchResults;
+        PlaceSearchEntry.TextChanged += OnPlaceSearchTextChanged;
 
         _viewModel.PoisLoaded += OnPoisLoaded;
         _viewModel.ActivePoiChanged += OnActivePoiChanged;
         _viewModel.UserLocationChanged += OnUserLocationChanged;
-        _viewModel.AutoPlayPoiRequested += OnAutoPlayPoiRequested;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         _deepLinkService.PendingPoiLinkQueued += OnPendingPoiLinkQueued;
+        _deepLinkService.PendingPlaceSelectionQueued += OnPendingPlaceSelectionQueued;
         SizeChanged += OnPageSizeChanged;
         InitializeTtsPlayer();
     }
@@ -137,12 +132,14 @@ public partial class MainPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        EnsureAutoPlaySubscription(isEnabled: true);
         try
         {
             EnsureBottomSheetLayout();
             await EnsureUserLocationEnabledAsync();
             await _viewModel.InitializeAsync();
             await TryOpenPendingDeepLinkAsync();
+            await TryOpenPendingPlaceSelectionAsync();
             _ = ShowStatusBannerForOneSecondAsync();
 
             if (_viewModel.Pois.Count == 0)
@@ -278,6 +275,29 @@ public partial class MainPage : ContentPage
         });
     }
 
+    private void EnsureAutoPlaySubscription(bool isEnabled)
+    {
+        if (isEnabled)
+        {
+            if (_isAutoPlaySubscriptionActive)
+            {
+                return;
+            }
+
+            _viewModel.AutoPlayPoiRequested += OnAutoPlayPoiRequested;
+            _isAutoPlaySubscriptionActive = true;
+            return;
+        }
+
+        if (!_isAutoPlaySubscriptionActive)
+        {
+            return;
+        }
+
+        _viewModel.AutoPlayPoiRequested -= OnAutoPlayPoiRequested;
+        _isAutoPlaySubscriptionActive = false;
+    }
+
     private async Task TryOpenPendingDeepLinkAsync()
     {
         if (!_deepLinkService.TryTakePendingPoiLink(out var pending) || pending is null)
@@ -327,6 +347,59 @@ public partial class MainPage : ContentPage
         });
     }
 
+    private async Task TryOpenPendingPlaceSelectionAsync()
+    {
+        if (!_deepLinkService.TryTakePendingPlaceSelection(out var pending) || pending is null)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(pending.PoiId))
+        {
+            var poi = _viewModel.Pois.FirstOrDefault(x => string.Equals(x.Id, pending.PoiId, StringComparison.OrdinalIgnoreCase));
+            if (poi is not null)
+            {
+                _selectedPoi = poi;
+                _selectedSearchResult = null;
+                _lastRouteSummary = null;
+                ClearRoute();
+                PlayAudioButton.IsEnabled = HasPlayableAudio(poi);
+                UpdateBottomSheetContent(poi, resetPlayerState: false);
+                MoveMapToPreserveZoom(poi.Latitude, poi.Longitude);
+                await ShowSheetExpandedAsync();
+                return;
+            }
+        }
+
+        var selected = new SearchPlaceResult
+        {
+            Name = pending.Name,
+            Address = pending.Address,
+            Latitude = pending.Latitude,
+            Longitude = pending.Longitude,
+            ImageUrl = pending.ImageUrl,
+            PlaceId = pending.PlaceId,
+            PoiId = pending.PoiId,
+            Importance = 1
+        };
+
+        await SelectSearchResultAsync(selected);
+    }
+
+    private void OnPendingPlaceSelectionQueued()
+    {
+        MainThread.BeginInvokeOnMainThread(async () =>
+        {
+            try
+            {
+                await TryOpenPendingPlaceSelectionAsync();
+            }
+            catch
+            {
+            }
+        });
+    }
+
     private async Task EnsureUserLocationEnabledAsync()
     {
         if (_isLocationSetupDone)
@@ -346,7 +419,7 @@ public partial class MainPage : ContentPage
             if (status != PermissionStatus.Granted)
             {
                 PoiMap.IsShowingUser = false;
-                await DisplayAlertAsync("Thông báo", "Cần cấp quyền vị trí để hiển thị vị trí hiện tại.", "OK");
+                await DisplayAlertAsync("Th?ng b?o", "C?n c?p quy?n v? tr? d? hi?n th? v? tr? hi?n t?i.", "OK");
                 return;
             }
 
@@ -388,7 +461,7 @@ public partial class MainPage : ContentPage
 
         try
         {
-            await SearchPlaceAsync(forceSelection: true);
+            await SearchPlaceAsync();
         }
         finally
         {
@@ -500,7 +573,7 @@ public partial class MainPage : ContentPage
 
             if (_lastUserLocation is null)
             {
-                await DisplayAlertAsync("Thông báo", "Chưa lấy được vị trí hiện tại.", "OK");
+                await DisplayAlertAsync("Th?ng b?o", "Chua l?y du?c v? tr? hi?n t?i.", "OK");
                 return;
             }
 
@@ -508,7 +581,7 @@ public partial class MainPage : ContentPage
         }
         catch
         {
-            await DisplayAlertAsync("Thông báo", "Không thể xác định vị trí hiện tại.", "OK");
+            await DisplayAlertAsync("Th?ng b?o", "Kh?ng th? x?c d?nh v? tr? hi?n t?i.", "OK");
         }
         finally
         {
@@ -519,42 +592,68 @@ public partial class MainPage : ContentPage
         }
     }
 
-    private async void OnPlaceSearchCompleted(object? sender, EventArgs e)
+
+    private void OnPlaceSearchTextChanged(object sender, Microsoft.Maui.Controls.TextChangedEventArgs e)
     {
-        await SearchPlaceAsync(forceSelection: true);
+        _ = HandlePlaceSearchTextChangedAsync(e.NewTextValue);
     }
 
-    private async void OnPlaceSearchTextChanged(object? sender, TextChangedEventArgs e)
+    private async Task HandlePlaceSearchTextChangedAsync(string? newTextValue)
     {
         _searchTypingCts?.Cancel();
         _searchTypingCts?.Dispose();
 
-        var query = e.NewTextValue?.Trim() ?? string.Empty;
+        var query = newTextValue?.Trim() ?? string.Empty;
         if (query.Length < 2)
         {
             HideSearchResults();
+            SetSearchUiState(isLoading: false, errorText: null);
             return;
         }
 
         var cts = new CancellationTokenSource();
         _searchTypingCts = cts;
+        SetSearchUiState(isLoading: true, errorText: null);
 
         try
         {
             await Task.Delay(220, cts.Token);
             var results = await SearchPlacesAsync(query, cts.Token);
+            if (cts.IsCancellationRequested)
+            {
+                return;
+            }
+
+            BindSearchResults(results, keepVisible: true);
+            SetSearchUiState(isLoading: false, errorText: results.Count == 0 ? "Khong tim thay ket qua." : null);
+        }
+        catch (OperationCanceledException)
+        {
+            // Ignore cancellation while typing.
+        }
+        catch (Exception ex)
+        {
             if (!cts.IsCancellationRequested)
             {
-                BindSearchResults(results, keepVisible: true);
+                CrashLogger.Write("MainPage.OnPlaceSearchTextChanged", ex);
+                HideSearchResults();
+                SetSearchUiState(isLoading: false, errorText: "Khong the tim kiem luc nay.");
             }
-        }
-        catch
-        {
-            HideSearchResults();
         }
     }
 
-    private async Task SearchPlaceAsync(bool forceSelection)
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        EnsureAutoPlaySubscription(isEnabled: false);
+    }
+
+    private async void OnPlaceSearchCompleted(object? sender, EventArgs e)
+    {
+        await SearchPlaceAsync();
+    }
+
+    private async Task SearchPlaceAsync()
     {
         var query = PlaceSearchEntry.Text?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(query))
@@ -563,32 +662,25 @@ public partial class MainPage : ContentPage
             return;
         }
 
+        SetSearchUiState(isLoading: true, errorText: null);
+
         try
         {
-            List<SearchPlaceResult> results;
-            if (string.Equals(query, _lastSearchQuery, StringComparison.OrdinalIgnoreCase) && _searchResults.Count > 0)
-            {
-                results = _searchResults.ToList();
-            }
-            else
-            {
-                results = await SearchPlacesAsync(query, CancellationToken.None);
-            }
+            var results = await SearchPlacesAsync(query, CancellationToken.None);
 
-            BindSearchResults(results, keepVisible: !forceSelection || results.Count > 1);
+            // Always show full result list — user selects from the list.
+            BindSearchResults(results, keepVisible: true);
+            SetSearchUiState(isLoading: false, errorText: results.Count == 0 ? "Không tìm thấy kết quả." : null);
+
             if (results.Count == 0)
             {
                 await DisplayAlertAsync("Thông báo", "Không tìm thấy địa điểm.", "OK");
-                return;
-            }
-
-            if (forceSelection)
-            {
-                await SelectSearchResultAsync(results[0]);
             }
         }
         catch (Exception ex)
         {
+            CrashLogger.Write("MainPage.SearchPlaceAsync", ex);
+            SetSearchUiState(isLoading: false, errorText: "Không thể tìm kiếm lúc này.");
             await DisplayAlertAsync("Lỗi", $"Không thể tìm địa điểm: {ex.Message}", "OK");
         }
     }
@@ -613,7 +705,7 @@ public partial class MainPage : ContentPage
         var resolved = await ResolveSearchResultAsync(result);
         if (!resolved.HasCoordinates)
         {
-            await DisplayAlertAsync("Thông báo", "Không thể lấy tọa độ cho địa điểm này.", "OK");
+            await DisplayAlertAsync("Th?ng b?o", "Kh?ng th? l?y t?a d? cho d?a di?m n?y.", "OK");
             return;
         }
 
@@ -626,6 +718,7 @@ public partial class MainPage : ContentPage
         PlaceSearchEntry.Text = resolved.Name;
         PlaceSearchEntry.Unfocus();
         HideSearchResults();
+        SetSearchUiState(isLoading: false, errorText: null);
 
         UpdateBottomSheetContent(resolved);
         await ShowSheetPartialAsync();
@@ -639,361 +732,32 @@ public partial class MainPage : ContentPage
             return result;
         }
 
-        if (!string.IsNullOrWhiteSpace(result.PlaceId))
-        {
-            var details = await QueryGooglePlaceDetailsAsync(result.PlaceId, CancellationToken.None);
-            if (details is not null)
-            {
-                return details;
-            }
-        }
-
-        var fallback = await QueryGoogleGeocodeAsync(result.Address, 1, applyVnFilter: false, applyBoundedBias: true, CancellationToken.None);
-        return fallback.FirstOrDefault() ?? result;
+        return await _placeSearchService.ResolveAsync(result, _lastUserLocation, CancellationToken.None);
     }
 
     private async Task<List<SearchPlaceResult>> SearchPlacesAsync(string query, CancellationToken cancellationToken)
     {
-        if (TryParseCoordinateInput(query, out var coordinate))
-        {
-            _lastSearchQuery = query;
-            return new List<SearchPlaceResult> { coordinate };
-        }
+        var poiCandidates = _viewModel.Pois
+            .Select(p => new PoiSearchCandidate
+            {
+                PoiId = p.Id,
+                Name = p.Name,
+                Address = p.Description,
+                Latitude = p.Latitude,
+                Longitude = p.Longitude,
+                ImageUrl = NormalizeRemoteImageUrl(p.ImageUrl)
+            })
+            .ToList();
 
-        var list = await QueryGoogleAutocompleteAsync(query, 8, applyVnFilter: true, applyLocationBias: true, cancellationToken);
-        if (list.Count == 0)
-        {
-            list = await QueryGoogleAutocompleteAsync(query, 8, applyVnFilter: false, applyLocationBias: true, cancellationToken);
-        }
-
-        if (list.Count == 0)
-        {
-            list = await QueryGoogleGeocodeAsync(query, 8, applyVnFilter: true, applyBoundedBias: true, cancellationToken);
-        }
-
-        if (list.Count == 0)
-        {
-            list = await QueryGoogleGeocodeAsync(query, 8, applyVnFilter: false, applyBoundedBias: true, cancellationToken);
-        }
-
-        if (list.Count == 0)
-        {
-            list = await QueryGoogleGeocodeAsync(query, 8, applyVnFilter: false, applyBoundedBias: false, cancellationToken);
-        }
+        var list = await _placeSearchService.SearchAsync(
+            query,
+            _lastUserLocation,
+            maxResults: 6,
+            poiCandidates,
+            cancellationToken);
 
         _lastSearchQuery = query;
-        return RankSearchResults(query, list);
-    }
-
-    private async Task<List<SearchPlaceResult>> QueryGoogleAutocompleteAsync(
-        string query,
-        int limit,
-        bool applyVnFilter,
-        bool applyLocationBias,
-        CancellationToken cancellationToken)
-    {
-        var parameters = new List<string>
-        {
-            $"input={Uri.EscapeDataString(query)}",
-            $"language={Uri.EscapeDataString(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName)}",
-            "types=establishment|geocode",
-            $"key={Uri.EscapeDataString(GoogleMapsApiKey)}"
-        };
-
-        if (applyVnFilter)
-        {
-            parameters.Add("components=country:vn");
-        }
-
-        if (applyLocationBias && _lastUserLocation is not null)
-        {
-            parameters.Add($"location={_lastUserLocation.Latitude.ToString(CultureInfo.InvariantCulture)},{_lastUserLocation.Longitude.ToString(CultureInfo.InvariantCulture)}");
-            parameters.Add("radius=15000");
-        }
-
-        var url = $"https://maps.googleapis.com/maps/api/place/autocomplete/json?{string.Join("&", parameters)}";
-        using var response = await HttpClient.GetAsync(url, cancellationToken);
-        if (!response.IsSuccessStatusCode)
-        {
-            return new List<SearchPlaceResult>();
-        }
-
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-
-        var status = document.RootElement.TryGetProperty("status", out var statusNode) ? statusNode.GetString() : null;
-        if (!string.Equals(status, "OK", StringComparison.Ordinal)
-            && !string.Equals(status, "ZERO_RESULTS", StringComparison.Ordinal))
-        {
-            return new List<SearchPlaceResult>();
-        }
-
-        if (!document.RootElement.TryGetProperty("predictions", out var predictionsNode)
-            || predictionsNode.ValueKind != JsonValueKind.Array)
-        {
-            return new List<SearchPlaceResult>();
-        }
-
-        var results = new List<SearchPlaceResult>();
-        foreach (var item in predictionsNode.EnumerateArray())
-        {
-            if (!TryBuildAutocompleteResult(item, out var result))
-            {
-                continue;
-            }
-
-            results.Add(result);
-            if (results.Count >= limit)
-            {
-                break;
-            }
-        }
-
-        return results;
-    }
-
-    private async Task<List<SearchPlaceResult>> QueryGoogleGeocodeAsync(
-        string query,
-        int limit,
-        bool applyVnFilter,
-        bool applyBoundedBias,
-        CancellationToken cancellationToken)
-    {
-        var parameters = new List<string>
-        {
-            $"address={Uri.EscapeDataString(query)}",
-            $"language={Uri.EscapeDataString(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName)}",
-            $"key={Uri.EscapeDataString(GoogleMapsApiKey)}"
-        };
-
-        if (applyVnFilter)
-        {
-            parameters.Add("components=country:VN");
-            parameters.Add("region=vn");
-        }
-
-        if (applyBoundedBias && _lastUserLocation is not null)
-        {
-            const double delta = 0.08;
-            var south = _lastUserLocation.Latitude - delta;
-            var west = _lastUserLocation.Longitude - delta;
-            var north = _lastUserLocation.Latitude + delta;
-            var east = _lastUserLocation.Longitude + delta;
-            var bounds = $"{south.ToString(CultureInfo.InvariantCulture)},{west.ToString(CultureInfo.InvariantCulture)}|{north.ToString(CultureInfo.InvariantCulture)},{east.ToString(CultureInfo.InvariantCulture)}";
-            parameters.Add($"bounds={Uri.EscapeDataString(bounds)}");
-        }
-
-        var url = $"https://maps.googleapis.com/maps/api/geocode/json?{string.Join("&", parameters)}";
-        using var response = await HttpClient.GetAsync(url, cancellationToken);
-        if (!response.IsSuccessStatusCode)
-        {
-            return new List<SearchPlaceResult>();
-        }
-
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-
-        var status = document.RootElement.TryGetProperty("status", out var statusNode) ? statusNode.GetString() : null;
-        if (!string.Equals(status, "OK", StringComparison.Ordinal))
-        {
-            return new List<SearchPlaceResult>();
-        }
-
-        if (!document.RootElement.TryGetProperty("results", out var resultsNode)
-            || resultsNode.ValueKind != JsonValueKind.Array)
-        {
-            return new List<SearchPlaceResult>();
-        }
-
-        var results = new List<SearchPlaceResult>();
-        foreach (var item in resultsNode.EnumerateArray())
-        {
-            if (!TryBuildGeocodeResult(item, out var result))
-            {
-                continue;
-            }
-
-            results.Add(result);
-            if (results.Count >= limit)
-            {
-                break;
-            }
-        }
-
-        return results;
-    }
-
-    private async Task<SearchPlaceResult?> QueryGooglePlaceDetailsAsync(string placeId, CancellationToken cancellationToken)
-    {
-        var parameters = new List<string>
-        {
-            $"place_id={Uri.EscapeDataString(placeId)}",
-            $"language={Uri.EscapeDataString(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName)}",
-            "fields=name,formatted_address,geometry,photos",
-            $"key={Uri.EscapeDataString(GoogleMapsApiKey)}"
-        };
-
-        var url = $"https://maps.googleapis.com/maps/api/place/details/json?{string.Join("&", parameters)}";
-        using var response = await HttpClient.GetAsync(url, cancellationToken);
-        if (!response.IsSuccessStatusCode)
-        {
-            return null;
-        }
-
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-
-        var status = document.RootElement.TryGetProperty("status", out var statusNode) ? statusNode.GetString() : null;
-        if (!string.Equals(status, "OK", StringComparison.Ordinal))
-        {
-            return null;
-        }
-
-        if (!document.RootElement.TryGetProperty("result", out var resultNode))
-        {
-            return null;
-        }
-
-        return TryBuildPlaceDetailsResult(resultNode, placeId, out var result) ? result : null;
-    }
-
-    private static bool TryBuildAutocompleteResult(JsonElement item, out SearchPlaceResult result)
-    {
-        result = null!;
-        var placeId = item.TryGetProperty("place_id", out var placeIdNode) ? placeIdNode.GetString() : null;
-        if (string.IsNullOrWhiteSpace(placeId))
-        {
-            return false;
-        }
-
-        var description = item.TryGetProperty("description", out var descriptionNode)
-            ? descriptionNode.GetString() ?? string.Empty
-            : string.Empty;
-        var mainText = string.Empty;
-
-        if (item.TryGetProperty("structured_formatting", out var formattingNode)
-            && formattingNode.TryGetProperty("main_text", out var mainTextNode))
-        {
-            mainText = mainTextNode.GetString() ?? string.Empty;
-        }
-
-        if (string.IsNullOrWhiteSpace(mainText))
-        {
-            mainText = description.Split(',').FirstOrDefault()?.Trim() ?? "Địa điểm";
-        }
-
-        result = new SearchPlaceResult
-        {
-            Name = mainText,
-            Address = description,
-            Latitude = double.NaN,
-            Longitude = double.NaN,
-            Importance = 1.0,
-            PlaceId = placeId
-        };
-
-        return true;
-    }
-
-    private static bool TryBuildGeocodeResult(JsonElement item, out SearchPlaceResult result)
-    {
-        result = null!;
-        if (!item.TryGetProperty("geometry", out var geometryNode)
-            || !geometryNode.TryGetProperty("location", out var locationNode)
-            || !locationNode.TryGetProperty("lat", out var latNode)
-            || !locationNode.TryGetProperty("lng", out var lonNode))
-        {
-            return false;
-        }
-
-        var lat = latNode.GetDouble();
-        var lon = lonNode.GetDouble();
-        var address = item.TryGetProperty("formatted_address", out var addressNode)
-            ? addressNode.GetString() ?? string.Empty
-            : string.Empty;
-
-        var name = address.Split(',').FirstOrDefault()?.Trim() ?? "Địa điểm";
-        result = new SearchPlaceResult
-        {
-            Name = name,
-            Address = string.IsNullOrWhiteSpace(address) ? "Không có địa chỉ" : address,
-            Latitude = lat,
-            Longitude = lon,
-            Importance = 0.7,
-            PlaceId = item.TryGetProperty("place_id", out var placeIdNode) ? placeIdNode.GetString() : null
-        };
-        return true;
-    }
-
-    private bool TryBuildPlaceDetailsResult(JsonElement item, string placeId, out SearchPlaceResult result)
-    {
-        result = null!;
-        if (!item.TryGetProperty("geometry", out var geometryNode)
-            || !geometryNode.TryGetProperty("location", out var locationNode)
-            || !locationNode.TryGetProperty("lat", out var latNode)
-            || !locationNode.TryGetProperty("lng", out var lonNode))
-        {
-            return false;
-        }
-
-        var name = item.TryGetProperty("name", out var nameNode) ? nameNode.GetString() ?? "Địa điểm" : "Địa điểm";
-        var address = item.TryGetProperty("formatted_address", out var addressNode) ? addressNode.GetString() ?? "Không có địa chỉ" : "Không có địa chỉ";
-
-        string? photoUrl = null;
-        if (item.TryGetProperty("photos", out var photosNode) && photosNode.ValueKind == JsonValueKind.Array)
-        {
-            var first = photosNode.EnumerateArray().FirstOrDefault();
-            if (first.TryGetProperty("photo_reference", out var refNode))
-            {
-                var photoRef = refNode.GetString();
-                if (!string.IsNullOrWhiteSpace(photoRef))
-                {
-                    photoUrl = $"https://maps.googleapis.com/maps/api/place/photo?maxwidth=900&photo_reference={Uri.EscapeDataString(photoRef)}&key={Uri.EscapeDataString(GoogleMapsApiKey)}";
-                }
-            }
-        }
-
-        result = new SearchPlaceResult
-        {
-            Name = name,
-            Address = address,
-            Latitude = latNode.GetDouble(),
-            Longitude = lonNode.GetDouble(),
-            Importance = 1.0,
-            ImageUrl = photoUrl,
-            PlaceId = placeId
-        };
-        return true;
-    }
-
-    private List<SearchPlaceResult> RankSearchResults(string query, IEnumerable<SearchPlaceResult> results)
-    {
-        var normalized = query.Trim().ToLowerInvariant();
-
-        return results
-            .Select(r =>
-            {
-                var score = r.Importance;
-                var n = r.Name.ToLowerInvariant();
-                var a = r.Address.ToLowerInvariant();
-
-                if (n == normalized) score += 3.0;
-                else if (n.StartsWith(normalized, StringComparison.Ordinal)) score += 1.4;
-                else if (n.Contains(normalized, StringComparison.Ordinal)) score += 0.9;
-
-                if (a.Contains(normalized, StringComparison.Ordinal)) score += 0.3;
-                if (_lastUserLocation is not null && r.HasCoordinates)
-                {
-                    var km = MauiLocation.CalculateDistance(_lastUserLocation.Latitude, _lastUserLocation.Longitude, r.Latitude, r.Longitude, DistanceUnits.Kilometers);
-                    score += Math.Max(0, 1.2 - Math.Min(40, km) / 25d);
-                }
-
-                return new { Result = r, Score = score };
-            })
-            .OrderByDescending(x => x.Score)
-            .Select(x => x.Result)
-            .Take(8)
-            .ToList();
+        return list;
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -1057,48 +821,68 @@ public partial class MainPage : ContentPage
 
         PoiMap.MapElements.Add(_foodZoneCircle);
     }
-    private static bool TryParseCoordinateInput(string query, out SearchPlaceResult result)
-    {
-        result = null!;
-        var segments = query.Split(',', StringSplitOptions.TrimEntries);
-        if (segments.Length != 2)
-        {
-            return false;
-        }
-
-        if (!double.TryParse(segments[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var lat)
-            || !double.TryParse(segments[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var lon))
-        {
-            return false;
-        }
-
-        if (lat is < -90 or > 90 || lon is < -180 or > 180)
-        {
-            return false;
-        }
-
-        result = new SearchPlaceResult
-        {
-            Name = "Tọa độ",
-            Address = $"{lat.ToString(CultureInfo.InvariantCulture)}, {lon.ToString(CultureInfo.InvariantCulture)}",
-            Latitude = lat,
-            Longitude = lon,
-            Importance = 0.6
-        };
-
-        return true;
-    }
-
     private void BindSearchResults(List<SearchPlaceResult> results, bool keepVisible)
     {
-        _searchResults.Clear();
-        _searchResults.AddRange(results);
-        SearchResultsView.ItemsSource = null;
-        SearchResultsView.ItemsSource = _searchResults;
-        SearchResultsView.IsVisible = keepVisible && _searchResults.Count > 0;
+        try
+        {
+            _searchResults.Clear();
+            foreach (var item in results)
+            {
+                _searchResults.Add(item);
+            }
+
+            SearchResultsView.IsVisible = keepVisible && _searchResults.Count > 0;
+        }
+        catch (Exception ex)
+        {
+            CrashLogger.Write("MainPage.BindSearchResults", ex);
+            _searchResults.Clear();
+            SearchResultsView.IsVisible = false;
+        }
     }
 
     private void HideSearchResults() => SearchResultsView.IsVisible = false;
+
+    private void SetSearchUiState(bool isLoading, string? errorText)
+    {
+        SearchStatusLayout.IsVisible = isLoading || !string.IsNullOrWhiteSpace(errorText);
+        SearchLoadingIndicator.IsRunning = isLoading;
+        SearchErrorLabel.Text = errorText ?? string.Empty;
+        SearchErrorLabel.IsVisible = !string.IsNullOrWhiteSpace(errorText);
+    }
+
+    private static string? NormalizeRemoteImageUrl(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return null;
+        }
+
+        var value = raw.Trim();
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri))
+        {
+            return null;
+        }
+
+        if (!string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return value;
+    }
+
+    private static ImageSource? BuildSafeImageSource(string? raw)
+    {
+        var normalized = NormalizeRemoteImageUrl(raw);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return null;
+        }
+
+        return ImageSource.FromUri(new Uri(normalized));
+    }
 
     private Task DrawSearchResultAsync(SearchPlaceResult destination)
     {
@@ -1142,7 +926,7 @@ public partial class MainPage : ContentPage
         var pin = new Pin
         {
             Label = string.IsNullOrWhiteSpace(poi.Name) ? "POI" : poi.Name.Trim(),
-            Address = $"Bán kính {Math.Round(poi.RadiusMeters)} m",
+            Address = $"B?n k?nh {Math.Round(poi.RadiusMeters)} m",
             Type = PinType.Place,
             Location = new MauiLocation(poi.Latitude, poi.Longitude)
         };
@@ -1264,7 +1048,7 @@ public partial class MainPage : ContentPage
     private static string BuildCompactPoiName(string? name)
     {
         var trimmed = string.IsNullOrWhiteSpace(name) ? "POI" : name.Trim();
-        return trimmed.Length <= 20 ? trimmed : $"{trimmed[..19]}…";
+        return trimmed.Length <= 20 ? trimmed : $"{trimmed[..19]}?";
     }
 
     private static AndroidBitmapDescriptor BuildAndroidPoiMarkerIcon(string label, bool isHighlighted)
@@ -1596,7 +1380,7 @@ public partial class MainPage : ContentPage
             : $"{result.Address}\n{_lastRouteSummary}";
         SheetImage.Source = string.IsNullOrWhiteSpace(result.ImageUrl)
             ? ImageSource.FromFile("dotnet_bot.png")
-            : ImageSource.FromUri(new Uri(result.ImageUrl));
+            : BuildSafeImageSource(result.ImageUrl) ?? "dotnet_bot.png";
     }
 
     private void UpdateBottomSheetContent(PoiViewModel poi, bool resetPlayerState = true)
@@ -1631,7 +1415,7 @@ public partial class MainPage : ContentPage
         SheetAddressLabel.Text = description + distanceText;
         SheetImage.Source = string.IsNullOrWhiteSpace(poi.ImageUrl)
             ? ImageSource.FromFile("dotnet_bot.png")
-            : ImageSource.FromUri(new Uri(poi.ImageUrl));
+            : BuildSafeImageSource(poi.ImageUrl) ?? "dotnet_bot.png";
     }
 
     private async void OnDirectionsClicked(object? sender, EventArgs e)
@@ -1667,7 +1451,7 @@ public partial class MainPage : ContentPage
 
         if (!_selectedSearchResult.HasCoordinates)
         {
-            await DisplayAlertAsync("Thông báo", "Địa điểm này chưa có tọa độ hợp lệ.", "OK");
+            await DisplayAlertAsync("Th?ng b?o", "??a di?m n?y chua c? t?a d? h?p l?.", "OK");
             return;
         }
 
@@ -2006,7 +1790,7 @@ public partial class MainPage : ContentPage
             case PlaybackSourceKind.TtsNative:
                 AudioPlayerContainer.IsVisible = false;
                 TtsPlayerContainer.IsVisible = true;
-                TtsPlayPauseButton.Text = _ttsIsPlaying ? "⏸" : "▶";
+                TtsPlayPauseButton.Text = _ttsIsPlaying ? "Pause" : "Play";
                 RefreshTtsUi();
                 break;
             case PlaybackSourceKind.AudioWeb:
@@ -2043,7 +1827,7 @@ public partial class MainPage : ContentPage
         TtsPlayerContainer.IsVisible = false;
         if (stopPlayback)
         {
-            TtsPlayPauseButton.Text = "▶";
+            TtsPlayPauseButton.Text = "Play";
             TtsProgressSlider.Value = 0;
             TtsProgressSlider.Maximum = 1;
             TtsCurrentTimeLabel.Text = "00:00";
@@ -2180,12 +1964,12 @@ public partial class MainPage : ContentPage
                     Locale = locale
                 };
                 _ttsIsPlaying = true;
-                TtsPlayPauseButton.Text = "⏸";
+                TtsPlayPauseButton.Text = "Pause";
                 await TextToSpeech.Default.SpeakAsync(narration, options, CancellationToken.None);
                 _ttsElapsedSeconds = TtsProgressSlider.Maximum;
                 RefreshTtsUi();
                 _ttsIsPlaying = false;
-                TtsPlayPauseButton.Text = "▶";
+                TtsPlayPauseButton.Text = "Play";
                 await HandleCurrentPlaybackCompletedAsync();
                 return;
             }
@@ -2237,7 +2021,7 @@ public partial class MainPage : ContentPage
         _ttsCts = new CancellationTokenSource();
         var token = _ttsCts.Token;
         _ttsIsPlaying = true;
-        TtsPlayPauseButton.Text = "⏸";
+        TtsPlayPauseButton.Text = "Pause";
         _ttsTimer?.Start();
         var locale = await ResolvePreferredTtsLocaleAsync();
 
@@ -2270,7 +2054,7 @@ public partial class MainPage : ContentPage
         {
             _ttsIsPlaying = false;
             _ttsTimer?.Stop();
-            TtsPlayPauseButton.Text = "▶";
+            TtsPlayPauseButton.Text = "Play";
             if (_ttsWordIndex >= _ttsWords.Count)
             {
                 _ttsElapsedSeconds = TtsProgressSlider.Maximum;
@@ -2355,10 +2139,10 @@ public partial class MainPage : ContentPage
                || ch == '?'
                || ch == ';'
                || ch == ':'
-               || ch == '。'
-               || ch == '！'
-               || ch == '？'
-               || ch == '；'
+               || ch == '?'
+               || ch == '!'
+               || ch == '?'
+               || ch == ';'
                || ch == '\n'
                || ch == '\r';
     }
@@ -2592,9 +2376,9 @@ public partial class MainPage : ContentPage
 </head>
 <body>
   <div class="controls">
-    <button onclick="skip(-10)">⏪ 10s</button>
-    <button id="playPause" class="play" onclick="toggle()">▶</button>
-    <button onclick="skip(10)">10s ⏩</button>
+    <button onclick="skip(-10)">Back 10s</button>
+    <button id="playPause" class="play" onclick="toggle()">Play</button>
+    <button onclick="skip(10)">Forward 10s</button>
   </div>
   <audio id="audio" preload="metadata" src="__AUDIO_URL__"></audio>
   <div class="row">
@@ -2603,7 +2387,7 @@ public partial class MainPage : ContentPage
     <span id="dur">00:00</span>
   </div>
   <div class="vol">
-    <span>Âm lượng</span>
+    <span>Volume</span>
     <input id="volume" type="range" min="0" max="1" step="0.01" value="0.8" />
   </div>
   <script>
@@ -2652,9 +2436,9 @@ public partial class MainPage : ContentPage
       a.play().catch(() => {{ }});
     }});
 
-    a.addEventListener('play', () => {{ btn.textContent = '⏸'; notify('play'); }});
-    a.addEventListener('pause', () => {{ btn.textContent = '▶'; notify('pause'); }});
-    a.addEventListener('ended', () => {{ btn.textContent = '▶'; notify('ended'); }});
+    a.addEventListener('play', () => {{ btn.textContent = 'Pause'; notify('play'); }});
+    a.addEventListener('pause', () => {{ btn.textContent = 'Play'; notify('pause'); }});
+    a.addEventListener('ended', () => {{ btn.textContent = 'Play'; notify('ended'); }});
     a.addEventListener('timeupdate', () => {{
       progress.value = a.currentTime || 0;
       cur.textContent = fmt(a.currentTime || 0);
@@ -2714,9 +2498,9 @@ public partial class MainPage : ContentPage
 </head>
 <body>
   <div class="controls">
-    <button onclick="skip(-10)">⏪ 10s</button>
-    <button id="playPause" class="play" onclick="toggle()">▶</button>
-    <button onclick="skip(10)">10s ⏩</button>
+    <button onclick="skip(-10)">Back 10s</button>
+    <button id="playPause" class="play" onclick="toggle()">Play</button>
+    <button onclick="skip(10)">Forward 10s</button>
   </div>
   <div class="row">
     <span id="cur">00:00</span>
@@ -2724,10 +2508,10 @@ public partial class MainPage : ContentPage
     <span id="dur">00:00</span>
   </div>
   <div class="vol">
-    <span>Âm lượng</span>
+    <span>Volume</span>
     <input id="volume" type="range" min="0" max="1" step="0.01" value="0.8" />
   </div>
-  <div class="note">TTS player (mô phỏng tiến trình)</div>
+  <div class="note">TTS player (m? ph?ng ti?n tr?nh)</div>
   <script>
     const fullText = __TTS_TEXT_JSON__;
     const languageTag = __LANG_TAG_JSON__;
@@ -2776,7 +2560,7 @@ public partial class MainPage : ContentPage
       progress.value = seconds;
       cur.textContent = fmt(seconds);
       dur.textContent = fmt(totalSeconds);
-      btn.textContent = paused || !playing ? '▶' : '⏸';
+      btn.textContent = paused || !playing ? 'Play' : 'Pause';
       notify('timeupdate');
     }
 
@@ -2880,7 +2664,7 @@ public partial class MainPage : ContentPage
 
         await Share.Default.RequestAsync(new ShareTextRequest
         {
-            Title = "Chia sẻ địa điểm",
+            Title = "Chia s? d?a di?m",
             Text = text
         });
     }
@@ -3046,3 +2830,5 @@ public partial class MainPage : ContentPage
         _routePolyline = null;
     }
 }
+
+

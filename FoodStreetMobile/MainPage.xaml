@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:maps="http://schemas.microsoft.com/dotnet/2021/maui/maps"
@@ -66,7 +66,7 @@
                             Radius="15"
                             Offset="0,6" />
                 </Border.Shadow>
-                <Grid RowDefinitions="Auto,Auto">
+                <Grid RowDefinitions="Auto,Auto,Auto">
                     <Grid ColumnDefinitions="*,Auto">
                          <Entry x:Name="PlaceSearchEntry"
                                Placeholder="{loc:Translate Key=Main_SearchPlaceholder}"
@@ -74,7 +74,6 @@
                                Keyboard="Text"
                                Margin="12,6"
                                ReturnType="Search"
-                               TextChanged="OnPlaceSearchTextChanged"
                                Completed="OnPlaceSearchCompleted" />
                         <ImageButton Grid.Column="1"
                                      Source="ic_search.svg"
@@ -85,11 +84,28 @@
                                      CornerRadius="20"
                                      Clicked="OnSearchPlaceClicked" />
                     </Grid>
+                    <HorizontalStackLayout Grid.Row="1"
+                                           x:Name="SearchStatusLayout"
+                                           Margin="10,0,10,2"
+                                           Spacing="8"
+                                           IsVisible="False">
+                        <ActivityIndicator x:Name="SearchLoadingIndicator"
+                                           IsRunning="False"
+                                           Color="#C2410C"
+                                           WidthRequest="14"
+                                           HeightRequest="14" />
+                        <Label x:Name="SearchErrorLabel"
+                               Text=""
+                               FontSize="11"
+                               TextColor="#B91C1C"
+                               VerticalOptions="Center"
+                               IsVisible="False" />
+                    </HorizontalStackLayout>
                     <CollectionView x:Name="SearchResultsView"
-                                    Grid.Row="1"
+                                    Grid.Row="2"
                                     Margin="6,4,6,6"
                                     IsVisible="False"
-                                    HeightRequest="220"
+                                    HeightRequest="190"
                                     SelectionMode="Single"
                                     SelectionChanged="OnSearchResultSelectionChanged">
                         <CollectionView.ItemTemplate>
@@ -99,16 +115,21 @@
                                         StrokeShape="RoundRectangle 12"
                                         Margin="0,3"
                                         BackgroundColor="White">
-                                    <VerticalStackLayout Spacing="2">
+                                    <Grid ColumnDefinitions="*,Auto"
+                                          ColumnSpacing="10">
                                         <Label Text="{Binding Name}"
                                                FontSize="14"
                                                TextColor="#2F1A0F"
-                                               FontAttributes="Bold" />
-                                        <Label Text="{Binding Address}"
+                                               FontAttributes="Bold"
+                                               MaxLines="1"
+                                               LineBreakMode="TailTruncation"
+                                               VerticalOptions="Center" />
+                                        <Label Grid.Column="1"
+                                               Text="{Binding DistanceText}"
                                                FontSize="12"
                                                TextColor="#8A6A58"
-                                               LineBreakMode="TailTruncation" />
-                                    </VerticalStackLayout>
+                                               VerticalOptions="Center" />
+                                    </Grid>
                                 </Border>
                             </DataTemplate>
                         </CollectionView.ItemTemplate>

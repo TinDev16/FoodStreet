@@ -124,7 +124,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public event Action<Location>? UserLocationChanged;
     public event Action<PoiViewModel>? AutoPlayPoiRequested;
 
-    public async Task InitializeAsync()
+    public async Task EnsureDataInitializedAsync()
     {
         if (!_initialized)
         {
@@ -134,6 +134,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
 
         await RefreshFromServerAsync();
+    }
+
+    public async Task InitializeAsync()
+    {
+        await EnsureDataInitializedAsync();
 
         if (!IsTracking)
         {

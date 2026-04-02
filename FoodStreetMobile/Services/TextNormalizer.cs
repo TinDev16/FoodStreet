@@ -26,8 +26,17 @@ public static class TextNormalizer
         return sb
             .ToString()
             .Normalize(NormalizationForm.FormC)
-            .Replace('đ', 'd')
-            .Replace('Đ', 'D');
+            .Replace('d', 'd')
+            .Replace('�', 'D');
+    }
+
+    public static string NormalizeForSearch(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return string.Empty;
+        }
+
+        return RemoveDiacritics(text).Trim().ToLowerInvariant();
     }
 }
-

@@ -298,4 +298,4 @@ E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify_qr_deepl
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\ypiyamc441-{0}-nuwrjjzyrl-nuwrjjzyrl.gz
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\c1c5jflion-{0}-or4fwkfrug-or4fwkfrug.gz
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\3mxjwy81f5-{0}-hzh05ukstm-hzh05ukstm.gz
-E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\tihf3uqke4-{0}-7q4zqda4ml-7q4zqda4ml.gz
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\tihf3uqke4-{0}-qovvi85ymd-qovvi85ymd.gz

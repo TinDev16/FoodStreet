@@ -4,7 +4,9 @@ public sealed class DeepLinkService
 {
     private readonly object _sync = new();
     private PendingPoiLink? _pendingPoiLink;
+    private PendingPlaceSelection? _pendingPlaceSelection;
     public event Action? PendingPoiLinkQueued;
+    public event Action? PendingPlaceSelectionQueued;
 
     public bool TryQueueFromUri(Uri uri)
     {
@@ -56,6 +58,26 @@ public sealed class DeepLinkService
         }
     }
 
+    public void QueuePendingPlaceSelection(PendingPlaceSelection selection)
+    {
+        lock (_sync)
+        {
+            _pendingPlaceSelection = selection;
+        }
+
+        PendingPlaceSelectionQueued?.Invoke();
+    }
+
+    public bool TryTakePendingPlaceSelection(out PendingPlaceSelection? selection)
+    {
+        lock (_sync)
+        {
+            selection = _pendingPlaceSelection;
+            _pendingPlaceSelection = null;
+            return selection is not null;
+        }
+    }
+
     private static Dictionary<string, string> ParseQuery(string? query)
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -103,4 +125,15 @@ public sealed class PendingPoiLink
 {
     public required string PoiId { get; init; }
     public string LangCode { get; init; } = string.Empty;
+}
+
+public sealed class PendingPlaceSelection
+{
+    public required string Name { get; init; }
+    public required string Address { get; init; }
+    public double Latitude { get; init; }
+    public double Longitude { get; init; }
+    public string? ImageUrl { get; init; }
+    public string? PlaceId { get; init; }
+    public string? PoiId { get; init; }
 }

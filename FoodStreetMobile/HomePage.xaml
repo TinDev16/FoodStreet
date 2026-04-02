@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:loc="clr-namespace:FoodStreetMobile.Localization"
@@ -71,13 +71,16 @@
                                 <Grid ColumnDefinitions="*,Auto"
                                     HeightRequest="50">
 
-                                    <Entry Grid.Column="0"
+                                    <Entry x:Name="HomeSearchEntry"
+                                        Grid.Column="0"
                                         Placeholder="{loc:Translate Key=Home_SearchPlaceholder}"
                                         BackgroundColor="Transparent"
                                         TextColor="#2C1C19"
                                         PlaceholderColor="#C4A898"
                                         FontSize="14"
-                                        VerticalOptions="Center" />
+                                        VerticalOptions="Center"
+                                        ReturnType="Search"
+                                        Completed="OnHomeSearchCompleted" />
 
                                     <Border Grid.Column="1"
                                             BackgroundColor="#FF6B35"
@@ -86,11 +89,14 @@
                                             Padding="10,8"
                                             Margin="0,6,6,6"
                                             VerticalOptions="Center">
-
-                                        <Label Text="🔍"
-                                            FontSize="14"
-                                            HorizontalOptions="Center"
-                                            VerticalOptions="Center" />
+                                        <Border.GestureRecognizers>
+                                            <TapGestureRecognizer Tapped="OnHomeSearchTapped" />
+                                        </Border.GestureRecognizers>
+                                        <Image Source="ic_search.svg"
+                                               WidthRequest="14"
+                                               HeightRequest="14"
+                                               HorizontalOptions="Center"
+                                               VerticalOptions="Center" />
 
                                     </Border>
 
@@ -99,6 +105,54 @@
                             </Border>
 
                         </Grid>
+                        <VerticalStackLayout x:Name="HomeSearchStatusLayout"
+                                             Margin="24,8,24,0"
+                                             Spacing="4"
+                                             IsVisible="False">
+                            <HorizontalStackLayout Spacing="8">
+                                <ActivityIndicator x:Name="HomeSearchLoadingIndicator"
+                                                   IsRunning="False"
+                                                   WidthRequest="14"
+                                                   HeightRequest="14"
+                                                   Color="#C2410C" />
+                                <Label x:Name="HomeSearchErrorLabel"
+                                       FontSize="12"
+                                       TextColor="#B91C1C"
+                                       IsVisible="False" />
+                            </HorizontalStackLayout>
+                        </VerticalStackLayout>
+                        <CollectionView x:Name="HomeSearchResultsView"
+                                        Margin="20,8,20,0"
+                                        SelectionMode="Single"
+                                        IsVisible="False"
+                                        HeightRequest="190"
+                                        SelectionChanged="OnHomeSearchResultSelectionChanged">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Padding="10"
+                                            Stroke="#EFE7DF"
+                                            StrokeShape="RoundRectangle 12"
+                                            Margin="0,3"
+                                            BackgroundColor="White">
+                                        <Grid ColumnDefinitions="*,Auto"
+                                              ColumnSpacing="10">
+                                            <Label Text="{Binding Name}"
+                                                   FontSize="14"
+                                                   TextColor="#2F1A0F"
+                                                   FontAttributes="Bold"
+                                                   MaxLines="1"
+                                                   LineBreakMode="TailTruncation"
+                                                   VerticalOptions="Center" />
+                                            <Label Grid.Column="1"
+                                                   Text="{Binding DistanceText}"
+                                                   FontSize="12"
+                                                   TextColor="#8A6A58"
+                                                   VerticalOptions="Center" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
                 <!-- ─────────────────────────────
                      SECTION: Danh Mục
                 ──────────────────────────────── -->

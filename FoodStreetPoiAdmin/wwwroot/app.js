@@ -186,7 +186,6 @@
     sourceLangSelect.value = state.selectedSourceLang;
     loadSourceFieldsFromState();
   };
-
   const renderList = (items) => {
     rowsEl.innerHTML = "";
     listHintEl.textContent = `${items.length} POI`;
@@ -195,15 +194,15 @@
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td class="mono">${escapeHtml(item.id)}</td>
-        <td>${escapeHtml(item.nameVi || "")}</td>
-        <td class="mono">${escapeHtml(String(item.latitude))}, ${escapeHtml(String(item.longitude))}</td>
-        <td class="mono">${escapeHtml(String(item.radiusMeters))}</td>
+        <td class="fw-500">${escapeHtml(item.nameVi || "")}</td>
+        <td class="mono">${escapeHtml(String(item.latitude))}, <br/>${escapeHtml(String(item.longitude))}</td>
+        <td class="mono">${escapeHtml(String(item.radiusMeters))}m</td>
         <td class="mono">${escapeHtml(String(item.priority))}</td>
-        <td>${item.isActive ? "YES" : ""}</td>
-        <td>
-          <button type="button" class="secondary" data-action="qr" data-id="${escapeAttr(item.id)}">Tao QR</button>
-          <button type="button" class="secondary" data-action="edit" data-id="${escapeAttr(item.id)}">Sua</button>
-          <button type="button" class="danger" data-action="del" data-id="${escapeAttr(item.id)}">Xoa</button>
+        <td>${item.isActive ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-error">Inactive</span>'}</td>
+        <td class="actions-cell">
+          <button type="button" class="secondary icon-only" title="Tạo QR" data-action="qr" data-id="${escapeAttr(item.id)}"><i class="fa-solid fa-qrcode pointer-events-none"></i></button>
+          <button type="button" class="secondary icon-only" title="Sửa" data-action="edit" data-id="${escapeAttr(item.id)}"><i class="fa-solid fa-pen pointer-events-none"></i></button>
+          <button type="button" class="danger icon-only" title="Xóa" data-action="del" data-id="${escapeAttr(item.id)}"><i class="fa-solid fa-trash pointer-events-none"></i></button>
         </td>
       `;
       rowsEl.appendChild(tr);

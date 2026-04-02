@@ -35,6 +35,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<PoiRepository>();
         builder.Services.AddSingleton<AppDatabase>();
         builder.Services.AddSingleton<PoiSyncService>();
+        builder.Services.AddSingleton<PlaceSearchService>();
         builder.Services.AddSingleton<DeepLinkService>();
         builder.Services.AddSingleton<AppLanguageService>();
         builder.Services.AddSingleton<GeofenceEngine>();
