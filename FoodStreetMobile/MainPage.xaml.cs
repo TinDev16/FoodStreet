@@ -1,4 +1,4 @@
-using FoodStreetMobile.ViewModels;
+﻿using FoodStreetMobile.ViewModels;
 using FoodStreetMobile.Services;
 using FoodStreetMobile.Models;
 using Microsoft.Maui.ApplicationModel;
