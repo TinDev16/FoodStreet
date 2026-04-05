@@ -98,6 +98,7 @@ public partial class MainPage : ContentPage
     private double _currentPlaybackDurationSeconds = 1;
     private bool _isAdvancingQueue;
     private bool _isAutoPlaySubscriptionActive;
+    private bool _isSearchSelectionActive;
 
     private bool _sheetInitialized;
     private double _sheetExpandedTranslation;
@@ -182,6 +183,7 @@ public partial class MainPage : ContentPage
             _searchPin = null;
             _selectedPoi = null;
             _selectedSearchResult = null;
+            _isSearchSelectionActive = false;
             _lastRouteSummary = null;
             PlayAudioButton.IsEnabled = false;
             ResetPlaybackQueueState();
@@ -265,6 +267,13 @@ public partial class MainPage : ContentPage
     {
         MainThread.BeginInvokeOnMainThread(async () =>
         {
+            if (ShouldDeferAutoPlaybackBecauseUserIsViewingSearch())
+            {
+                await RequestAutoPlaybackAsync(poi);
+                return;
+            }
+
+            _isSearchSelectionActive = false;
             _selectedPoi = poi;
             _selectedSearchResult = null;
             _lastRouteSummary = null;
@@ -323,6 +332,7 @@ public partial class MainPage : ContentPage
             return;
         }
 
+        _isSearchSelectionActive = false;
         _selectedPoi = poi;
         _selectedSearchResult = null;
         _lastRouteSummary = null;
@@ -354,6 +364,7 @@ public partial class MainPage : ContentPage
             return;
         }
 
+        _isSearchSelectionActive = true;
         if (!string.IsNullOrWhiteSpace(pending.PoiId))
         {
             var poi = _viewModel.Pois.FirstOrDefault(x => string.Equals(x.Id, pending.PoiId, StringComparison.OrdinalIgnoreCase));
@@ -709,6 +720,7 @@ public partial class MainPage : ContentPage
             return;
         }
 
+        _isSearchSelectionActive = true;
         _selectedSearchResult = resolved;
         _selectedPoi = null;
         _lastRouteSummary = null;
@@ -1210,6 +1222,7 @@ public partial class MainPage : ContentPage
         }
 
         e.HideInfoWindow = true;
+        _isSearchSelectionActive = false;
         _selectedPoi = poi;
         _selectedSearchResult = null;
         _lastRouteSummary = null;
@@ -1350,14 +1363,33 @@ public partial class MainPage : ContentPage
 
         if (current >= closeThreshold)
         {
+            var queued = _queuedPlaybackPoi;
+            var shouldKeepPartialForQueuedPlayback = _isSearchSelectionActive
+                && _currentPlaybackPoi is null
+                && queued is not null;
+
+            _isSearchSelectionActive = false;
             _selectedPoi = null;
             _selectedSearchResult = null;
             PlayAudioButton.IsEnabled = false;
             if (_currentPlaybackPoi is null)
             {
-                HideAudioPlayer(resetPlaybackQueueState: true);
+                HideAudioPlayer(resetPlaybackQueueState: queued is null);
             }
+
+            if (shouldKeepPartialForQueuedPlayback)
+            {
+                var queuedPoi = queued!;
+                _selectedPoi = queuedPoi;
+                PlayAudioButton.IsEnabled = HasPlayableAudio(queuedPoi);
+                UpdateBottomSheetContent(queuedPoi, resetPlayerState: false);
+                await AnimateBottomSheetToAsync(_sheetPartialTranslation, 170, Easing.CubicOut);
+                await TryStartQueuedPlaybackIfIdleAsync();
+                return;
+            }
+
             await AnimateBottomSheetToAsync(_sheetHiddenTranslation, 170, Easing.CubicIn);
+            await TryStartQueuedPlaybackIfIdleAsync();
             return;
         }
 
@@ -1589,6 +1621,13 @@ public partial class MainPage : ContentPage
             return;
         }
 
+        if (ShouldDeferAutoPlaybackBecauseUserIsViewingSearch() && _currentPlaybackPoi is null)
+        {
+            _queuedPlaybackPoi = poi;
+            RefreshPlaybackQueuePanel();
+            return;
+        }
+
         if (IsSamePoi(_currentPlaybackPoi, poi))
         {
             RefreshPlaybackQueuePanel();
@@ -1605,6 +1644,33 @@ public partial class MainPage : ContentPage
         await StartPoiPlaybackAsync(poi, allowInterrupt: false);
     }
 
+    private bool ShouldDeferAutoPlaybackBecauseUserIsViewingSearch()
+    {
+        if (!_isSearchSelectionActive)
+        {
+            return false;
+        }
+
+        if (!_sheetInitialized)
+        {
+            return true;
+        }
+
+        return SearchBottomSheet.TranslationY < (_sheetHiddenTranslation - 1);
+    }
+
+    private async Task TryStartQueuedPlaybackIfIdleAsync()
+    {
+        if (_currentPlaybackPoi is not null || _queuedPlaybackPoi is null)
+        {
+            return;
+        }
+
+        var nextPoi = _queuedPlaybackPoi;
+        _queuedPlaybackPoi = null;
+        await StartPoiPlaybackAsync(nextPoi, allowInterrupt: true);
+    }
+
     private async Task StartPoiPlaybackAsync(PoiViewModel poi, bool allowInterrupt)
     {
         if (!HasPlayableAudio(poi))
@@ -1612,6 +1678,7 @@ public partial class MainPage : ContentPage
             return;
         }
 
+        var previousPlaybackPoi = _currentPlaybackPoi;
         if (allowInterrupt && _currentPlaybackPoi is not null && !IsSamePoi(_currentPlaybackPoi, poi))
         {
             StopCurrentPlaybackOnly();
@@ -1622,6 +1689,7 @@ public partial class MainPage : ContentPage
         _currentPlaybackElapsedSeconds = 0;
         _currentPlaybackDurationSeconds = 1;
         RefreshPlaybackQueuePanel();
+        SyncBottomSheetToCurrentPlayback(previousPlaybackPoi, poi);
 
         if (!string.IsNullOrWhiteSpace(poi.AudioUrl))
         {
@@ -1662,26 +1730,100 @@ public partial class MainPage : ContentPage
         _isAdvancingQueue = true;
         try
         {
-            _currentPlaybackPoi = null;
-            _currentPlaybackSource = PlaybackSourceKind.None;
-            _currentPlaybackElapsedSeconds = 0;
-            _currentPlaybackDurationSeconds = 1;
-            RefreshPlaybackQueuePanel();
+            var finishedPoi = _currentPlaybackPoi;
+            var wasViewingSearchPoi = finishedPoi is not null
+                && _isSearchSelectionActive
+                && _selectedSearchResult is null
+                && IsSamePoi(_selectedPoi, finishedPoi);
 
             if (_queuedPlaybackPoi is null)
             {
+                _currentPlaybackPoi = null;
+                _currentPlaybackSource = PlaybackSourceKind.None;
+                _currentPlaybackElapsedSeconds = 0;
+                _currentPlaybackDurationSeconds = 1;
+                RefreshPlaybackQueuePanel();
+
+                if (wasViewingSearchPoi)
+                {
+                    _isSearchSelectionActive = false;
+                    _selectedPoi = null;
+                    _selectedSearchResult = null;
+                    PlayAudioButton.IsEnabled = false;
+                    await AnimateBottomSheetToAsync(_sheetHiddenTranslation, 140, Easing.CubicIn);
+                }
                 return;
             }
 
             var nextPoi = _queuedPlaybackPoi;
             _queuedPlaybackPoi = null;
             RefreshPlaybackQueuePanel();
+
+            if (wasViewingSearchPoi)
+            {
+                _isSearchSelectionActive = false;
+                _selectedPoi = null;
+                _selectedSearchResult = null;
+                PlayAudioButton.IsEnabled = false;
+                await AnimateBottomSheetToAsync(_sheetHiddenTranslation, 140, Easing.CubicIn);
+
+                _selectedPoi = nextPoi;
+                _selectedSearchResult = null;
+                _lastRouteSummary = null;
+                ClearRoute();
+                PlayAudioButton.IsEnabled = HasPlayableAudio(nextPoi);
+                UpdateBottomSheetContent(nextPoi, resetPlayerState: false);
+                await ShowSheetPartialAsync();
+            }
             await StartPoiPlaybackAsync(nextPoi, allowInterrupt: true);
         }
         finally
         {
             _isAdvancingQueue = false;
         }
+    }
+
+    private void SyncBottomSheetToCurrentPlayback(PoiViewModel? previousPlaybackPoi, PoiViewModel currentPlaybackPoi)
+    {
+        if (_selectedSearchResult is not null)
+        {
+            return;
+        }
+
+        if (_isSearchSelectionActive)
+        {
+            return;
+        }
+
+        if (!_sheetInitialized)
+        {
+            return;
+        }
+
+        var isSheetVisible = SearchBottomSheet.TranslationY < (_sheetHiddenTranslation - 1);
+        if (!isSheetVisible)
+        {
+            return;
+        }
+
+        if (_selectedPoi is null)
+        {
+            return;
+        }
+
+        if (previousPlaybackPoi is null || !IsSamePoi(_selectedPoi, previousPlaybackPoi))
+        {
+            return;
+        }
+
+        if (IsSamePoi(_selectedPoi, currentPlaybackPoi))
+        {
+            return;
+        }
+
+        _selectedPoi = currentPlaybackPoi;
+        PlayAudioButton.IsEnabled = HasPlayableAudio(currentPlaybackPoi);
+        UpdateBottomSheetContent(currentPlaybackPoi, resetPlayerState: false);
     }
 
     private void ResetPlaybackQueueState()
@@ -1717,8 +1859,9 @@ public partial class MainPage : ContentPage
 
     private void RefreshPlaybackQueuePanel()
     {
-        PlaybackQueuePanel.IsVisible = _currentPlaybackPoi is not null;
-        if (_currentPlaybackPoi is null)
+        var displayPoi = _currentPlaybackPoi ?? _queuedPlaybackPoi;
+        PlaybackQueuePanel.IsVisible = displayPoi is not null;
+        if (displayPoi is null)
         {
             QueueInfoBorder.IsVisible = false;
             CurrentPlayingNameLabel.Text = "--";
@@ -1728,15 +1871,25 @@ public partial class MainPage : ContentPage
             return;
         }
 
-        CurrentPlayingNameLabel.Text = _currentPlaybackPoi.Name;
-        var safeDuration = Math.Max(1, _currentPlaybackDurationSeconds);
-        var progress = Math.Clamp(_currentPlaybackElapsedSeconds / safeDuration, 0, 1);
-        CurrentPlayingProgressBar.Progress = progress;
-        CurrentPlayingTimeLabel.Text = FormatTime(_currentPlaybackElapsedSeconds);
-        CurrentPlayingDurationLabel.Text = FormatTime(safeDuration);
+        CurrentPlayingNameLabel.Text = displayPoi.Name;
+        if (_currentPlaybackPoi is null)
+        {
+            CurrentPlayingProgressBar.Progress = 0;
+            CurrentPlayingTimeLabel.Text = "00:00";
+            CurrentPlayingDurationLabel.Text = "00:00";
+        }
+        else
+        {
+            var safeDuration = Math.Max(1, _currentPlaybackDurationSeconds);
+            var progress = Math.Clamp(_currentPlaybackElapsedSeconds / safeDuration, 0, 1);
+            CurrentPlayingProgressBar.Progress = progress;
+            CurrentPlayingTimeLabel.Text = FormatTime(_currentPlaybackElapsedSeconds);
+            CurrentPlayingDurationLabel.Text = FormatTime(safeDuration);
+        }
 
-        QueueInfoBorder.IsVisible = _queuedPlaybackPoi is not null;
-        if (_queuedPlaybackPoi is null)
+        var hasNext = _currentPlaybackPoi is not null && _queuedPlaybackPoi is not null;
+        QueueInfoBorder.IsVisible = hasNext;
+        if (!hasNext)
         {
             QueuedPoiNameLabel.Text = "--";
             QueuedPoiDistanceLabel.IsVisible = false;

@@ -259,7 +259,6 @@ E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify_qr_tunne
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify_qr_tunnel4\runtimes\win-arm64\native\e_sqlite3.dll
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify_qr_tunnel4\runtimes\win-x64\native\e_sqlite3.dll
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify_qr_tunnel4\runtimes\win-x86\native\e_sqlite3.dll
-E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\k9mnuggnn9-{0}-3wrtkr42di-3wrtkr42di.gz
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\a07yuef3si-{0}-065bz6ng3t-065bz6ng3t.gz
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify_qr_deeplink\FoodStreetPoiAdmin.staticwebassets.runtime.json
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify_qr_deeplink\FoodStreetPoiAdmin.staticwebassets.endpoints.json
@@ -295,7 +294,8 @@ E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify_qr_deepl
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify_qr_deeplink\runtimes\win-arm64\native\e_sqlite3.dll
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify_qr_deeplink\runtimes\win-x64\native\e_sqlite3.dll
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify_qr_deeplink\runtimes\win-x86\native\e_sqlite3.dll
-E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\ypiyamc441-{0}-nuwrjjzyrl-nuwrjjzyrl.gz
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\c1c5jflion-{0}-or4fwkfrug-or4fwkfrug.gz
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\3mxjwy81f5-{0}-hzh05ukstm-hzh05ukstm.gz
-E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\tihf3uqke4-{0}-qovvi85ymd-qovvi85ymd.gz
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\k9mnuggnn9-{0}-xdso3qi6pj-xdso3qi6pj.gz
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\ypiyamc441-{0}-cxbzu45nn8-cxbzu45nn8.gz
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\tihf3uqke4-{0}-69pqxp9u4v-69pqxp9u4v.gz
