@@ -60,6 +60,7 @@ public partial class MainPage : ContentPage
     private readonly MainViewModel _viewModel;
     private readonly PlaceSearchService _placeSearchService;
     private readonly DeepLinkService _deepLinkService;
+    private readonly PoiViewHistoryService _poiViewHistoryService;
     private readonly ObservableCollection<SearchPlaceResult> _searchResults = new();
 
     private bool _hasCenteredOnUser;
@@ -110,12 +111,13 @@ public partial class MainPage : ContentPage
     private const double MapMarginUpdateThresholdPx = 3;
     private const int MapMarginUpdateMinIntervalMs = 16;
 
-    public MainPage(MainViewModel viewModel, PlaceSearchService placeSearchService, DeepLinkService deepLinkService)
+    public MainPage(MainViewModel viewModel, PlaceSearchService placeSearchService, DeepLinkService deepLinkService, PoiViewHistoryService poiViewHistoryService)
     {
         InitializeComponent();
         _viewModel = viewModel;
         _placeSearchService = placeSearchService;
         _deepLinkService = deepLinkService;
+        _poiViewHistoryService = poiViewHistoryService;
         BindingContext = _viewModel;
         SearchResultsView.ItemsSource = _searchResults;
         PlaceSearchEntry.TextChanged += OnPlaceSearchTextChanged;
@@ -277,11 +279,23 @@ public partial class MainPage : ContentPage
             _selectedPoi = poi;
             _selectedSearchResult = null;
             _lastRouteSummary = null;
+            await RecordPoiViewAsync(poi);
             PlayAudioButton.IsEnabled = HasPlayableAudio(poi);
             UpdateBottomSheetContent(poi, resetPlayerState: false);
             await ShowSheetPartialAsync();
             await RequestAutoPlaybackAsync(poi);
         });
+    }
+
+    private async Task RecordPoiViewAsync(PoiViewModel poi)
+    {
+        try
+        {
+            await _poiViewHistoryService.RecordViewedAsync(poi.Id, poi.Name, poi.ImageUrl);
+        }
+        catch
+        {
+        }
     }
 
     private void EnsureAutoPlaySubscription(bool isEnabled)
@@ -337,6 +351,7 @@ public partial class MainPage : ContentPage
         _selectedSearchResult = null;
         _lastRouteSummary = null;
         ClearRoute();
+        await RecordPoiViewAsync(poi);
         PlayAudioButton.IsEnabled = HasPlayableAudio(poi);
         UpdateBottomSheetContent(poi, resetPlayerState: false);
         MoveMapToPreserveZoom(poi.Latitude, poi.Longitude);
@@ -374,6 +389,7 @@ public partial class MainPage : ContentPage
                 _selectedSearchResult = null;
                 _lastRouteSummary = null;
                 ClearRoute();
+                await RecordPoiViewAsync(poi);
                 PlayAudioButton.IsEnabled = HasPlayableAudio(poi);
                 UpdateBottomSheetContent(poi, resetPlayerState: false);
                 MoveMapToPreserveZoom(poi.Latitude, poi.Longitude);
@@ -1228,6 +1244,7 @@ public partial class MainPage : ContentPage
         _lastRouteSummary = null;
         ClearRoute();
 
+        await RecordPoiViewAsync(poi);
         UpdateBottomSheetContent(poi);
         await ShowSheetPartialAsync();
         MoveMapToPreserveZoom(poi.Latitude, poi.Longitude);

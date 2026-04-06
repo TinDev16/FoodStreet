@@ -58,6 +58,21 @@ public sealed class DeepLinkService
         }
     }
 
+    public void QueuePendingPoiLink(PendingPoiLink link)
+    {
+        if (link is null)
+        {
+            return;
+        }
+
+        lock (_sync)
+        {
+            _pendingPoiLink = link;
+        }
+
+        PendingPoiLinkQueued?.Invoke();
+    }
+
     public void QueuePendingPlaceSelection(PendingPlaceSelection selection)
     {
         lock (_sync)

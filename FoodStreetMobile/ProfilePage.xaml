@@ -40,6 +40,28 @@
                             SelectedItem="{Binding SelectedLanguage}" />
                 </VerticalStackLayout>
             </Border>
+
+            <Border Padding="18"
+                    BackgroundColor="White"
+                    Stroke="#EFE4DB"
+                    StrokeShape="RoundRectangle 18">
+                <Grid ColumnDefinitions="*,Auto" VerticalOptions="Center">
+                    <Label Text="{loc:Translate Key=Profile_PoiHistory}"
+                           FontSize="16"
+                           FontAttributes="Bold"
+                           TextColor="#2C1C19" />
+
+                    <Label Grid.Column="1"
+                           Text="›"
+                           FontSize="22"
+                           TextColor="#C9B8AE"
+                           VerticalTextAlignment="Center" />
+
+                    <Grid.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding OpenPoiHistoryCommand}" />
+                    </Grid.GestureRecognizers>
+                </Grid>
+            </Border>
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>

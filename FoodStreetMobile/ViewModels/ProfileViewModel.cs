@@ -1,19 +1,24 @@
-using FoodStreetMobile.Services;
+﻿using FoodStreetMobile.Services;
+using Microsoft.Extensions.DependencyInjection;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows.Input;
 
 namespace FoodStreetMobile.ViewModels;
 
 public sealed class ProfileViewModel : INotifyPropertyChanged
 {
     private readonly AppLanguageService _languageService;
+    private readonly IServiceProvider _services;
     private AppLanguageOption? _selectedLanguage;
 
-    public ProfileViewModel(AppLanguageService languageService)
+    public ProfileViewModel(AppLanguageService languageService, IServiceProvider services)
     {
         _languageService = languageService;
+        _services = services;
         Languages = new ObservableCollection<AppLanguageOption>(_languageService.SupportedLanguages);
+        OpenPoiHistoryCommand = new Command(async () => await OpenPoiHistoryAsync());
 
         _selectedLanguage =
             Languages.FirstOrDefault(x => string.Equals(x.Code, _languageService.CurrentLanguage, StringComparison.OrdinalIgnoreCase))
@@ -31,6 +36,8 @@ public sealed class ProfileViewModel : INotifyPropertyChanged
     }
 
     public ObservableCollection<AppLanguageOption> Languages { get; }
+
+    public ICommand OpenPoiHistoryCommand { get; }
 
     public AppLanguageOption? SelectedLanguage
     {
@@ -53,9 +60,25 @@ public sealed class ProfileViewModel : INotifyPropertyChanged
         }
     }
 
+    private async Task OpenPoiHistoryAsync()
+    {
+        try
+        {
+            var page = _services.GetRequiredService<PoiViewHistoryPage>();
+            if (Shell.Current is not null)
+            {
+                await Shell.Current.Navigation.PushAsync(page);
+            }
+        }
+        catch
+        {
+        }
+    }
+
     public event PropertyChangedEventHandler? PropertyChanged;
 
     private void OnPropertyChanged([CallerMemberName] string? name = null)
         => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
+
 

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <root>
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
@@ -12,7 +12,6 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-
   <data name="Profile_Title" xml:space="preserve">
     <value>Cá nhân</value>
   </data>
@@ -25,7 +24,18 @@
   <data name="Profile_LanguageLabel" xml:space="preserve">
     <value>Ngôn ngữ</value>
   </data>
-
+  <data name="Profile_PoiHistory" xml:space="preserve">
+    <value>Lịch sử xem POI</value>
+  </data>
+  <data name="PoiHistory_Title" xml:space="preserve">
+    <value>Lịch sử xem POI</value>
+  </data>
+  <data name="PoiHistory_Hint" xml:space="preserve">
+    <value>Chạm một mục để mở lại trên bản đồ.</value>
+  </data>
+  <data name="PoiHistory_Empty" xml:space="preserve">
+    <value>Chưa có lịch sử xem.</value>
+  </data>
   <data name="Main_ExploreVinhKhanh" xml:space="preserve">
     <value>Khám phá Vĩnh Khánh</value>
   </data>
@@ -53,14 +63,12 @@
   <data name="Main_Share" xml:space="preserve">
     <value>Chia sẻ</value>
   </data>
-
   <data name="Main_NowPlaying" xml:space="preserve">
     <value>Đang phát</value>
   </data>
   <data name="Main_PlaybackQueue" xml:space="preserve">
     <value>Danh sách phát</value>
   </data>
-
   <data name="Home_HeaderTitle" xml:space="preserve">
     <value>Vĩnh Khánh</value>
   </data>
