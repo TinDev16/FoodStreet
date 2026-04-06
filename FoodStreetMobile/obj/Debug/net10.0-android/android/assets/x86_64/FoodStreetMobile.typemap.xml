@@ -1,4 +1,4 @@
-<api type="debug" assembly-name="FoodStreetMobile" mvid="f82c3b99960d42319f89b6286aba9a93">
+<api type="debug" assembly-name="FoodStreetMobile" mvid="db445fffc6144a8dacb80b86f4bb7a6d">
   <java-to-managed>
     <entry java-name="crc646c0ac8ca95f9f276/CustomMapHandler_MapReadyCallback" managed-name="CustomMapHandler+MapReadyCallback, FoodStreetMobile" managed-type-token-id="33554485" />
     <entry java-name="crc646c0ac8ca95f9f276/CustomMapHandler_MapReadyCallback_MarkerClickListener" managed-name="CustomMapHandler+MapReadyCallback+MarkerClickListener, FoodStreetMobile" managed-type-token-id="33554645" />

@@ -298,7 +298,6 @@ E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\c
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\3mxjwy81f5-{0}-hzh05ukstm-hzh05ukstm.gz
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\k9mnuggnn9-{0}-xdso3qi6pj-xdso3qi6pj.gz
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\ypiyamc441-{0}-cxbzu45nn8-cxbzu45nn8.gz
-E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\tihf3uqke4-{0}-69pqxp9u4v-69pqxp9u4v.gz
 D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\bin\Debug\net10.0\FoodStreetPoiAdmin.staticwebassets.runtime.json
 D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\bin\Debug\net10.0\FoodStreetPoiAdmin.staticwebassets.endpoints.json
 D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\bin\Debug\net10.0\FoodStreetPoiAdmin.exe
@@ -396,3 +395,4 @@ D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\bin_verify_header_menu_fix\runtimes\w
 D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\bin_verify_header_menu_fix\runtimes\win-arm64\native\e_sqlite3.dll
 D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\bin_verify_header_menu_fix\runtimes\win-x64\native\e_sqlite3.dll
 D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\bin_verify_header_menu_fix\runtimes\win-x86\native\e_sqlite3.dll
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\tihf3uqke4-{0}-ocd4wssj2n-ocd4wssj2n.gz
