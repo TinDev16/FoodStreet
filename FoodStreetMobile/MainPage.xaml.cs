@@ -25,6 +25,9 @@ namespace FoodStreetMobile;
 
 public partial class MainPage : ContentPage
 {
+    private const string PlayEmoji = "▶️";
+    private const string PauseEmoji = "⏸️";
+
     private enum PlaybackSourceKind
     {
         None = 0,
@@ -1960,7 +1963,7 @@ public partial class MainPage : ContentPage
             case PlaybackSourceKind.TtsNative:
                 AudioPlayerContainer.IsVisible = false;
                 TtsPlayerContainer.IsVisible = true;
-                TtsPlayPauseButton.Text = _ttsIsPlaying ? "Pause" : "Play";
+                TtsPlayPauseButton.Text = _ttsIsPlaying ? PauseEmoji : PlayEmoji;
                 RefreshTtsUi();
                 break;
             case PlaybackSourceKind.AudioWeb:
@@ -1997,7 +2000,7 @@ public partial class MainPage : ContentPage
         TtsPlayerContainer.IsVisible = false;
         if (stopPlayback)
         {
-            TtsPlayPauseButton.Text = "Play";
+            TtsPlayPauseButton.Text = PlayEmoji;
             TtsProgressSlider.Value = 0;
             TtsProgressSlider.Maximum = 1;
             TtsCurrentTimeLabel.Text = "00:00";
@@ -2134,12 +2137,12 @@ public partial class MainPage : ContentPage
                     Locale = locale
                 };
                 _ttsIsPlaying = true;
-                TtsPlayPauseButton.Text = "Pause";
+                TtsPlayPauseButton.Text = PauseEmoji;
                 await TextToSpeech.Default.SpeakAsync(narration, options, CancellationToken.None);
                 _ttsElapsedSeconds = TtsProgressSlider.Maximum;
                 RefreshTtsUi();
                 _ttsIsPlaying = false;
-                TtsPlayPauseButton.Text = "Play";
+                TtsPlayPauseButton.Text = PlayEmoji;
                 await HandleCurrentPlaybackCompletedAsync();
                 return;
             }
@@ -2191,7 +2194,7 @@ public partial class MainPage : ContentPage
         _ttsCts = new CancellationTokenSource();
         var token = _ttsCts.Token;
         _ttsIsPlaying = true;
-        TtsPlayPauseButton.Text = "Pause";
+        TtsPlayPauseButton.Text = PauseEmoji;
         _ttsTimer?.Start();
         var locale = await ResolvePreferredTtsLocaleAsync();
 
@@ -2224,7 +2227,7 @@ public partial class MainPage : ContentPage
         {
             _ttsIsPlaying = false;
             _ttsTimer?.Stop();
-            TtsPlayPauseButton.Text = "Play";
+            TtsPlayPauseButton.Text = PlayEmoji;
             if (_ttsWordIndex >= _ttsWords.Count)
             {
                 _ttsElapsedSeconds = TtsProgressSlider.Maximum;
@@ -2547,7 +2550,7 @@ public partial class MainPage : ContentPage
 <body>
   <div class="controls">
     <button onclick="skip(-10)">Back 10s</button>
-    <button id="playPause" class="play" onclick="toggle()">Play</button>
+    <button id="playPause" class="play" onclick="toggle()">▶️</button>
     <button onclick="skip(10)">Forward 10s</button>
   </div>
   <audio id="audio" preload="metadata" src="__AUDIO_URL__"></audio>
@@ -2567,7 +2570,6 @@ public partial class MainPage : ContentPage
     const dur = document.getElementById('dur');
     const progress = document.getElementById('progress');
     const volume = document.getElementById('volume');
-    let lastSentAt = 0;
     let lastSentAt = 0;
 
     const fmt = (s) => {{
@@ -2606,9 +2608,9 @@ public partial class MainPage : ContentPage
       a.play().catch(() => {{ }});
     }});
 
-    a.addEventListener('play', () => {{ btn.textContent = 'Pause'; notify('play'); }});
-    a.addEventListener('pause', () => {{ btn.textContent = 'Play'; notify('pause'); }});
-    a.addEventListener('ended', () => {{ btn.textContent = 'Play'; notify('ended'); }});
+    a.addEventListener('play', () => {{ btn.textContent = '⏸️'; notify('play'); }});
+    a.addEventListener('pause', () => {{ btn.textContent = '▶️'; notify('pause'); }});
+    a.addEventListener('ended', () => {{ btn.textContent = '▶️'; notify('ended'); }});
     a.addEventListener('timeupdate', () => {{
       progress.value = a.currentTime || 0;
       cur.textContent = fmt(a.currentTime || 0);
@@ -2669,7 +2671,7 @@ public partial class MainPage : ContentPage
 <body>
   <div class="controls">
     <button onclick="skip(-10)">Back 10s</button>
-    <button id="playPause" class="play" onclick="toggle()">Play</button>
+    <button id="playPause" class="play" onclick="toggle()">▶️</button>
     <button onclick="skip(10)">Forward 10s</button>
   </div>
   <div class="row">
@@ -2730,7 +2732,7 @@ public partial class MainPage : ContentPage
       progress.value = seconds;
       cur.textContent = fmt(seconds);
       dur.textContent = fmt(totalSeconds);
-      btn.textContent = paused || !playing ? 'Play' : 'Pause';
+      btn.textContent = paused || !playing ? '▶️' : '⏸️';
       notify('timeupdate');
     }
 
