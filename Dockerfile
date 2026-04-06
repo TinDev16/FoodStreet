@@ -10,4 +10,4 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
 COPY --from=build /app/out .
 
-CMD ["dotnet", "YourProject.dll"]
+CMD ["dotnet", "FoodStreet.dll"]
