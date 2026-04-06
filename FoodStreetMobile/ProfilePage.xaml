@@ -4,7 +4,8 @@
              xmlns:loc="clr-namespace:FoodStreetMobile.Localization"
              x:Class="FoodStreetMobile.ProfilePage"
              BackgroundColor="#F2F2F2"
-             Title="{loc:Translate Key=Profile_Title}">
+             Title="{loc:Translate Key=Profile_Title}"
+             Shell.NavBarIsVisible="False">
 
     <ScrollView>
         <VerticalStackLayout Padding="20" Spacing="16">
@@ -39,6 +40,28 @@
                             ItemDisplayBinding="{Binding Label}"
                             SelectedItem="{Binding SelectedLanguage}" />
                 </VerticalStackLayout>
+            </Border>
+
+            <Border Padding="18"
+                    BackgroundColor="White"
+                    Stroke="#EFE4DB"
+                    StrokeShape="RoundRectangle 18">
+                <Grid ColumnDefinitions="*,Auto" VerticalOptions="Center">
+                    <Label Text="{loc:Translate Key=Profile_PoiHistory}"
+                           FontSize="16"
+                           FontAttributes="Bold"
+                           TextColor="#2C1C19" />
+
+                    <Label Grid.Column="1"
+                           Text="›"
+                           FontSize="22"
+                           TextColor="#C9B8AE"
+                           VerticalTextAlignment="Center" />
+
+                    <Grid.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding OpenPoiHistoryCommand}" />
+                    </Grid.GestureRecognizers>
+                </Grid>
             </Border>
         </VerticalStackLayout>
     </ScrollView>

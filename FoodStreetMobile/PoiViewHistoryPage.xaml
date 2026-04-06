@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:loc="clr-namespace:FoodStreetMobile.Localization"
+             xmlns:local="clr-namespace:FoodStreetMobile"
+             x:Class="FoodStreetMobile.PoiViewHistoryPage"
+             BackgroundColor="#F2F2F2"
+             Title="{loc:Translate Key=PoiHistory_Title}">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <DataTemplate x:Key="MonthHeaderTemplate">
+                <Label Text="{Binding Title}"
+                       Margin="0,12,0,4"
+                       FontSize="18"
+                       FontAttributes="Bold"
+                       TextColor="#2C1C19" />
+            </DataTemplate>
+
+            <DataTemplate x:Key="DayHeaderTemplate">
+                <Label Text="{Binding Title}"
+                       Margin="0,8,0,6"
+                       FontSize="14"
+                       FontAttributes="Bold"
+                       TextColor="#8E7A6D" />
+            </DataTemplate>
+
+            <DataTemplate x:Key="EntryTemplate">
+                <Border Padding="12"
+                        BackgroundColor="White"
+                        Stroke="#EFE4DB"
+                        StrokeShape="RoundRectangle 16">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer
+                            Command="{Binding BindingContext.OpenPoiCommand, Source={RelativeSource AncestorType={x:Type local:PoiViewHistoryPage}}}"
+                            CommandParameter="{Binding}" />
+                    </Border.GestureRecognizers>
+
+                    <Grid ColumnDefinitions="52,*,Auto" ColumnSpacing="12" VerticalOptions="Center">
+                        <Border WidthRequest="52"
+                                HeightRequest="52"
+                                Stroke="#EFE4DB"
+                                StrokeShape="RoundRectangle 12"
+                                BackgroundColor="#FFF7ED">
+                            <Image Source="{Binding PoiImageUrl}"
+                                   Aspect="AspectFill" />
+                        </Border>
+
+                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                            <Label Text="{Binding PoiName}"
+                                   FontSize="16"
+                                   FontAttributes="Bold"
+                                   TextColor="#2C1C19"
+                                   LineBreakMode="TailTruncation" />
+                            <Label Text="{Binding ViewedTimeText}"
+                                   FontSize="13"
+                                   TextColor="#8E7A6D" />
+                        </VerticalStackLayout>
+
+                        <Label Grid.Column="2"
+                               Text="›"
+                               FontSize="22"
+                               TextColor="#C9B8AE"
+                               VerticalTextAlignment="Center" />
+                    </Grid>
+                </Border>
+            </DataTemplate>
+
+            <local:PoiViewHistoryTemplateSelector
+                x:Key="PoiViewHistoryTemplateSelector"
+                MonthHeaderTemplate="{StaticResource MonthHeaderTemplate}"
+                DayHeaderTemplate="{StaticResource DayHeaderTemplate}"
+                EntryTemplate="{StaticResource EntryTemplate}" />
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*" Padding="20">
+        <Label Text="{loc:Translate Key=PoiHistory_Hint}"
+               FontSize="14"
+               TextColor="#8E7A6D" />
+
+        <Grid Grid.Row="1">
+            <CollectionView ItemsSource="{Binding Items}"
+                            ItemTemplate="{StaticResource PoiViewHistoryTemplateSelector}"
+                            SelectionMode="None"
+                            Margin="0,8,0,0" />
+
+            <Label IsVisible="{Binding IsEmpty}"
+                   Text="{loc:Translate Key=PoiHistory_Empty}"
+                   FontSize="15"
+                   TextColor="#8E7A6D"
+                   HorizontalTextAlignment="Center"
+                   VerticalTextAlignment="Center" />
+        </Grid>
+    </Grid>
+</ContentPage>
+

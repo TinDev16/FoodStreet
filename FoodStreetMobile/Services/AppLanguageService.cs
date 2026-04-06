@@ -1,4 +1,4 @@
-using FoodStreetMobile.Localization;
+﻿using FoodStreetMobile.Localization;
 using Microsoft.Maui.Storage;
 using System.Globalization;
 
@@ -94,4 +94,5 @@ public sealed class AppLanguageOption
             new AppLanguageOption { Code = "ko", Label = "한국어 (ko)" },
         ];
 }
+
 

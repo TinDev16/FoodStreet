@@ -32363,20 +32363,20 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\lenovo\\.nuget\\packages\\": {}
+    "C:\\Users\\ACER\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetMobile\\FoodStreetMobile.csproj",
+      "projectUniqueName": "D:\\HK2 N3\\C#\\FoodStreet\\FoodStreetMobile\\FoodStreetMobile.csproj",
       "projectName": "FoodStreetMobile",
-      "projectPath": "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetMobile\\FoodStreetMobile.csproj",
-      "packagesPath": "C:\\Users\\lenovo\\.nuget\\packages\\",
-      "outputPath": "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetMobile\\obj\\",
+      "projectPath": "D:\\HK2 N3\\C#\\FoodStreet\\FoodStreetMobile\\FoodStreetMobile.csproj",
+      "packagesPath": "C:\\Users\\ACER\\.nuget\\packages\\",
+      "outputPath": "D:\\HK2 N3\\C#\\FoodStreet\\FoodStreetMobile\\obj\\",
       "projectStyle": "PackageReference",
       "crossTargeting": true,
       "configFilePaths": [
-        "C:\\Users\\lenovo\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        "C:\\Users\\ACER\\AppData\\Roaming\\NuGet\\NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net10.0-android",

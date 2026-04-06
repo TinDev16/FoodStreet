@@ -34,6 +34,7 @@ public static class MauiProgram
 
         builder.Services.AddSingleton<PoiRepository>();
         builder.Services.AddSingleton<AppDatabase>();
+        builder.Services.AddSingleton<PoiViewHistoryService>();
         builder.Services.AddSingleton<PoiSyncService>();
         builder.Services.AddSingleton<PlaceSearchService>();
         builder.Services.AddSingleton<DeepLinkService>();
@@ -43,9 +44,11 @@ public static class MauiProgram
         builder.Services.AddSingleton<LocationTracker>();
         builder.Services.AddSingleton<MainViewModel>();
         builder.Services.AddSingleton<ProfileViewModel>();
+        builder.Services.AddTransient<PoiViewHistoryViewModel>();
         builder.Services.AddSingleton<HomePage>();
         builder.Services.AddSingleton<MainPage>();
         builder.Services.AddSingleton<ProfilePage>();
+        builder.Services.AddTransient<PoiViewHistoryPage>();
         builder.Services.AddSingleton<AppShell>();
 
 #if DEBUG

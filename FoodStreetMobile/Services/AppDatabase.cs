@@ -31,6 +31,7 @@ public sealed class AppDatabase
             await connection.CreateTableAsync<PoiTranslationEntity>();
             await connection.CreateTableAsync<PlaybackStateEntity>();
             await connection.CreateTableAsync<AppSettingEntity>();
+            await connection.CreateTableAsync<PoiViewHistoryEntity>();
             await connection.ExecuteAsync("CREATE UNIQUE INDEX IF NOT EXISTS ux_poi_lang ON poi_translations(poi_id, lang_code);");
             await CleanupLegacySeedAsync(connection);
             await SeedIfNeededAsync(connection);
