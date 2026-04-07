@@ -296,8 +296,6 @@ E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify_qr_deepl
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify_qr_deeplink\runtimes\win-x86\native\e_sqlite3.dll
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\c1c5jflion-{0}-or4fwkfrug-or4fwkfrug.gz
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\3mxjwy81f5-{0}-hzh05ukstm-hzh05ukstm.gz
-E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\k9mnuggnn9-{0}-xdso3qi6pj-xdso3qi6pj.gz
-E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\ypiyamc441-{0}-cxbzu45nn8-cxbzu45nn8.gz
 D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\bin\Debug\net10.0\FoodStreetPoiAdmin.staticwebassets.runtime.json
 D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\bin\Debug\net10.0\FoodStreetPoiAdmin.staticwebassets.endpoints.json
 D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\bin\Debug\net10.0\FoodStreetPoiAdmin.exe
@@ -396,3 +394,12 @@ D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\bin_verify_header_menu_fix\runtimes\w
 D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\bin_verify_header_menu_fix\runtimes\win-x64\native\e_sqlite3.dll
 D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\bin_verify_header_menu_fix\runtimes\win-x86\native\e_sqlite3.dll
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\tihf3uqke4-{0}-ocd4wssj2n-ocd4wssj2n.gz
+e:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\k9mnuggnn9-{0}-1uly9v49hw-1uly9v49hw.gz
+e:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\ypiyamc441-{0}-dxknlyps5l-dxknlyps5l.gz
+e:\Study_project\C#\FoodStreet\FoodStreet\_build_verify\FoodStreetPoiAdmin.staticwebassets.runtime.json
+e:\Study_project\C#\FoodStreet\FoodStreet\_build_verify\FoodStreetPoiAdmin.staticwebassets.endpoints.json
+e:\Study_project\C#\FoodStreet\FoodStreet\_build_verify\FoodStreetPoiAdmin.exe
+e:\Study_project\C#\FoodStreet\FoodStreet\_build_verify\FoodStreetPoiAdmin.deps.json
+e:\Study_project\C#\FoodStreet\FoodStreet\_build_verify\FoodStreetPoiAdmin.runtimeconfig.json
+e:\Study_project\C#\FoodStreet\FoodStreet\_build_verify\FoodStreetPoiAdmin.dll
+e:\Study_project\C#\FoodStreet\FoodStreet\_build_verify\FoodStreetPoiAdmin.pdb
