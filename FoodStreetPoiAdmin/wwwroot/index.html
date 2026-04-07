@@ -19,17 +19,13 @@
         <span>FS Admin</span>
       </div>
       <nav class="sidebar-nav">
-        <a href="#" class="nav-item active">
+        <a href="#" class="nav-item active" id="navPoiManage">
           <i class="fa-solid fa-list-check"></i> 
           <span>Quản lý POI</span>
         </a>
-        <a href="#" class="nav-item" id="ownerManageNav" hidden>
+        <a href="/owner.html" class="nav-item" id="ownerManageNav" hidden>
           <i class="fa-solid fa-user-shield"></i>
           <span>Quản lý Owner</span>
-        </a>
-        <a href="/poi.html" class="nav-item" target="_blank">
-          <i class="fa-solid fa-mobile-screen"></i> 
-          <span>Trang Client POI</span>
         </a>
       </nav>
       <div class="sidebar-footer">
@@ -57,7 +53,7 @@
       <div class="scroll-container">
         <main class="layout">
           <!-- Form Card -->
-          <section class="card">
+          <section class="card" id="poiFormCard">
             <header class="card-header">
               <div class="card-title">
                 <i class="fa-solid fa-pen-to-square"></i>
@@ -239,59 +235,6 @@
             </div>
           </section>
 
-          <section class="card" id="ownerManagementCard" hidden>
-            <header class="card-header">
-              <div class="card-title">
-                <i class="fa-solid fa-user-shield"></i>
-                <h2>Quản lý owner</h2>
-              </div>
-            </header>
-
-            <div class="grid-2">
-              <div>
-                <h3 class="small muted mb-15">Tạo tài khoản owner</h3>
-                <form id="ownerCreateForm">
-                  <div class="form-group">
-                    <label>Username
-                      <input id="ownerUsername" type="text" required minlength="3" />
-                    </label>
-                  </div>
-                  <div class="form-group">
-                    <label>Họ tên
-                      <input id="ownerFullName" type="text" />
-                    </label>
-                  </div>
-                  <div class="form-group">
-                    <label>Password
-                      <input id="ownerPassword" type="password" required minlength="6" />
-                    </label>
-                  </div>
-                  <div class="actions">
-                    <button type="submit"><i class="fa-solid fa-user-plus"></i> Tạo owner</button>
-                  </div>
-                </form>
-              </div>
-
-              <div>
-                <h3 class="small muted mb-15">Gán owner cho POI</h3>
-                <form id="ownerAssignForm">
-                  <div class="form-group">
-                    <label>POI
-                      <select id="assignPoiId" required></select>
-                    </label>
-                  </div>
-                  <div class="form-group">
-                    <label>Owner
-                      <select id="assignOwnerId" required></select>
-                    </label>
-                  </div>
-                  <div class="actions">
-                    <button type="submit"><i class="fa-solid fa-link"></i> Gán owner</button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </section>
         </main>
       </div>
     </div>
@@ -373,6 +316,6 @@
     </form>
   </dialog>
 
-  <script src="/app.js?v=20260407-render-qr"></script>
+  <script src="/app.js?v=20260407-owner-menu-fix2"></script>
 </body>
 </html>

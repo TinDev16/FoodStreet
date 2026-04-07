@@ -27,12 +27,9 @@
   const sidebarUserNameEl = $("#sidebarUserName");
   const sidebarUserRoleEl = $("#sidebarUserRole");
   const sidebarUserAvatarEl = $("#sidebarUserAvatar");
-  const ownerManagementCardEl = $("#ownerManagementCard");
-  const ownerCreateFormEl = $("#ownerCreateForm");
-  const ownerAssignFormEl = $("#ownerAssignForm");
-  const assignPoiIdEl = $("#assignPoiId");
-  const assignOwnerIdEl = $("#assignOwnerId");
   const ownerManageNavEl = $("#ownerManageNav");
+  const navClientPoiEl = $("#navClientPoi");
+  const poiFormCardEl = $("#poiFormCard");
 
   const state = {
     languages: [],
@@ -54,6 +51,7 @@
       user: null,
     },
     owners: [],
+    poiItems: [],
   };
 
   const setStatus = (msg, isError = false) => {
@@ -282,11 +280,19 @@
 
   const loadList = async () => {
     const items = await apiGet("/api/pois/admin");
+    state.poiItems = Array.isArray(items) ? items : [];
     renderList(items);
     reloadOwnerOptions();
   };
 
   const resetForm = () => {
+    const isOwnerRole = (state.auth.user?.role || "").toLowerCase() === "owner";
+    if (isOwnerRole) {
+      formEl.elements.namedItem("id").value = "";
+      setStatus("Tai khoan owner khong duoc tao POI moi. Hay chon POI trong danh sach de sua.", true);
+      return;
+    }
+
     formEl.reset();
     state.current.id = "";
     state.current.coreImageUrl = "";
@@ -448,9 +454,20 @@
     sidebarUserRoleEl.textContent = role ? role.toUpperCase() : "Chua dang nhap";
     sidebarUserAvatarEl.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=4f46e5&color=fff&rounded=true`;
 
-    const showOwnerMgmt = isSuperAdmin();
-    ownerManagementCardEl.hidden = !showOwnerMgmt;
-    ownerManageNavEl.hidden = !showOwnerMgmt;
+    const roleCode = (state.auth.user?.role || "").toLowerCase();
+    const isOwnerRole = roleCode === "owner";
+    ownerManageNavEl.hidden = !isSuperAdmin();
+    if (navClientPoiEl) {
+      navClientPoiEl.hidden = isOwnerRole;
+    }
+    if (createBtn) {
+      createBtn.hidden = isOwnerRole;
+      createBtn.disabled = isOwnerRole;
+      createBtn.title = isOwnerRole ? "Tai khoan owner khong duoc tao POI moi." : "";
+    }
+    if (poiFormCardEl && isOwnerRole && !(state.current?.id || "").trim()) {
+      poiFormCardEl.hidden = true;
+    }
   };
 
   const requireLogin = async () => {
@@ -475,29 +492,7 @@
   };
 
   const reloadOwnerOptions = () => {
-    if (!assignOwnerIdEl || !assignPoiIdEl) return;
-    assignOwnerIdEl.innerHTML = "";
-    const unassignOpt = document.createElement("option");
-    unassignOpt.value = "";
-    unassignOpt.textContent = "— Bỏ gán owner —";
-    assignOwnerIdEl.appendChild(unassignOpt);
-
-    for (const owner of state.owners) {
-      const opt = document.createElement("option");
-      opt.value = owner.id;
-      opt.textContent = owner.fullName ? `${owner.username} (${owner.fullName})` : owner.username;
-      assignOwnerIdEl.appendChild(opt);
-    }
-
-    assignPoiIdEl.innerHTML = "";
-    for (const row of rowsEl.querySelectorAll("button[data-action='edit']")) {
-      const id = row.dataset.id;
-      if (!id) continue;
-      const opt = document.createElement("option");
-      opt.value = id;
-      opt.textContent = `POI #${id}`;
-      assignPoiIdEl.appendChild(opt);
-    }
+    // owner assignment moved to /owner.html
   };
 
   const loadOwners = async () => {
@@ -509,6 +504,12 @@
 
     state.owners = await apiGet("/api/admin/owners");
     reloadOwnerOptions();
+  };
+
+  const revealOwnerEditForm = () => {
+    if (!poiFormCardEl) return;
+    if ((state.auth.user?.role || "").toLowerCase() !== "owner") return;
+    poiFormCardEl.hidden = false;
   };
 
   const wireEvents = () => {
@@ -531,7 +532,10 @@
         await loadOwners();
         await loadList();
       } catch (err) {
-        authStatusEl.textContent = err?.message || String(err);
+        const msg = err?.message || String(err);
+        authStatusEl.textContent = msg.includes("401")
+          ? "Dang nhap that bai. Kiem tra username/password hoac tai khoan da bi xoa mem."
+          : msg;
       }
     });
 
@@ -542,41 +546,6 @@
       localStorage.removeItem("adminToken");
       updateIdentityUi();
       authDialogEl.showModal();
-    });
-
-    ownerCreateFormEl?.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      try {
-        await apiPostJson("/api/admin/owners", {
-          username: ($("#ownerUsername")?.value || "").trim(),
-          fullName: ($("#ownerFullName")?.value || "").trim(),
-          password: ($("#ownerPassword")?.value || "").trim(),
-        });
-        ownerCreateFormEl.reset();
-        await loadOwners();
-        setStatus("Da tao owner.");
-      } catch (err) {
-        setStatus(err?.message || String(err), true);
-      }
-    });
-
-    ownerAssignFormEl?.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const poiId = (assignPoiIdEl?.value || "").trim();
-      if (!poiId) {
-        setStatus("Chon POI can gan owner.", true);
-        return;
-      }
-
-      try {
-        await apiPostJson(`/api/admin/pois/${encodeURIComponent(poiId)}/assign-owner`, {
-          ownerId: (assignOwnerIdEl?.value || "").trim() || null,
-        });
-        setStatus("Da cap nhat owner cho POI.");
-        await loadList();
-      } catch (err) {
-        setStatus(err?.message || String(err), true);
-      }
     });
 
     sourceLangSelect.addEventListener("change", () => setActiveSourceLang(sourceLangSelect.value || "vi"));
@@ -620,6 +589,7 @@
         if (action === "qr") {
           await openQrDialog(id);
         } else if (action === "edit") {
+          revealOwnerEditForm();
           await loadPoi(id);
         } else if (action === "del") {
           if (!confirm(`Xoa POI #${id}?`)) return;
@@ -682,6 +652,12 @@
       e.preventDefault();
       updateFromGpsInput();
       if (!formEl.reportValidity()) return;
+      const isOwnerRole = (state.auth.user?.role || "").toLowerCase() === "owner";
+      const currentId = (formEl.elements.namedItem("id").value || "").trim();
+      if (isOwnerRole && !currentId) {
+        setStatus("Tai khoan owner chi duoc sua POI da duoc gan, khong duoc tao moi.", true);
+        return;
+      }
 
       setStatus("Saving...");
       try {
@@ -717,6 +693,9 @@
     if (ok) {
       await loadOwners();
       await loadList();
+      if ((state.auth.user?.role || "").toLowerCase() === "owner" && poiFormCardEl) {
+        poiFormCardEl.hidden = true;
+      }
     }
     setStatus("");
   };

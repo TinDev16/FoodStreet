@@ -21,6 +21,10 @@
   padding: 0;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   font-family: 'Outfit', -apple-system, sans-serif;
   background: radial-gradient(circle at top right, #1e1b4b, var(--bg-color) 40%),
@@ -239,6 +243,26 @@ body {
 }
 
 .header-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+.tab-floating-group {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--card-border);
+  padding: 6px;
+  border-radius: 999px;
+  gap: 6px;
+}
+
+.tab-floating {
+  border-radius: 999px;
+  padding: 8px 14px;
+  min-width: 128px;
+  box-shadow: none;
+}
+
+.tab-floating.active {
+  background: linear-gradient(135deg, var(--accent-color), var(--accent-hover));
+  border-color: transparent;
+  box-shadow: 0 6px 18px var(--accent-glow);
+}
 
 label {
   display: block;
@@ -441,6 +465,36 @@ tbody td .secondary, tbody td .danger {
 
 .muted { color: var(--text-secondary); }
 .small { font-size: 0.85rem; }
+.mt-10 { margin-top: 10px; }
+.mb-10 { margin-bottom: 10px; }
+
+.owner-poi-list {
+  border: 1px solid var(--input-border);
+  border-radius: 12px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 10px;
+  background: rgba(255,255,255,0.02);
+}
+
+.owner-poi-item {
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: border-color .2s ease, background .2s ease;
+}
+
+.owner-poi-item:last-child { margin-bottom: 0; }
+.owner-poi-item:hover { border-color: rgba(99,102,241,.55); }
+.owner-poi-item.active {
+  border-color: #818cf8;
+  background: rgba(99,102,241,.16);
+}
+
+.owner-poi-title { font-weight: 600; color: var(--text-primary); }
+.owner-poi-meta { font-size: .82rem; color: var(--text-secondary); margin-top: 4px; }
 
 #status { 
   min-height: 24px; 
@@ -467,6 +521,19 @@ tbody td .secondary, tbody td .danger {
 .qr-dialog::backdrop { 
   background: rgba(0, 0, 0, 0.6); 
   backdrop-filter: blur(6px);
+}
+
+#ownerPoiDialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(980px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+}
+
+#ownerPoiDialog .qr-panel {
+  max-height: calc(100vh - 64px);
+  overflow: auto;
 }
 
 .qr-panel { 

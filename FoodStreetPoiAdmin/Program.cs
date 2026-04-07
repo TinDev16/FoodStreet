@@ -185,7 +185,9 @@ app.MapGet("/api/admin/owners", async (HttpContext context) =>
         return Results.Forbid();
     }
 
-    var owners = await GetOwnerAccountsAsync(connectionString);
+    var includeDeleted = string.Equals(context.Request.Query["includeDeleted"], "1", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(context.Request.Query["includeDeleted"], "true", StringComparison.OrdinalIgnoreCase);
+    var owners = await GetOwnerAccountsAsync(connectionString, includeDeleted);
     return Results.Ok(owners);
 }).RequireAuthorization();
 
@@ -220,6 +222,93 @@ app.MapPost("/api/admin/owners", async (HttpContext context, AdminCreateOwnerReq
     {
         return Results.BadRequest(new { error = ex.Message });
     }
+}).RequireAuthorization();
+
+app.MapPut("/api/admin/owners/{id}", async (HttpContext context, string id, AdminUpdateOwnerRequest? req) =>
+{
+    if (!TryGetAdminActor(context.User, out var actor))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!IsSuperAdmin(actor))
+    {
+        return Results.Forbid();
+    }
+
+    if (!long.TryParse((id ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var ownerId) || ownerId <= 0)
+    {
+        return Results.BadRequest(new { error = "owner id khong hop le." });
+    }
+
+    if (req is null)
+    {
+        return Results.BadRequest(new { error = "Thieu du lieu cap nhat owner." });
+    }
+
+    if (!string.IsNullOrWhiteSpace(req.Password) && req.Password.Trim().Length < 6)
+    {
+        return Results.BadRequest(new { error = "Password phai co it nhat 6 ky tu." });
+    }
+
+    try
+    {
+        var ok = await UpdateOwnerAccountAsync(connectionString, ownerId, req.Username?.Trim(), req.FullName?.Trim(), req.Password?.Trim());
+        return ok ? Results.Ok(new { id = ownerId.ToString(CultureInfo.InvariantCulture) }) : Results.NotFound();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+}).RequireAuthorization();
+
+app.MapDelete("/api/admin/owners/{id}", async (HttpContext context, string id) =>
+{
+    if (!TryGetAdminActor(context.User, out var actor))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!IsSuperAdmin(actor))
+    {
+        return Results.Forbid();
+    }
+
+    if (!long.TryParse((id ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var ownerId) || ownerId <= 0)
+    {
+        return Results.BadRequest(new { error = "owner id khong hop le." });
+    }
+
+    try
+    {
+        var ok = await DeleteOwnerAccountAsync(connectionString, ownerId);
+        return ok ? Results.Ok(new { id = ownerId.ToString(CultureInfo.InvariantCulture) }) : Results.NotFound();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+}).RequireAuthorization();
+
+app.MapPost("/api/admin/owners/{id}/restore", async (HttpContext context, string id) =>
+{
+    if (!TryGetAdminActor(context.User, out var actor))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!IsSuperAdmin(actor))
+    {
+        return Results.Forbid();
+    }
+
+    if (!long.TryParse((id ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var ownerId) || ownerId <= 0)
+    {
+        return Results.BadRequest(new { error = "owner id khong hop le." });
+    }
+
+    var ok = await RestoreOwnerAccountAsync(connectionString, ownerId);
+    return ok ? Results.Ok(new { id = ownerId.ToString(CultureInfo.InvariantCulture), restored = true }) : Results.NotFound();
 }).RequireAuthorization();
 
 app.MapPost("/api/admin/pois/{id}/assign-owner", async (HttpContext context, string id, AssignPoiOwnerRequest? req) =>
@@ -752,6 +841,11 @@ app.MapPost("/api/pois", async (HttpContext context, PoiAdminUpsertRequest reque
         poiId = parsed;
     }
 
+    if (IsOwner(actor) && poiId is null)
+    {
+        return Results.Forbid();
+    }
+
     var mapLink = string.IsNullOrWhiteSpace(request.MapLink)
         ? $"https://maps.google.com/?q={request.Latitude.ToString(CultureInfo.InvariantCulture)},{request.Longitude.ToString(CultureInfo.InvariantCulture)}"
         : request.MapLink.Trim();
@@ -1239,6 +1333,9 @@ static async Task InitializeDatabaseAsync(string connectionString)
             role TEXT NOT NULL,
             full_name TEXT NOT NULL DEFAULT '',
             is_active INTEGER NOT NULL DEFAULT 1,
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            deleted_at TEXT,
+            delete_status TEXT NOT NULL DEFAULT 'ACTIVE',
             created_at TEXT NOT NULL
         );
         CREATE UNIQUE INDEX IF NOT EXISTS ux_admin_accounts_username ON admin_accounts(username);
@@ -1356,6 +1453,36 @@ static async Task InitializeDatabaseAsync(string connectionString)
     {
         await createUsers.ExecuteNonQueryAsync();
     }
+
+    try
+    {
+        await using var migrate = new SqliteCommand("ALTER TABLE admin_accounts ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0;", connection);
+        await migrate.ExecuteNonQueryAsync();
+    }
+    catch { }
+
+    try
+    {
+        await using var migrate = new SqliteCommand("ALTER TABLE admin_accounts ADD COLUMN deleted_at TEXT;", connection);
+        await migrate.ExecuteNonQueryAsync();
+    }
+    catch { }
+
+    try
+    {
+        await using var migrate = new SqliteCommand("ALTER TABLE admin_accounts ADD COLUMN delete_status TEXT NOT NULL DEFAULT 'ACTIVE';", connection);
+        await migrate.ExecuteNonQueryAsync();
+    }
+    catch { }
+
+    await using (var backfillAdminDeleteStatus = new SqliteCommand("""
+        UPDATE admin_accounts
+        SET delete_status = CASE WHEN COALESCE(is_deleted, 0) = 1 THEN 'DELETED' ELSE 'ACTIVE' END
+        WHERE delete_status IS NULL OR delete_status = '';
+        """, connection))
+    {
+        await backfillAdminDeleteStatus.ExecuteNonQueryAsync();
+    }
 }
 
 static async Task<SqliteConnection> OpenConnectionAsync(string connectionString)
@@ -1442,7 +1569,7 @@ static async Task<(long Id, string Username, string Role, string FullName)?> Fin
 {
     await using var connection = await OpenConnectionAsync(connectionString);
     await using var cmd = new SqliteCommand("""
-        SELECT id, username, password_hash, role, full_name, is_active
+        SELECT id, username, password_hash, role, full_name, is_active, is_deleted
         FROM admin_accounts
         WHERE lower(username) = lower($u)
         LIMIT 1;
@@ -1455,7 +1582,8 @@ static async Task<(long Id, string Username, string Role, string FullName)?> Fin
     }
 
     var isActive = reader.IsDBNull(5) || reader.GetInt32(5) != 0;
-    if (!isActive)
+    var isDeleted = !reader.IsDBNull(6) && reader.GetInt32(6) != 0;
+    if (!isActive || isDeleted)
     {
         return null;
     }
@@ -1473,15 +1601,20 @@ static async Task<(long Id, string Username, string Role, string FullName)?> Fin
         reader.IsDBNull(4) ? string.Empty : reader.GetString(4));
 }
 
-static async Task<List<OwnerAccountDto>> GetOwnerAccountsAsync(string connectionString)
+static async Task<List<OwnerAccountDto>> GetOwnerAccountsAsync(string connectionString, bool includeDeleted = false)
 {
     await using var connection = await OpenConnectionAsync(connectionString);
-    await using var cmd = new SqliteCommand("""
-        SELECT id, username, full_name
+    var sql = """
+        SELECT id, username, full_name, COALESCE(is_deleted, 0), deleted_at, COALESCE(delete_status, 'ACTIVE')
         FROM admin_accounts
-        WHERE role = 'owner' AND COALESCE(is_active, 1) = 1
+        WHERE role = 'owner'
         ORDER BY username ASC;
-        """, connection);
+        """;
+    if (!includeDeleted)
+    {
+        sql = sql.Replace("ORDER BY", "AND COALESCE(is_deleted, 0) = 0 ORDER BY", StringComparison.Ordinal);
+    }
+    await using var cmd = new SqliteCommand(sql, connection);
     await using var reader = await cmd.ExecuteReaderAsync();
     var result = new List<OwnerAccountDto>();
     while (await reader.ReadAsync())
@@ -1491,6 +1624,9 @@ static async Task<List<OwnerAccountDto>> GetOwnerAccountsAsync(string connection
             Id = reader.GetInt64(0).ToString(CultureInfo.InvariantCulture),
             Username = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
             FullName = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+            IsDeleted = !reader.IsDBNull(3) && reader.GetInt32(3) != 0,
+            DeletedAt = reader.IsDBNull(4) ? null : reader.GetString(4),
+            DeleteStatus = reader.IsDBNull(5) ? "ACTIVE" : reader.GetString(5),
         });
     }
 
@@ -1519,6 +1655,106 @@ static async Task<long> CreateOwnerAccountAsync(string connectionString, string 
     insert.Parameters.AddWithValue("$createdAt", DateTimeOffset.UtcNow.ToString("O"));
     var raw = await insert.ExecuteScalarAsync();
     return Convert.ToInt64(raw, CultureInfo.InvariantCulture);
+}
+
+static async Task<bool> UpdateOwnerAccountAsync(string connectionString, long ownerId, string? username, string? fullName, string? password)
+{
+    await using var connection = await OpenConnectionAsync(connectionString);
+    await using var exists = new SqliteCommand("SELECT 1 FROM admin_accounts WHERE id = $id AND role = 'owner' AND COALESCE(is_deleted, 0) = 0 LIMIT 1;", connection);
+    exists.Parameters.AddWithValue("$id", ownerId);
+    if (await exists.ExecuteScalarAsync() is null)
+    {
+        return false;
+    }
+
+    if (!string.IsNullOrWhiteSpace(username))
+    {
+        await using var checkUser = new SqliteCommand("SELECT 1 FROM admin_accounts WHERE lower(username) = lower($u) AND id <> $id LIMIT 1;", connection);
+        checkUser.Parameters.AddWithValue("$u", username);
+        checkUser.Parameters.AddWithValue("$id", ownerId);
+        if (await checkUser.ExecuteScalarAsync() is not null)
+        {
+            throw new InvalidOperationException("Username da ton tai.");
+        }
+    }
+
+    var setSql = new List<string>();
+    await using var cmd = new SqliteCommand { Connection = connection };
+    cmd.Parameters.AddWithValue("$id", ownerId);
+
+    if (!string.IsNullOrWhiteSpace(username))
+    {
+        setSql.Add("username = $u");
+        cmd.Parameters.AddWithValue("$u", username);
+    }
+
+    if (fullName is not null)
+    {
+        setSql.Add("full_name = $fullName");
+        cmd.Parameters.AddWithValue("$fullName", fullName);
+    }
+
+    if (!string.IsNullOrWhiteSpace(password))
+    {
+        setSql.Add("password_hash = $passwordHash");
+        cmd.Parameters.AddWithValue("$passwordHash", BCrypt.Net.BCrypt.HashPassword(password));
+    }
+
+    if (setSql.Count == 0)
+    {
+        return true;
+    }
+
+    cmd.CommandText = $"UPDATE admin_accounts SET {string.Join(", ", setSql)} WHERE id = $id AND role = 'owner' AND COALESCE(is_deleted, 0) = 0;";
+    var affected = await cmd.ExecuteNonQueryAsync();
+    return affected > 0;
+}
+
+static async Task<bool> DeleteOwnerAccountAsync(string connectionString, long ownerId)
+{
+    await using var connection = await OpenConnectionAsync(connectionString);
+    await using var exists = new SqliteCommand("SELECT 1 FROM admin_accounts WHERE id = $id AND role = 'owner' AND COALESCE(is_deleted, 0) = 0 LIMIT 1;", connection);
+    exists.Parameters.AddWithValue("$id", ownerId);
+    if (await exists.ExecuteScalarAsync() is null)
+    {
+        return false;
+    }
+
+    // Unassign POIs before deleting owner.
+    await using (var unassign = new SqliteCommand("UPDATE pois SET owner_admin_id = NULL WHERE owner_admin_id = $id;", connection))
+    {
+        unassign.Parameters.AddWithValue("$id", ownerId);
+        await unassign.ExecuteNonQueryAsync();
+    }
+
+    await using var softDelete = new SqliteCommand("""
+        UPDATE admin_accounts
+        SET is_deleted = 1,
+            is_active = 0,
+            deleted_at = $deletedAt,
+            delete_status = 'DELETED'
+        WHERE id = $id AND role = 'owner' AND COALESCE(is_deleted, 0) = 0;
+        """, connection);
+    softDelete.Parameters.AddWithValue("$id", ownerId);
+    softDelete.Parameters.AddWithValue("$deletedAt", DateTimeOffset.UtcNow.ToString("O"));
+    var affected = await softDelete.ExecuteNonQueryAsync();
+    return affected > 0;
+}
+
+static async Task<bool> RestoreOwnerAccountAsync(string connectionString, long ownerId)
+{
+    await using var connection = await OpenConnectionAsync(connectionString);
+    await using var restore = new SqliteCommand("""
+        UPDATE admin_accounts
+        SET is_deleted = 0,
+            is_active = 1,
+            deleted_at = NULL,
+            delete_status = 'ACTIVE'
+        WHERE id = $id AND role = 'owner' AND COALESCE(is_deleted, 0) = 1;
+        """, connection);
+    restore.Parameters.AddWithValue("$id", ownerId);
+    var affected = await restore.ExecuteNonQueryAsync();
+    return affected > 0;
 }
 
 static async Task<bool> HasPoiAccessAsync(SqliteConnection connection, long poiId, AdminActor actor)
@@ -1632,6 +1868,7 @@ static async Task<List<PoiAdminListItemDto>> GetPoisForAdminListAsync(string con
             COALESCE(p.is_deleted, 0) AS is_deleted,
             p.deleted_at,
             COALESCE(p.delete_status, CASE WHEN COALESCE(p.is_deleted, 0) = 1 THEN 'DELETED' ELSE 'ACTIVE' END) AS delete_status,
+            p.owner_admin_id,
             COALESCE(a.username, '') AS owner_username,
             COALESCE(a.full_name, '') AS owner_full_name
         FROM pois p
@@ -1669,8 +1906,9 @@ static async Task<List<PoiAdminListItemDto>> GetPoisForAdminListAsync(string con
             IsDeleted = !reader.IsDBNull(10) && reader.GetInt32(10) != 0,
             DeletedAt = reader.IsDBNull(11) ? null : reader.GetString(11),
             DeleteStatus = reader.IsDBNull(12) ? "ACTIVE" : reader.GetString(12),
-            OwnerUsername = reader.IsDBNull(13) ? string.Empty : reader.GetString(13),
-            OwnerFullName = reader.IsDBNull(14) ? string.Empty : reader.GetString(14),
+            OwnerAdminId = reader.IsDBNull(13) ? null : reader.GetInt64(13).ToString(CultureInfo.InvariantCulture),
+            OwnerUsername = reader.IsDBNull(14) ? string.Empty : reader.GetString(14),
+            OwnerFullName = reader.IsDBNull(15) ? string.Empty : reader.GetString(15),
         });
     }
 
@@ -2314,6 +2552,7 @@ sealed class PoiAdminListItemDto
     public bool IsDeleted { get; set; }
     public string? DeletedAt { get; set; }
     public string DeleteStatus { get; set; } = "ACTIVE";
+    public string? OwnerAdminId { get; set; }
     public string OwnerUsername { get; set; } = string.Empty;
     public string OwnerFullName { get; set; } = string.Empty;
 }
@@ -2347,6 +2586,9 @@ sealed class OwnerAccountDto
     public string Id { get; set; } = string.Empty;
     public string Username { get; set; } = string.Empty;
     public string FullName { get; set; } = string.Empty;
+    public bool IsDeleted { get; set; }
+    public string? DeletedAt { get; set; }
+    public string DeleteStatus { get; set; } = "ACTIVE";
 }
 
 sealed class AdminLoginRequest
@@ -2356,6 +2598,13 @@ sealed class AdminLoginRequest
 }
 
 sealed class AdminCreateOwnerRequest
+{
+    public string? Username { get; set; }
+    public string? Password { get; set; }
+    public string? FullName { get; set; }
+}
+
+sealed class AdminUpdateOwnerRequest
 {
     public string? Username { get; set; }
     public string? Password { get; set; }
