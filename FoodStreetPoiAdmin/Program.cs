@@ -1,4 +1,5 @@
-﻿using Microsoft.Data.Sqlite;
+﻿using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Data.Sqlite;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Diagnostics;
@@ -42,7 +43,15 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 builder.Services.AddAuthorization();
 
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 var app = builder.Build();
+app.UseForwardedHeaders();
 
 var dataDirectory = Path.Combine(app.Environment.ContentRootPath, "App_Data");
 var uploadDirectory = Path.Combine(app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot"), "uploads");
@@ -53,19 +62,13 @@ var dbPath = Path.Combine(dataDirectory, "poi-admin.db3");
 var connectionString = $"Data Source={dbPath}";
 var adbReverseSync = new object();
 var lastAdbReverseAttemptUtc = DateTimeOffset.MinValue;
-var cloudflaredSync = new object();
-Process? cloudflaredProcess = null;
-var cloudflaredLogPath = Path.Combine(dataDirectory, "cloudflared-quick.log");
-var cloudflaredExecutablePath = ResolveCloudflaredExecutablePath();
-string? cloudflaredQuickTunnelUrl = null;
-var quickTunnelLocalUrl = "http://localhost:5187";
-var autoStartQuickTunnel = IsQuickTunnelAutoStartEnabled();
 
 var supportedLanguages = SupportedLanguage.CreateDefaults();
 var supportedLanguageSet = supportedLanguages.Select(x => x.Code).ToHashSet(StringComparer.OrdinalIgnoreCase);
 var configuredPublicBaseUrl = NormalizePublicBaseUrl(
     Environment.GetEnvironmentVariable("POI_PUBLIC_BASE_URL")
-    ?? Environment.GetEnvironmentVariable("PUBLIC_BASE_URL"));
+    ?? Environment.GetEnvironmentVariable("PUBLIC_BASE_URL")
+    ?? app.Configuration["PublicBaseUrl"]);
 var translationApiKey = Environment.GetEnvironmentVariable("GOOGLE_TRANSLATE_API_KEY")?.Trim();
 if (string.IsNullOrWhiteSpace(translationApiKey))
 {
@@ -240,13 +243,6 @@ app.MapGet("/api/public/base-url", async (HttpContext context) =>
     }
 
     return Results.Ok(new { baseUrl });
-});
-
-app.MapPost("/api/cloudflared/quick-tunnel", async () =>
-{
-    var quickUrl = await EnsureQuickTunnelUrlAsync(quickTunnelLocalUrl);
-    configuredPublicBaseUrl = quickUrl;
-    return Results.Ok(new { baseUrl = quickUrl });
 });
 
 app.MapPost("/api/uploads", async (HttpContext context) =>
@@ -823,47 +819,6 @@ app.MapDelete("/api/shops/{id}", async (string id) =>
     };
 });
 
-app.Lifetime.ApplicationStarted.Register(() =>
-{
-    if (!autoStartQuickTunnel)
-    {
-        return;
-    }
-
-    _ = Task.Run(async () =>
-    {
-        try
-        {
-            var quickUrl = await EnsureQuickTunnelUrlAsync(quickTunnelLocalUrl);
-            configuredPublicBaseUrl = quickUrl;
-            Console.WriteLine($"[Cloudflared] Quick tunnel ready: {quickUrl}");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Cloudflared] Auto-start quick tunnel failed: {ex.Message}");
-        }
-    });
-});
-
-app.Lifetime.ApplicationStopping.Register(() =>
-{
-    lock (cloudflaredSync)
-    {
-        if (cloudflaredProcess is null || cloudflaredProcess.HasExited)
-        {
-            return;
-        }
-
-        try
-        {
-            cloudflaredProcess.Kill(entireProcessTree: true);
-        }
-        catch
-        {
-        }
-    }
-});
-
 app.Run();
 
 async Task TryEnsureAdbReverseAsync()
@@ -930,7 +885,7 @@ async Task<(string? BaseUrl, string? Error)> ResolvePublicBaseUrlForRequestAsync
         var requestedBaseUrl = NormalizePublicBaseUrl(requestedBaseUrlRaw);
         if (string.IsNullOrWhiteSpace(requestedBaseUrl))
         {
-            error = "Invalid baseUrl. Use full http(s) URL, for example: https://abc.trycloudflare.com";
+            error = "Invalid baseUrl. Use full http(s) URL, for example: https://example.com";
             return (null, error);
         }
 
@@ -945,22 +900,7 @@ async Task<(string? BaseUrl, string? Error)> ResolvePublicBaseUrlForRequestAsync
     var fallback = $"{context.Request.Scheme}://{context.Request.Host.ToUriComponent()}{context.Request.PathBase.ToUriComponent()}".TrimEnd('/');
     if (IsLocalUrl(fallback))
     {
-        if (autoStartQuickTunnel)
-        {
-            try
-            {
-                var quickUrl = await EnsureQuickTunnelUrlAsync(quickTunnelLocalUrl);
-                configuredPublicBaseUrl = quickUrl;
-                return (quickUrl, null);
-            }
-            catch (Exception ex)
-            {
-                error = $"Khong the tu dong lay Cloudflare tunnel URL: {ex.Message}";
-                return (null, error);
-            }
-        }
-
-        error = "Public URL dang la localhost. Vui long nhap Cloudflare Tunnel URL hoac bam 'Lay tunnel URL'.";
+        error = "Public URL dang la localhost. Vui long nhap Public base URL trong hop thoai QR hoac cau hinh bien moi truong POI_PUBLIC_BASE_URL.";
         return (null, error);
     }
 
@@ -1052,251 +992,6 @@ static async Task<byte[]> RenderQrPngAsync(string content, int size, Cancellatio
     }
 
     return await response.Content.ReadAsByteArrayAsync(cancellationToken);
-}
-
-async Task<string> EnsureQuickTunnelUrlAsync(string localUrl)
-{
-    if (string.IsNullOrWhiteSpace(localUrl) || !Uri.TryCreate(localUrl, UriKind.Absolute, out _))
-    {
-        throw new InvalidOperationException("Invalid local URL for quick tunnel.");
-    }
-
-    lock (cloudflaredSync)
-    {
-        if (cloudflaredProcess is not null && !cloudflaredProcess.HasExited)
-        {
-            // keep waiting for URL in logfile
-        }
-        else
-        {
-            if (string.IsNullOrWhiteSpace(cloudflaredExecutablePath) || !File.Exists(cloudflaredExecutablePath))
-            {
-                cloudflaredExecutablePath = ResolveCloudflaredExecutablePath();
-            }
-
-            if (string.IsNullOrWhiteSpace(cloudflaredExecutablePath) || !File.Exists(cloudflaredExecutablePath))
-            {
-                throw new InvalidOperationException("Khong tim thay cloudflared.exe. Hay cai dat cloudflared hoac dat bien moi truong CLOUDFLARED_PATH.");
-            }
-
-            try
-            {
-                cloudflaredQuickTunnelUrl = null;
-                if (File.Exists(cloudflaredLogPath))
-                {
-                    File.Delete(cloudflaredLogPath);
-                }
-            }
-            catch
-            {
-            }
-
-            var process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = cloudflaredExecutablePath,
-                    Arguments = $"tunnel --url {localUrl} --no-autoupdate --logfile \"{cloudflaredLogPath}\" --loglevel info",
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true
-                }
-            };
-
-            process.OutputDataReceived += (_, args) =>
-            {
-                var parsedUrl = ExtractQuickTunnelUrl(args.Data);
-                if (!string.IsNullOrWhiteSpace(parsedUrl))
-                {
-                    cloudflaredQuickTunnelUrl = parsedUrl;
-                }
-            };
-
-            process.ErrorDataReceived += (_, args) =>
-            {
-                var parsedUrl = ExtractQuickTunnelUrl(args.Data);
-                if (!string.IsNullOrWhiteSpace(parsedUrl))
-                {
-                    cloudflaredQuickTunnelUrl = parsedUrl;
-                }
-            };
-
-            if (!process.Start())
-            {
-                throw new InvalidOperationException("Khong the khoi chay cloudflared.");
-            }
-
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-            cloudflaredProcess = process;
-        }
-    }
-
-    for (var i = 0; i < 30; i++)
-    {
-        await Task.Delay(500);
-        var url = cloudflaredQuickTunnelUrl;
-        if (string.IsNullOrWhiteSpace(url))
-        {
-            url = ReadQuickTunnelUrlFromLog(cloudflaredLogPath);
-        }
-        if (!string.IsNullOrWhiteSpace(url))
-        {
-            cloudflaredQuickTunnelUrl = url;
-            return url;
-        }
-    }
-
-    throw new InvalidOperationException("Cloudflared da chay nhung khong doc duoc URL tunnel. Vui long thu lai hoac nhap URL tunnel thu cong.");
-}
-
-static string ResolveCloudflaredExecutablePath()
-{
-    var fromEnv = Environment.GetEnvironmentVariable("CLOUDFLARED_PATH")?.Trim();
-    if (!string.IsNullOrWhiteSpace(fromEnv) && File.Exists(fromEnv))
-    {
-        return fromEnv;
-    }
-
-    var wherePath = TryFindCloudflaredUsingWhere();
-    if (!string.IsNullOrWhiteSpace(wherePath) && File.Exists(wherePath))
-    {
-        return wherePath;
-    }
-
-    var candidates = new[]
-    {
-        @"C:\Program Files (x86)\cloudflared\cloudflared.exe",
-        @"C:\Program Files\cloudflared\cloudflared.exe",
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "cloudflared", "cloudflared.exe"),
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "cloudflared.exe"),
-    };
-
-    foreach (var candidate in candidates.Where(x => !string.IsNullOrWhiteSpace(x)))
-    {
-        if (File.Exists(candidate))
-        {
-            return candidate;
-        }
-    }
-
-    return string.Empty;
-}
-
-static string TryFindCloudflaredUsingWhere()
-{
-    try
-    {
-        using var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = "where",
-                Arguments = "cloudflared",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            }
-        };
-        if (!process.Start())
-        {
-            return string.Empty;
-        }
-
-        var output = process.StandardOutput.ReadToEnd();
-        process.WaitForExit(2000);
-        var firstLine = output
-            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .FirstOrDefault();
-        return firstLine ?? string.Empty;
-    }
-    catch
-    {
-        return string.Empty;
-    }
-}
-
-static string ReadQuickTunnelUrlFromLog(string logPath)
-{
-    if (!File.Exists(logPath))
-    {
-        return string.Empty;
-    }
-
-    try
-    {
-        var content = File.ReadAllText(logPath);
-        return ExtractQuickTunnelUrl(content);
-    }
-    catch
-    {
-        return string.Empty;
-    }
-}
-
-static string ExtractQuickTunnelUrl(string? text)
-{
-    if (string.IsNullOrWhiteSpace(text))
-    {
-        return string.Empty;
-    }
-
-    var match = Regex.Match(text, @"https://[a-z0-9-]+\.trycloudflare\.com", RegexOptions.IgnoreCase);
-    return match.Success ? match.Value : string.Empty;
-}
-
-static bool IsQuickTunnelAutoStartEnabled()
-{
-    var raw = Environment.GetEnvironmentVariable("POI_AUTO_START_CLOUDFLARE_TUNNEL");
-    if (string.IsNullOrWhiteSpace(raw))
-    {
-        return true;
-    }
-
-    var normalized = raw.Trim();
-    return !string.Equals(normalized, "0", StringComparison.OrdinalIgnoreCase)
-        && !string.Equals(normalized, "false", StringComparison.OrdinalIgnoreCase)
-        && !string.Equals(normalized, "off", StringComparison.OrdinalIgnoreCase)
-        && !string.Equals(normalized, "no", StringComparison.OrdinalIgnoreCase);
-}
-
-static void TryDeleteUploadedFile(string uploadDirectory, string? assetUrl)
-{
-    if (string.IsNullOrWhiteSpace(assetUrl))
-    {
-        return;
-    }
-
-    if (!assetUrl.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase))
-    {
-        return;
-    }
-
-    var fileName = Path.GetFileName(assetUrl);
-    if (string.IsNullOrWhiteSpace(fileName))
-    {
-        return;
-    }
-
-    var fullPath = Path.Combine(uploadDirectory, fileName);
-    if (!Path.GetFullPath(fullPath).StartsWith(Path.GetFullPath(uploadDirectory), StringComparison.OrdinalIgnoreCase))
-    {
-        return;
-    }
-
-    try
-    {
-        if (File.Exists(fullPath))
-        {
-            File.Delete(fullPath);
-        }
-    }
-    catch
-    {
-        // Best-effort cleanup only.
-    }
 }
 
 static async Task InitializeDatabaseAsync(string connectionString)

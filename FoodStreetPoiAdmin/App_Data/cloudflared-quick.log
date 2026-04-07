@@ -26,3 +26,4 @@
 {"level":"error","error":"lookup region1.v2.argotunnel.com: i/o timeout","time":"2026-04-07T04:57:12Z","message":"Failed to refresh DNS local resolver"}
 {"level":"error","error":"lookup region1.v2.argotunnel.com: i/o timeout","time":"2026-04-07T05:02:17Z","message":"Failed to refresh DNS local resolver"}
 {"level":"error","error":"lookup region1.v2.argotunnel.com: i/o timeout","time":"2026-04-07T05:07:22Z","message":"Failed to refresh DNS local resolver"}
+{"level":"error","error":"lookup region1.v2.argotunnel.com: i/o timeout","time":"2026-04-07T05:12:27Z","message":"Failed to refresh DNS local resolver"}

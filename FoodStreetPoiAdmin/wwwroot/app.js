@@ -12,7 +12,6 @@
   const qrDialogEl = $("#qrDialog");
   const qrLangSelect = $("#qrLang");
   const qrBaseUrlEl = $("#qrBaseUrl");
-  const qrDetectTunnelBtn = $("#qrDetectTunnelBtn");
   const qrPublicUrlEl = $("#qrPublicUrl");
   const qrPreviewImageEl = $("#qrPreviewImage");
   const qrCopyBtn = $("#qrCopyBtn");
@@ -474,24 +473,6 @@
       await refreshQrDialog();
     });
 
-    qrDetectTunnelBtn?.addEventListener("click", async () => {
-      setStatus("Dang lay URL Cloudflare Tunnel...");
-      try {
-        const data = await apiPost("/api/cloudflared/quick-tunnel");
-        state.qr.baseUrl = (data?.baseUrl || "").trim();
-        if (qrBaseUrlEl) {
-          qrBaseUrlEl.value = state.qr.baseUrl;
-        }
-        localStorage.setItem("poiPublicBaseUrl", state.qr.baseUrl);
-        if (state.qr.poiId) {
-          await refreshQrDialog();
-        }
-        setStatus("Da lay URL tunnel.");
-      } catch (err) {
-        setStatus(err?.message || String(err), true);
-      }
-    });
-
     qrCopyBtn.addEventListener("click", async () => {
       const text = (qrPublicUrlEl.value || "").trim();
       if (!text) return;
@@ -544,6 +525,14 @@
     setStatus("");
   };
 
+  /** Khi chạy trên Render/host công khai (không phải localhost), dùng origin làm fallback nếu API lỗi. */
+  const publicOriginFallback = () => {
+    if (typeof window === "undefined" || !window.location?.hostname) return "";
+    const h = window.location.hostname.toLowerCase();
+    if (h === "localhost" || h === "127.0.0.1" || h === "::1") return "";
+    return `${window.location.protocol}//${window.location.host}`;
+  };
+
   const refreshQrDialog = async () => {
     const poiId = state.qr.poiId;
     const langCode = state.qr.lang || "vi";
@@ -575,13 +564,13 @@
     state.qr.lang = state.selectedSourceLang || "vi";
     try {
       const baseInfo = await apiGet("/api/public/base-url");
-      state.qr.baseUrl = (baseInfo?.baseUrl || "").trim();
+      state.qr.baseUrl = (baseInfo?.baseUrl || "").trim() || publicOriginFallback();
       if (state.qr.baseUrl) {
         localStorage.setItem("poiPublicBaseUrl", state.qr.baseUrl);
       }
     } catch {
       const fromStorage = (localStorage.getItem("poiPublicBaseUrl") || "").trim();
-      state.qr.baseUrl = fromStorage || "";
+      state.qr.baseUrl = fromStorage || publicOriginFallback();
     }
 
     qrLangSelect.value = state.qr.lang;
