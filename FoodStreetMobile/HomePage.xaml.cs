@@ -227,9 +227,9 @@ public partial class HomePage : ContentPage
             PoiId = selected.PoiId
         });
 
-        if (Shell.Current is not null)
+        if (Shell.Current is AppShell shell)
         {
-            await Shell.Current.GoToAsync("//MainPage");
+            shell.NavigateToMainTabsTab(1);
         }
     }
 

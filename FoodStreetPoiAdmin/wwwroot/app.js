@@ -3,6 +3,7 @@
   const formEl = $("#poiForm");
   const statusEl = $("#status");
   const rowsEl = $("#poiRows");
+  const deletedRowsEl = $("#deletedPoiRows");
   const listHintEl = $("#listHint");
   const createBtn = $("#createBtn");
   const resetBtn = $("#resetBtn");
@@ -16,6 +17,10 @@
   const qrPreviewImageEl = $("#qrPreviewImage");
   const qrCopyBtn = $("#qrCopyBtn");
   const qrDownloadBtn = $("#qrDownloadBtn");
+  const tabActiveBtn = $("#tabActiveBtn");
+  const tabHistoryBtn = $("#tabHistoryBtn");
+  const activeTable = $("#activeTable");
+  const historyTable = $("#historyTable");
 
   const state = {
     languages: [],
@@ -31,6 +36,7 @@
       coreAudioUrl: "",
       translationsByLang: {},
     },
+    activeTab: "active",
   };
 
   const setStatus = (msg, isError = false) => {
@@ -188,9 +194,13 @@
   };
   const renderList = (items) => {
     rowsEl.innerHTML = "";
-    listHintEl.textContent = `${items.length} POI`;
+    deletedRowsEl.innerHTML = "";
 
-    for (const item of items) {
+    const activeItems = (items || []).filter((x) => !x.isDeleted);
+    const deletedItems = (items || []).filter((x) => !!x.isDeleted);
+    listHintEl.textContent = `${state.activeTab === "active" ? activeItems.length : deletedItems.length} POI`;
+
+    for (const item of activeItems) {
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td class="mono">${escapeHtml(item.id)}</td>
@@ -207,6 +217,28 @@
       `;
       rowsEl.appendChild(tr);
     }
+
+    for (const item of deletedItems) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="mono">${escapeHtml(item.id)}</td>
+        <td class="fw-500">${escapeHtml(item.nameVi || "")}</td>
+        <td>${escapeHtml(item.deletedAt || "")}</td>
+        <td class="actions-cell">
+          <button type="button" class="secondary icon-only" title="Khôi phục" data-action="restore" data-id="${escapeAttr(item.id)}"><i class="fa-solid fa-rotate-left pointer-events-none"></i></button>
+        </td>
+      `;
+      deletedRowsEl.appendChild(tr);
+    }
+  };
+
+  const setTab = (tab) => {
+    state.activeTab = tab === "history" ? "history" : "active";
+    const isHistory = state.activeTab === "history";
+    activeTable.hidden = isHistory;
+    historyTable.hidden = !isHistory;
+    tabActiveBtn.classList.toggle("active", !isHistory);
+    tabHistoryBtn.classList.toggle("active", isHistory);
   };
 
   const escapeHtml = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -374,6 +406,14 @@
 
     createBtn.addEventListener("click", () => resetForm());
     resetBtn.addEventListener("click", () => resetForm());
+    tabActiveBtn?.addEventListener("click", () => {
+      setTab("active");
+      loadList().catch((err) => setStatus(err?.message || String(err), true));
+    });
+    tabHistoryBtn?.addEventListener("click", () => {
+      setTab("history");
+      loadList().catch((err) => setStatus(err?.message || String(err), true));
+    });
     generateQrBtn?.addEventListener("click", async () => {
       const currentId = (state.current.id || formEl.elements.namedItem("id").value || "").trim();
       if (!currentId) {
@@ -388,7 +428,7 @@
       }
     });
 
-    rowsEl.addEventListener("click", async (e) => {
+    const onRowAction = async (e) => {
       const btn = e.target?.closest("button[data-action]");
       if (!btn) return;
       const action = btn.dataset.action;
@@ -402,16 +442,24 @@
           await loadPoi(id);
         } else if (action === "del") {
           if (!confirm(`Xoa POI #${id}?`)) return;
-          setStatus("Deleting...");
+          setStatus("Soft deleting...");
           await apiDelete(`/api/pois/${encodeURIComponent(id)}`);
           await loadList();
           resetForm();
-          setStatus(`Deleted POI #${id}`);
+          setStatus(`Soft deleted POI #${id}`);
+        } else if (action === "restore") {
+          if (!confirm(`Restore POI #${id}?`)) return;
+          setStatus("Restoring...");
+          await apiPost(`/api/pois/${encodeURIComponent(id)}/restore`);
+          await loadList();
+          setStatus(`Restored POI #${id}`);
         }
       } catch (err) {
         setStatus(err?.message || String(err), true);
       }
-    });
+    };
+    rowsEl.addEventListener("click", onRowAction);
+    deletedRowsEl.addEventListener("click", onRowAction);
 
     qrLangSelect.addEventListener("change", async () => {
       if (!state.qr.poiId) return;
@@ -490,6 +538,7 @@
     sourceLangSelect.value = defaultLang;
 
     wireEvents();
+    setTab("active");
     resetForm();
     await loadList();
     setStatus("");

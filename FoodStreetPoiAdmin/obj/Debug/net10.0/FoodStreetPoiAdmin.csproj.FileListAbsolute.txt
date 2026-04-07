@@ -394,8 +394,6 @@ D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\bin_verify_header_menu_fix\runtimes\w
 D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\bin_verify_header_menu_fix\runtimes\win-x64\native\e_sqlite3.dll
 D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\bin_verify_header_menu_fix\runtimes\win-x86\native\e_sqlite3.dll
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\tihf3uqke4-{0}-ocd4wssj2n-ocd4wssj2n.gz
-e:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\k9mnuggnn9-{0}-1uly9v49hw-1uly9v49hw.gz
-e:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\ypiyamc441-{0}-dxknlyps5l-dxknlyps5l.gz
 e:\Study_project\C#\FoodStreet\FoodStreet\_build_verify\FoodStreetPoiAdmin.staticwebassets.runtime.json
 e:\Study_project\C#\FoodStreet\FoodStreet\_build_verify\FoodStreetPoiAdmin.staticwebassets.endpoints.json
 e:\Study_project\C#\FoodStreet\FoodStreet\_build_verify\FoodStreetPoiAdmin.exe
@@ -403,3 +401,20 @@ e:\Study_project\C#\FoodStreet\FoodStreet\_build_verify\FoodStreetPoiAdmin.deps.
 e:\Study_project\C#\FoodStreet\FoodStreet\_build_verify\FoodStreetPoiAdmin.runtimeconfig.json
 e:\Study_project\C#\FoodStreet\FoodStreet\_build_verify\FoodStreetPoiAdmin.dll
 e:\Study_project\C#\FoodStreet\FoodStreet\_build_verify\FoodStreetPoiAdmin.pdb
+E:\Study_project\C#\FoodStreet\FoodStreet\.tmp-build\FoodStreetPoiAdmin\FoodStreetPoiAdmin.staticwebassets.runtime.json
+E:\Study_project\C#\FoodStreet\FoodStreet\.tmp-build\FoodStreetPoiAdmin\FoodStreetPoiAdmin.staticwebassets.endpoints.json
+E:\Study_project\C#\FoodStreet\FoodStreet\.tmp-build\FoodStreetPoiAdmin\FoodStreetPoiAdmin.deps.json
+E:\Study_project\C#\FoodStreet\FoodStreet\.tmp-build\FoodStreetPoiAdmin\FoodStreetPoiAdmin.runtimeconfig.json
+E:\Study_project\C#\FoodStreet\FoodStreet\.tmp-build\FoodStreetPoiAdmin\FoodStreetPoiAdmin.dll
+E:\Study_project\C#\FoodStreet\FoodStreet\.tmp-build\FoodStreetPoiAdmin\FoodStreetPoiAdmin.pdb
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\k9mnuggnn9-{0}-8tj2tigiv8-8tj2tigiv8.gz
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\ypiyamc441-{0}-brbfit8q7q-brbfit8q7q.gz
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin\Debug\net10.0\BCrypt.Net-Next.dll
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin\Debug\net10.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin\Debug\net10.0\Microsoft.IdentityModel.Abstractions.dll
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin\Debug\net10.0\Microsoft.IdentityModel.JsonWebTokens.dll
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin\Debug\net10.0\Microsoft.IdentityModel.Logging.dll
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin\Debug\net10.0\Microsoft.IdentityModel.Protocols.dll
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin\Debug\net10.0\Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin\Debug\net10.0\Microsoft.IdentityModel.Tokens.dll
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin\Debug\net10.0\System.IdentityModel.Tokens.Jwt.dll

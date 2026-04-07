@@ -12,7 +12,7 @@ public sealed class AppLanguageService
 
     public AppLanguageService()
     {
-        _currentLanguage = NormalizeLanguageCode(Preferences.Get(PreferenceKey, "vi")) ?? "vi";
+        _currentLanguage = NormalizeLanguageCode(Preferences.Get(PreferenceKey, "en")) ?? "en";
     }
 
     public event Action<string>? LanguageChanged;
@@ -28,7 +28,7 @@ public sealed class AppLanguageService
 
     public void SetLanguage(string languageCode)
     {
-        var normalized = NormalizeLanguageCode(languageCode) ?? "vi";
+        var normalized = NormalizeLanguageCode(languageCode) ?? "en";
         if (string.Equals(_currentLanguage, normalized, StringComparison.OrdinalIgnoreCase))
         {
             return;
@@ -86,8 +86,8 @@ public sealed class AppLanguageOption
     public static IReadOnlyList<AppLanguageOption> CreateDefaults()
         =>
         [
-            new AppLanguageOption { Code = "vi", Label = "Tiếng Việt (vi)" },
             new AppLanguageOption { Code = "en", Label = "English (en)" },
+            new AppLanguageOption { Code = "vi", Label = "Tiếng Việt (vi)" },
             new AppLanguageOption { Code = "zh", Label = "中文 (zh)" },
             new AppLanguageOption { Code = "ja", Label = "日本語 (ja)" },
             new AppLanguageOption { Code = "ru", Label = "Русский (ru)" },

@@ -1,7 +1,12 @@
 ﻿using Microsoft.Data.Sqlite;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using System.Diagnostics;
 using System.Globalization;
+using System.IdentityModel.Tokens.Jwt;
 using System.Net;
+using System.Security.Claims;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -13,6 +18,29 @@ if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("ASPNETCORE_URL
     // Allow emulator/physical devices on same LAN to reach the admin API.
     builder.WebHost.UseUrls("http://0.0.0.0:5187");
 }
+
+var jwtSecret = Environment.GetEnvironmentVariable("FOODSTREET_JWT_SECRET")?.Trim();
+if (string.IsNullOrWhiteSpace(jwtSecret) || jwtSecret.Length < 32)
+{
+    jwtSecret = "FoodStreetDevJwtSecretKey32CharsMin!!";
+}
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = "FoodStreetPoiAdmin",
+            ValidateAudience = true,
+            ValidAudience = "FoodStreetMobile",
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(2)
+        };
+    });
+builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
@@ -82,6 +110,124 @@ app.Use(async (context, next) =>
         });
     }
 });
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapPost("/api/mobile/auth/register", async (MobileRegisterRequest? req) =>
+{
+    if (req is null || string.IsNullOrWhiteSpace(req.Username) || string.IsNullOrWhiteSpace(req.Password))
+    {
+        return Results.BadRequest(new { error = "Thieu username hoac password." });
+    }
+
+    if (string.IsNullOrWhiteSpace(req.FullName) || string.IsNullOrWhiteSpace(req.Phone))
+    {
+        return Results.BadRequest(new { error = "Thieu ho ten hoac so dien thoai." });
+    }
+
+    var username = req.Username.Trim();
+    var phoneDigits = NormalizePhoneDigits(req.Phone);
+    if (username.Length < 3)
+    {
+        return Results.BadRequest(new { error = "Username phai co it nhat 3 ky tu." });
+    }
+
+    if (phoneDigits.Length < 8)
+    {
+        return Results.BadRequest(new { error = "So dien thoai khong hop le." });
+    }
+
+    if (req.Password.Length < 6)
+    {
+        return Results.BadRequest(new { error = "Mat khau phai co it nhat 6 ky tu." });
+    }
+
+    try
+    {
+        var userId = await MobileRegisterUserAsync(connectionString, username, req.Password, req.FullName.Trim(), req.Phone.Trim(), phoneDigits);
+        var token = CreateMobileJwt(userId, username, req.FullName.Trim(), req.Phone.Trim(), jwtSecret);
+        return Results.Ok(new MobileAuthResponse
+        {
+            Token = token,
+            UserId = userId,
+            Username = username,
+            FullName = req.FullName.Trim(),
+            Phone = req.Phone.Trim()
+        });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapPost("/api/mobile/auth/login", async (MobileLoginRequest? req) =>
+{
+    if (req is null || string.IsNullOrWhiteSpace(req.UsernameOrPhone) || string.IsNullOrWhiteSpace(req.Password))
+    {
+        return Results.BadRequest(new { error = "Thieu thong tin dang nhap." });
+    }
+
+    var user = await MobileFindUserForLoginAsync(connectionString, req.UsernameOrPhone.Trim(), req.Password);
+    if (user is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var token = CreateMobileJwt(user.Value.Id, user.Value.Username, user.Value.FullName, user.Value.Phone, jwtSecret);
+    return Results.Ok(new MobileAuthResponse
+    {
+        Token = token,
+        UserId = user.Value.Id,
+        Username = user.Value.Username,
+        FullName = user.Value.FullName,
+        Phone = user.Value.Phone
+    });
+});
+
+app.MapPost("/api/mobile/auth/logout", () => Results.Ok(new { message = "Dang xuat phia client (xoa token)." }));
+
+app.MapGet("/api/mobile/auth/me", (ClaimsPrincipal user) =>
+{
+    var idStr = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? user.FindFirstValue(JwtRegisteredClaimNames.Sub);
+    if (!long.TryParse(idStr, NumberStyles.Integer, CultureInfo.InvariantCulture, out var userId))
+    {
+        return Results.Unauthorized();
+    }
+
+    var username = user.FindFirstValue("username") ?? string.Empty;
+    var fullName = user.FindFirstValue("full_name") ?? string.Empty;
+    var phone = user.FindFirstValue("phone") ?? string.Empty;
+    return Results.Ok(new { id = userId, username, fullName, phone });
+}).RequireAuthorization();
+
+app.MapPost("/api/mobile/auth/change-password", async (ClaimsPrincipal user, MobileChangePasswordRequest? req) =>
+{
+    if (req is null || string.IsNullOrWhiteSpace(req.CurrentPassword) || string.IsNullOrWhiteSpace(req.NewPassword))
+    {
+        return Results.BadRequest(new { error = "Thieu mat khau cu hoac mat khau moi." });
+    }
+
+    if (req.NewPassword.Length < 6)
+    {
+        return Results.BadRequest(new { error = "Mat khau moi phai co it nhat 6 ky tu." });
+    }
+
+    var idStr = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? user.FindFirstValue(JwtRegisteredClaimNames.Sub);
+    if (!long.TryParse(idStr, NumberStyles.Integer, CultureInfo.InvariantCulture, out var userId))
+    {
+        return Results.Unauthorized();
+    }
+
+    var ok = await MobileChangePasswordAsync(connectionString, userId, req.CurrentPassword, req.NewPassword);
+    if (!ok)
+    {
+        return Results.BadRequest(new { error = "Mat khau hien tai khong dung." });
+    }
+
+    return Results.Ok(new { message = "Doi mat khau thanh cong." });
+}).RequireAuthorization();
 
 app.MapGet("/api/languages", () => Results.Ok(supportedLanguages));
 
@@ -495,6 +641,23 @@ app.MapDelete("/api/pois/{id}", async (string id) =>
         DeletePoiResult.NotFound => Results.NotFound(),
         _ => Results.Problem("Delete failed.")
     };
+});
+
+app.MapPost("/api/pois/{id}/restore", async (string id) =>
+{
+    await TryEnsureAdbReverseAsync();
+    if (string.IsNullOrWhiteSpace(id))
+    {
+        return Results.BadRequest(new { error = "Missing id." });
+    }
+
+    if (!TryParsePoiId(id, out var poiId))
+    {
+        return Results.BadRequest(new { error = "Invalid id." });
+    }
+
+    var restored = await RestorePoiAsync(connectionString, poiId);
+    return restored ? Results.Ok(new { id, restored = true }) : Results.NotFound();
 });
 
 // Legacy endpoints for older mobile build.
@@ -1155,7 +1318,10 @@ static async Task InitializeDatabaseAsync(string connectionString)
             map_link TEXT,
             image_url TEXT,
             audio_url TEXT,
-            is_active INTEGER
+            is_active INTEGER,
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            deleted_at TEXT,
+            delete_status TEXT NOT NULL DEFAULT 'ACTIVE'
         );
 
         CREATE TABLE IF NOT EXISTS poi_translations (
@@ -1186,6 +1352,46 @@ static async Task InitializeDatabaseAsync(string connectionString)
         // Ignore when the column already exists.
     }
 
+    try
+    {
+        await using var migrate = new SqliteCommand("ALTER TABLE pois ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0;", connection);
+        await migrate.ExecuteNonQueryAsync();
+    }
+    catch
+    {
+        // Ignore when the column already exists.
+    }
+
+    try
+    {
+        await using var migrate = new SqliteCommand("ALTER TABLE pois ADD COLUMN deleted_at TEXT;", connection);
+        await migrate.ExecuteNonQueryAsync();
+    }
+    catch
+    {
+        // Ignore when the column already exists.
+    }
+
+    try
+    {
+        await using var migrate = new SqliteCommand("ALTER TABLE pois ADD COLUMN delete_status TEXT NOT NULL DEFAULT 'ACTIVE';", connection);
+        await migrate.ExecuteNonQueryAsync();
+    }
+    catch
+    {
+        // Ignore when the column already exists.
+    }
+
+    // Backfill status based on is_deleted for old rows.
+    await using (var backfillDeleteStatus = new SqliteCommand("""
+        UPDATE pois
+        SET delete_status = CASE WHEN COALESCE(is_deleted, 0) = 1 THEN 'DELETED' ELSE 'ACTIVE' END
+        WHERE delete_status IS NULL OR delete_status = '';
+        """, connection))
+    {
+        await backfillDeleteStatus.ExecuteNonQueryAsync();
+    }
+
     // Ensure unique per poi/lang for upsert behavior (dedupe first if needed).
     try
     {
@@ -1209,6 +1415,23 @@ static async Task InitializeDatabaseAsync(string connectionString)
     catch
     {
         // Best-effort only. If index cannot be created, translation upserts may fail.
+    }
+
+    await using (var createUsers = new SqliteCommand("""
+        CREATE TABLE IF NOT EXISTS app_users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL COLLATE NOCASE,
+            password_hash TEXT NOT NULL,
+            full_name TEXT NOT NULL DEFAULT '',
+            phone TEXT NOT NULL,
+            phone_digits TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_app_users_username ON app_users(username);
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_app_users_phone_digits ON app_users(phone_digits);
+        """, connection))
+    {
+        await createUsers.ExecuteNonQueryAsync();
     }
 }
 
@@ -1242,7 +1465,7 @@ static async Task<List<PoiMobileDto>> GetPoisForMobileAsync(string connectionStr
         FROM pois p
         LEFT JOIN poi_translations t_req ON p.id = t_req.poi_id AND t_req.lang_code = $lang_code
         LEFT JOIN poi_translations t_vi ON p.id = t_vi.poi_id AND t_vi.lang_code = 'vi'
-        WHERE p.is_active = 1
+        WHERE p.is_active = 1 AND COALESCE(p.is_deleted, 0) = 0
         ORDER BY p.priority DESC, p.id ASC;
         ";
 
@@ -1289,7 +1512,10 @@ static async Task<List<PoiAdminListItemDto>> GetPoisForAdminListAsync(string con
             p.image_url,
             p.audio_url,
             p.is_active,
-            COALESCE(NULLIF(t_vi.name, ''), '') AS name_vi
+            COALESCE(NULLIF(t_vi.name, ''), '') AS name_vi,
+            COALESCE(p.is_deleted, 0) AS is_deleted,
+            p.deleted_at,
+            COALESCE(p.delete_status, CASE WHEN COALESCE(p.is_deleted, 0) = 1 THEN 'DELETED' ELSE 'ACTIVE' END) AS delete_status
         FROM pois p
         LEFT JOIN poi_translations t_vi ON p.id = t_vi.poi_id AND t_vi.lang_code = 'vi'
         ORDER BY p.priority DESC, p.id ASC;
@@ -1312,6 +1538,9 @@ static async Task<List<PoiAdminListItemDto>> GetPoisForAdminListAsync(string con
             AudioUrl = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
             IsActive = reader.GetInt32(8) != 0,
             NameVi = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
+            IsDeleted = !reader.IsDBNull(10) && reader.GetInt32(10) != 0,
+            DeletedAt = reader.IsDBNull(11) ? null : reader.GetString(11),
+            DeleteStatus = reader.IsDBNull(12) ? "ACTIVE" : reader.GetString(12),
         });
     }
 
@@ -1337,7 +1566,7 @@ static async Task<PoiMobileDto?> GetPoiForMobileAsync(SqliteConnection connectio
         FROM pois p
         LEFT JOIN poi_translations t_req ON p.id = t_req.poi_id AND t_req.lang_code = $lang_code
         LEFT JOIN poi_translations t_vi ON p.id = t_vi.poi_id AND t_vi.lang_code = 'vi'
-        WHERE p.id = $id;
+        WHERE p.id = $id AND COALESCE(p.is_deleted, 0) = 0;
         ";
 
     await using var command = new SqliteCommand(sql, connection);
@@ -1387,7 +1616,7 @@ static async Task<PoiMobileDto?> GetPoiForPublicAsync(SqliteConnection connectio
         FROM pois p
         LEFT JOIN poi_translations t_req ON p.id = t_req.poi_id AND t_req.lang_code = $lang_code
         LEFT JOIN poi_translations t_vi ON p.id = t_vi.poi_id AND t_vi.lang_code = 'vi'
-        WHERE p.id = $id AND p.is_active = 1;
+        WHERE p.id = $id AND p.is_active = 1 AND COALESCE(p.is_deleted, 0) = 0;
         ";
 
     await using var command = new SqliteCommand(sql, connection);
@@ -1484,8 +1713,8 @@ static async Task<long> UpsertPoiCoreAsync(SqliteConnection connection, System.D
     if (request.Id is null)
     {
         const string insertSql = @"
-            INSERT INTO pois (latitude, longitude, radius_meters, priority, map_link, image_url, audio_url, is_active)
-            VALUES ($latitude, $longitude, $radius, $priority, $map_link, $image_url, $audio_url, $is_active);
+            INSERT INTO pois (latitude, longitude, radius_meters, priority, map_link, image_url, audio_url, is_active, is_deleted, deleted_at, delete_status)
+            VALUES ($latitude, $longitude, $radius, $priority, $map_link, $image_url, $audio_url, $is_active, 0, NULL, 'ACTIVE');
             SELECT last_insert_rowid();
             ";
 
@@ -1504,8 +1733,8 @@ static async Task<long> UpsertPoiCoreAsync(SqliteConnection connection, System.D
     }
 
     const string upsertSql = @"
-        INSERT INTO pois (id, latitude, longitude, radius_meters, priority, map_link, image_url, audio_url, is_active)
-        VALUES ($id, $latitude, $longitude, $radius, $priority, $map_link, $image_url, $audio_url, $is_active)
+        INSERT INTO pois (id, latitude, longitude, radius_meters, priority, map_link, image_url, audio_url, is_active, is_deleted, deleted_at, delete_status)
+        VALUES ($id, $latitude, $longitude, $radius, $priority, $map_link, $image_url, $audio_url, $is_active, 0, NULL, 'ACTIVE')
         ON CONFLICT(id) DO UPDATE SET
             latitude = excluded.latitude,
             longitude = excluded.longitude,
@@ -1514,7 +1743,10 @@ static async Task<long> UpsertPoiCoreAsync(SqliteConnection connection, System.D
             map_link = excluded.map_link,
             image_url = excluded.image_url,
             audio_url = excluded.audio_url,
-            is_active = excluded.is_active;
+            is_active = excluded.is_active,
+            is_deleted = 0,
+            deleted_at = NULL,
+            delete_status = 'ACTIVE';
         ";
 
     await using var command = new SqliteCommand(upsertSql, connection);
@@ -1566,68 +1798,39 @@ static async Task UpsertTranslationAsync(
 static async Task<DeletePoiResult> DeletePoiAsync(string connectionString, string uploadDirectory, long id)
 {
     await using var connection = await OpenConnectionAsync(connectionString);
-    await using var transaction = await connection.BeginTransactionAsync();
-
-    var assetsToDelete = new List<string>();
-    const string selectAssets = "SELECT image_url, audio_url FROM pois WHERE id = $id;";
-    await using (var cmd = new SqliteCommand(selectAssets, connection))
-    {
-        cmd.Transaction = (SqliteTransaction)transaction;
-        cmd.Parameters.AddWithValue("$id", id);
-        await using var reader = await cmd.ExecuteReaderAsync();
-        if (!await reader.ReadAsync())
-        {
-            return DeletePoiResult.NotFound;
-        }
-
-        if (!reader.IsDBNull(0))
-        {
-            assetsToDelete.Add(reader.GetString(0));
-        }
-
-        if (!reader.IsDBNull(1))
-        {
-            assetsToDelete.Add(reader.GetString(1));
-        }
-    }
-
-    const string selectTranslationAudio = "SELECT audio_url FROM poi_translations WHERE poi_id = $id;";
-    await using (var cmd = new SqliteCommand(selectTranslationAudio, connection))
-    {
-        cmd.Transaction = (SqliteTransaction)transaction;
-        cmd.Parameters.AddWithValue("$id", id);
-        await using var reader = await cmd.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
-        {
-            if (!reader.IsDBNull(0))
-            {
-                assetsToDelete.Add(reader.GetString(0));
-            }
-        }
-    }
-
-    const string deletePoiSql = "DELETE FROM pois WHERE id = $id;";
-    int affected;
-    await using (var cmd = new SqliteCommand(deletePoiSql, connection))
-    {
-        cmd.Transaction = (SqliteTransaction)transaction;
-        cmd.Parameters.AddWithValue("$id", id);
-        affected = await cmd.ExecuteNonQueryAsync();
-    }
-
-    await transaction.CommitAsync();
-
+    const string softDeleteSql = """
+        UPDATE pois
+        SET is_deleted = 1,
+            deleted_at = $deletedAt,
+            delete_status = 'DELETED'
+        WHERE id = $id AND COALESCE(is_deleted, 0) = 0;
+        """;
+    await using var cmd = new SqliteCommand(softDeleteSql, connection);
+    cmd.Parameters.AddWithValue("$id", id);
+    cmd.Parameters.AddWithValue("$deletedAt", DateTimeOffset.UtcNow.ToString("O"));
+    var affected = await cmd.ExecuteNonQueryAsync();
     if (affected <= 0)
     {
         return DeletePoiResult.NotFound;
     }
 
-    foreach (var asset in assetsToDelete.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase))
-    {
-        TryDeleteUploadedFile(uploadDirectory, asset);
-    }
-
     return DeletePoiResult.Deleted;
+}
+
+static async Task<bool> RestorePoiAsync(string connectionString, long id)
+{
+    await using var connection = await OpenConnectionAsync(connectionString);
+    const string sql = """
+        UPDATE pois
+        SET is_deleted = 0,
+            deleted_at = NULL,
+            delete_status = 'ACTIVE'
+        WHERE id = $id AND COALESCE(is_deleted, 0) = 1;
+        """;
+    await using var cmd = new SqliteCommand(sql, connection);
+    cmd.Parameters.AddWithValue("$id", id);
+    var affected = await cmd.ExecuteNonQueryAsync();
+    return affected > 0;
 }
 
 static string? NormalizeAppLanguageCode(string? languageCode)
@@ -1748,6 +1951,168 @@ static async Task<List<string>> TranslateTextsAsync(
     return translated;
 }
 
+static string NormalizePhoneDigits(string? raw)
+{
+    if (string.IsNullOrWhiteSpace(raw))
+    {
+        return string.Empty;
+    }
+
+    var digits = Regex.Replace(raw.Trim(), @"\D", "");
+    if (digits.StartsWith("84", StringComparison.Ordinal) && digits.Length >= 10)
+    {
+        digits = "0" + digits[2..];
+    }
+
+    return digits;
+}
+
+static string CreateMobileJwt(long userId, string username, string fullName, string phone, string secret)
+{
+    var claims = new List<Claim>
+    {
+        new Claim(JwtRegisteredClaimNames.Sub, userId.ToString(CultureInfo.InvariantCulture)),
+        new Claim(ClaimTypes.NameIdentifier, userId.ToString(CultureInfo.InvariantCulture)),
+        new Claim("username", username),
+        new Claim("full_name", fullName),
+        new Claim("phone", phone),
+    };
+    var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
+    var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+    var token = new JwtSecurityToken(
+        issuer: "FoodStreetPoiAdmin",
+        audience: "FoodStreetMobile",
+        claims: claims,
+        expires: DateTime.UtcNow.AddDays(30),
+        signingCredentials: creds);
+    return new JwtSecurityTokenHandler().WriteToken(token);
+}
+
+static async Task<long> MobileRegisterUserAsync(string connectionString, string username, string password, string fullName, string phoneDisplay, string phoneDigits)
+{
+    await using var conn = await OpenConnectionAsync(connectionString);
+    await using var checkUser = new SqliteCommand("SELECT 1 FROM app_users WHERE lower(username) = lower($u) LIMIT 1;", conn);
+    checkUser.Parameters.AddWithValue("$u", username);
+    var exists = await checkUser.ExecuteScalarAsync();
+    if (exists is not null)
+    {
+        throw new InvalidOperationException("Username da ton tai.");
+    }
+
+    await using var checkPhone = new SqliteCommand("SELECT 1 FROM app_users WHERE phone_digits = $p LIMIT 1;", conn);
+    checkPhone.Parameters.AddWithValue("$p", phoneDigits);
+    var existsPhone = await checkPhone.ExecuteScalarAsync();
+    if (existsPhone is not null)
+    {
+        throw new InvalidOperationException("So dien thoai da duoc dang ky.");
+    }
+
+    var hash = BCrypt.Net.BCrypt.HashPassword(password);
+    await using var insert = new SqliteCommand("""
+        INSERT INTO app_users (username, password_hash, full_name, phone, phone_digits, created_at)
+        VALUES ($u, $h, $fn, $ph, $pd, $ca);
+        SELECT last_insert_rowid();
+        """, conn);
+    insert.Parameters.AddWithValue("$u", username);
+    insert.Parameters.AddWithValue("$h", hash);
+    insert.Parameters.AddWithValue("$fn", fullName);
+    insert.Parameters.AddWithValue("$ph", phoneDisplay);
+    insert.Parameters.AddWithValue("$pd", phoneDigits);
+    insert.Parameters.AddWithValue("$ca", DateTimeOffset.UtcNow.ToString("O"));
+    var raw = await insert.ExecuteScalarAsync();
+    return Convert.ToInt64(raw, CultureInfo.InvariantCulture);
+}
+
+static async Task<(long Id, string Username, string FullName, string Phone)?> MobileFindUserForLoginAsync(string connectionString, string usernameOrPhone, string password)
+{
+    await using var conn = await OpenConnectionAsync(connectionString);
+    var trimmed = usernameOrPhone.Trim();
+    var digits = NormalizePhoneDigits(trimmed);
+    var phoneMatch = digits.Length >= 8 ? digits : "___no_phone_match___";
+
+    const string sql = """
+        SELECT id, username, password_hash, full_name, phone
+        FROM app_users
+        WHERE lower(username) = lower($u) OR phone_digits = $pd
+        LIMIT 1;
+        """;
+    await using var cmd = new SqliteCommand(sql, conn);
+    cmd.Parameters.AddWithValue("$u", trimmed);
+    cmd.Parameters.AddWithValue("$pd", phoneMatch);
+    await using var reader = await cmd.ExecuteReaderAsync();
+    if (!await reader.ReadAsync())
+    {
+        return null;
+    }
+
+    var id = reader.GetInt64(0);
+    var username = reader.GetString(1);
+    var hash = reader.GetString(2);
+    var fullName = reader.IsDBNull(3) ? string.Empty : reader.GetString(3);
+    var phone = reader.IsDBNull(4) ? string.Empty : reader.GetString(4);
+
+    if (!BCrypt.Net.BCrypt.Verify(password, hash))
+    {
+        return null;
+    }
+
+    return (id, username, fullName, phone);
+}
+
+static async Task<bool> MobileChangePasswordAsync(string connectionString, long userId, string currentPassword, string newPassword)
+{
+    await using var conn = await OpenConnectionAsync(connectionString);
+    await using var select = new SqliteCommand("SELECT password_hash FROM app_users WHERE id = $id LIMIT 1;", conn);
+    select.Parameters.AddWithValue("$id", userId);
+    var scalar = await select.ExecuteScalarAsync();
+    if (scalar is null)
+    {
+        return false;
+    }
+
+    var hash = Convert.ToString(scalar, CultureInfo.InvariantCulture) ?? string.Empty;
+    if (string.IsNullOrEmpty(hash) || !BCrypt.Net.BCrypt.Verify(currentPassword, hash))
+    {
+        return false;
+    }
+
+    var newHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+    await using var update = new SqliteCommand("UPDATE app_users SET password_hash = $h WHERE id = $id;", conn);
+    update.Parameters.AddWithValue("$h", newHash);
+    update.Parameters.AddWithValue("$id", userId);
+    var rows = await update.ExecuteNonQueryAsync();
+    return rows > 0;
+}
+
+sealed class MobileRegisterRequest
+{
+    public string? Username { get; set; }
+    public string? Password { get; set; }
+    public string? FullName { get; set; }
+    public string? Phone { get; set; }
+}
+
+sealed class MobileLoginRequest
+{
+    public string? UsernameOrPhone { get; set; }
+    public string? Password { get; set; }
+}
+
+sealed class MobileChangePasswordRequest
+{
+    public string? CurrentPassword { get; set; }
+    public string? NewPassword { get; set; }
+}
+
+sealed class MobileAuthResponse
+{
+    public string Token { get; set; } = string.Empty;
+    public long UserId { get; set; }
+    public string Username { get; set; } = string.Empty;
+    public string FullName { get; set; } = string.Empty;
+    public string Phone { get; set; } = string.Empty;
+}
+
 enum DeletePoiResult
 {
     Unknown = 0,
@@ -1800,6 +2165,9 @@ sealed class PoiAdminListItemDto
     public string AudioUrl { get; set; } = string.Empty;
     public bool IsActive { get; set; }
     public string NameVi { get; set; } = string.Empty;
+    public bool IsDeleted { get; set; }
+    public string? DeletedAt { get; set; }
+    public string DeleteStatus { get; set; } = "ACTIVE";
 }
 
 sealed class PoiTranslationDto

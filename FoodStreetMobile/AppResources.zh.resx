@@ -19,9 +19,6 @@
   <data name="Profile_AccountHeader" xml:space="preserve">
     <value>账户</value>
   </data>
-  <data name="Profile_AccountHint" xml:space="preserve">
-    <value>个人内容稍后更新。</value>
-  </data>
   <data name="Profile_LanguageLabel" xml:space="preserve">
     <value>语言</value>
   </data>
@@ -142,5 +139,101 @@
   </data>
   <data name="PoiHistory_Empty" xml:space="preserve">
     <value>暂无浏览历史。</value>
+  </data>
+  <data name="Onboarding_Title" xml:space="preserve">
+    <value>选择语言</value>
+  </data>
+  <data name="Onboarding_Subtitle" xml:space="preserve">
+    <value>选择应用显示语言。您稍后可于个人资料中更改。</value>
+  </data>
+  <data name="Onboarding_Continue" xml:space="preserve">
+    <value>继续</value>
+  </data>
+  <data name="Auth_Title" xml:space="preserve">
+    <value>登录</value>
+  </data>
+  <data name="Auth_RegisterPageTitle" xml:space="preserve">
+    <value>注册账户</value>
+  </data>
+  <data name="Auth_NoAccountPrompt" xml:space="preserve">
+    <value>还没有账户？</value>
+  </data>
+  <data name="Auth_LinkRegister" xml:space="preserve">
+    <value>注册</value>
+  </data>
+  <data name="Auth_AlreadyHaveAccount" xml:space="preserve">
+    <value>已有账户？</value>
+  </data>
+  <data name="Auth_LinkLogin" xml:space="preserve">
+    <value>登录</value>
+  </data>
+  <data name="Auth_ServerLabel" xml:space="preserve">
+    <value>API 服务器</value>
+  </data>
+  <data name="Auth_LoginSection" xml:space="preserve">
+    <value>登录（用户名或电话）</value>
+  </data>
+  <data name="Auth_RegisterSection" xml:space="preserve">
+    <value>注册账户</value>
+  </data>
+  <data name="Auth_UserOrPhone" xml:space="preserve">
+    <value>用户名或电话号码</value>
+  </data>
+  <data name="Auth_Password" xml:space="preserve">
+    <value>密码</value>
+  </data>
+  <data name="Auth_Login" xml:space="preserve">
+    <value>登录</value>
+  </data>
+  <data name="Auth_Register" xml:space="preserve">
+    <value>注册</value>
+  </data>
+  <data name="Auth_RegUsername" xml:space="preserve">
+    <value>用户名</value>
+  </data>
+  <data name="Auth_RegFullName" xml:space="preserve">
+    <value>姓名</value>
+  </data>
+  <data name="Auth_RegPhone" xml:space="preserve">
+    <value>电话号码</value>
+  </data>
+  <data name="Profile_PersonalInfo" xml:space="preserve">
+    <value>个人信息</value>
+  </data>
+  <data name="Profile_FieldId" xml:space="preserve">
+    <value>ID：</value>
+  </data>
+  <data name="Profile_FieldUsername" xml:space="preserve">
+    <value>用户名：</value>
+  </data>
+  <data name="Profile_FieldFullName" xml:space="preserve">
+    <value>姓名：</value>
+  </data>
+  <data name="Profile_FieldPhone" xml:space="preserve">
+    <value>电话：</value>
+  </data>
+  <data name="Profile_ChangePassword" xml:space="preserve">
+    <value>更改密码</value>
+  </data>
+  <data name="Profile_CurrentPassword" xml:space="preserve">
+    <value>当前密码</value>
+  </data>
+  <data name="Profile_NewPassword" xml:space="preserve">
+    <value>新密码</value>
+  </data>
+  <data name="Profile_ConfirmPassword" xml:space="preserve">
+    <value>确认新密码</value>
+  </data>
+  <data name="Profile_SubmitPassword" xml:space="preserve">
+    <value>保存新密码</value>
+  </data>
+  <data name="Profile_Logout" xml:space="preserve">
+    <value>退出登录</value>
+  </data>
+  <data name="Profile_NotSignedIn" xml:space="preserve">
+    <value>您尚未登录。请登录以同步并使用全部功能。</value>
+  </data>
+  <data name="Profile_GoLogin" xml:space="preserve">
+    <value>登录</value>
   </data>
 </root>

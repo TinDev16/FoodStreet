@@ -722,3 +722,10 @@ E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetMobile\obj\Debug\net10.0-ios
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetMobile\obj\Debug\net10.0-ios\iossimulator-x64\FoodStreetMobile.pdb
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetMobile\obj\Debug\net10.0-ios\iossimulator-x64\FoodStreetMobile.genruntimeconfig.cache
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetMobile\obj\Debug\net10.0-ios\iossimulator-x64\ref\FoodStreetMobile.dll
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetMobile\bin\Debug\net10.0-ios\iossimulator-x64\vi\FoodStreetMobile.resources.dll
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetMobile\bin\Debug\net10.0-ios\iossimulator-x64\CommunityToolkit.Maui.dll
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetMobile\bin\Debug\net10.0-ios\iossimulator-x64\CommunityToolkit.Maui.Core.dll
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetMobile\bin\Debug\net10.0-ios\iossimulator-x64\Microsoft.Maui.resources.zip
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetMobile\obj\Debug\net10.0-ios\iossimulator-x64\FoodStreetMobile.AppResources.vi.resources
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetMobile\obj\Debug\net10.0-ios\iossimulator-x64\vi\FoodStreetMobile.resources.cs
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetMobile\obj\Debug\net10.0-ios\iossimulator-x64\vi\FoodStreetMobile.resources.dll

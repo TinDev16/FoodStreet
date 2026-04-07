@@ -36,7 +36,10 @@ public partial class App : Application
             {
                 if (Shell.Current is not null)
                 {
-                    await Shell.Current.GoToAsync("//MainPage");
+                    if (Shell.Current is AppShell shell)
+                    {
+                        shell.NavigateToMainTabsTab(1);
+                    }
                 }
             }
             catch

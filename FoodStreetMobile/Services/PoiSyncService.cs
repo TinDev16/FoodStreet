@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using FoodStreetMobile.Models;
 using Microsoft.Maui.Storage;
@@ -7,6 +8,8 @@ namespace FoodStreetMobile.Services;
 
 public sealed class PoiSyncService
 {
+    public const string MobileJwtPreferenceKey = "mobile_auth_jwt";
+
     private const string BaseUrlsPreferenceKey = "admin_base_urls";
     private readonly AppDatabase _database;
     private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(8) };
@@ -25,6 +28,20 @@ public sealed class PoiSyncService
     {
         var normalized = string.IsNullOrWhiteSpace(rawValue) ? string.Empty : rawValue.Trim();
         Preferences.Set(BaseUrlsPreferenceKey, normalized);
+    }
+
+    public void SetMobileJwtToken(string? token)
+    {
+        Preferences.Set(MobileJwtPreferenceKey, token ?? string.Empty);
+    }
+
+    private void AttachBearerIfAny(HttpRequestMessage request)
+    {
+        var token = Preferences.Get(MobileJwtPreferenceKey, string.Empty);
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
     }
 
     public async Task<bool> TrySyncAsync(string? languageCode = null)
@@ -91,10 +108,16 @@ public sealed class PoiSyncService
         var endpoint = $"{baseUrl}/api/pois?lang={Uri.EscapeDataString(requestedLang)}";
         try
         {
-            var pois = await _httpClient.GetFromJsonAsync<List<PoiSyncDto>>(endpoint);
-            if (pois is not null)
+            using var req = new HttpRequestMessage(HttpMethod.Get, endpoint);
+            AttachBearerIfAny(req);
+            using var res = await _httpClient.SendAsync(req);
+            if (res.IsSuccessStatusCode)
             {
-                return pois;
+                var pois = await res.Content.ReadFromJsonAsync<List<PoiSyncDto>>();
+                if (pois is not null)
+                {
+                    return pois;
+                }
             }
         }
         catch
@@ -103,7 +126,15 @@ public sealed class PoiSyncService
         }
 
         var legacyEndpoint = $"{baseUrl}/api/shops?lang={Uri.EscapeDataString(requestedLang)}";
-        var legacy = await _httpClient.GetFromJsonAsync<List<ShopSyncDto>>(legacyEndpoint);
+        using var legacyReq = new HttpRequestMessage(HttpMethod.Get, legacyEndpoint);
+        AttachBearerIfAny(legacyReq);
+        using var legacyRes = await _httpClient.SendAsync(legacyReq);
+        if (!legacyRes.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        var legacy = await legacyRes.Content.ReadFromJsonAsync<List<ShopSyncDto>>();
         if (legacy is null)
         {
             return null;

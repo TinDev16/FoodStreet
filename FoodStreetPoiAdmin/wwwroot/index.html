@@ -199,10 +199,14 @@
                 <i class="fa-solid fa-table-list"></i>
                 <h2>Danh sách POI</h2>
               </div>
-              <div class="small muted" id="listHint"></div>
+              <div class="header-actions">
+                <button type="button" id="tabActiveBtn" class="secondary">Danh sách</button>
+                <button type="button" id="tabHistoryBtn" class="secondary">Lịch sử</button>
+                <div class="small muted" id="listHint"></div>
+              </div>
             </header>
             <div class="table-responsive">
-              <table>
+              <table id="activeTable">
                 <thead>
                   <tr>
                     <th width="80">ID</th>
@@ -215,6 +219,17 @@
                   </tr>
                 </thead>
                 <tbody id="poiRows"></tbody>
+              </table>
+              <table id="historyTable" hidden>
+                <thead>
+                  <tr>
+                    <th width="80">ID</th>
+                    <th>Tên POI</th>
+                    <th>Thời điểm xóa</th>
+                    <th width="130" class="text-right">Hành động</th>
+                  </tr>
+                </thead>
+                <tbody id="deletedPoiRows"></tbody>
               </table>
             </div>
           </section>

@@ -19,9 +19,6 @@
   <data name="Profile_AccountHeader" xml:space="preserve">
     <value>계정</value>
   </data>
-  <data name="Profile_AccountHint" xml:space="preserve">
-    <value>개인 콘텐츠는 추후 업데이트됩니다.</value>
-  </data>
   <data name="Profile_LanguageLabel" xml:space="preserve">
     <value>언어</value>
   </data>
@@ -142,5 +139,101 @@
   </data>
   <data name="PoiHistory_Empty" xml:space="preserve">
     <value>보기 기록이 없습니다.</value>
+  </data>
+  <data name="Onboarding_Title" xml:space="preserve">
+    <value>언어 선택</value>
+  </data>
+  <data name="Onboarding_Subtitle" xml:space="preserve">
+    <value>앱 표시 언어를 선택하세요. 나중에 프로필에서 변경할 수 있습니다.</value>
+  </data>
+  <data name="Onboarding_Continue" xml:space="preserve">
+    <value>계속</value>
+  </data>
+  <data name="Auth_Title" xml:space="preserve">
+    <value>로그인</value>
+  </data>
+  <data name="Auth_RegisterPageTitle" xml:space="preserve">
+    <value>계정 만들기</value>
+  </data>
+  <data name="Auth_NoAccountPrompt" xml:space="preserve">
+    <value>계정이 없으신가요?</value>
+  </data>
+  <data name="Auth_LinkRegister" xml:space="preserve">
+    <value>회원가입</value>
+  </data>
+  <data name="Auth_AlreadyHaveAccount" xml:space="preserve">
+    <value>이미 계정이 있으신가요?</value>
+  </data>
+  <data name="Auth_LinkLogin" xml:space="preserve">
+    <value>로그인</value>
+  </data>
+  <data name="Auth_ServerLabel" xml:space="preserve">
+    <value>API 서버</value>
+  </data>
+  <data name="Auth_LoginSection" xml:space="preserve">
+    <value>로그인 (사용자 이름 또는 전화)</value>
+  </data>
+  <data name="Auth_RegisterSection" xml:space="preserve">
+    <value>계정 만들기</value>
+  </data>
+  <data name="Auth_UserOrPhone" xml:space="preserve">
+    <value>사용자 이름 또는 전화번호</value>
+  </data>
+  <data name="Auth_Password" xml:space="preserve">
+    <value>비밀번호</value>
+  </data>
+  <data name="Auth_Login" xml:space="preserve">
+    <value>로그인</value>
+  </data>
+  <data name="Auth_Register" xml:space="preserve">
+    <value>회원가입</value>
+  </data>
+  <data name="Auth_RegUsername" xml:space="preserve">
+    <value>사용자 이름</value>
+  </data>
+  <data name="Auth_RegFullName" xml:space="preserve">
+    <value>이름</value>
+  </data>
+  <data name="Auth_RegPhone" xml:space="preserve">
+    <value>전화번호</value>
+  </data>
+  <data name="Profile_PersonalInfo" xml:space="preserve">
+    <value>개인 정보</value>
+  </data>
+  <data name="Profile_FieldId" xml:space="preserve">
+    <value>ID:</value>
+  </data>
+  <data name="Profile_FieldUsername" xml:space="preserve">
+    <value>사용자 이름:</value>
+  </data>
+  <data name="Profile_FieldFullName" xml:space="preserve">
+    <value>이름:</value>
+  </data>
+  <data name="Profile_FieldPhone" xml:space="preserve">
+    <value>전화:</value>
+  </data>
+  <data name="Profile_ChangePassword" xml:space="preserve">
+    <value>비밀번호 변경</value>
+  </data>
+  <data name="Profile_CurrentPassword" xml:space="preserve">
+    <value>현재 비밀번호</value>
+  </data>
+  <data name="Profile_NewPassword" xml:space="preserve">
+    <value>새 비밀번호</value>
+  </data>
+  <data name="Profile_ConfirmPassword" xml:space="preserve">
+    <value>새 비밀번호 확인</value>
+  </data>
+  <data name="Profile_SubmitPassword" xml:space="preserve">
+    <value>새 비밀번호 저장</value>
+  </data>
+  <data name="Profile_Logout" xml:space="preserve">
+    <value>로그아웃</value>
+  </data>
+  <data name="Profile_NotSignedIn" xml:space="preserve">
+    <value>로그인하지 않았습니다. 동기화 및 전체 기능을 사용하려면 로그인하세요.</value>
+  </data>
+  <data name="Profile_GoLogin" xml:space="preserve">
+    <value>로그인</value>
   </data>
 </root>

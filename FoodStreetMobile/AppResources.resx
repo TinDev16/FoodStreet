@@ -12,119 +12,107 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+
   <data name="Profile_Title" xml:space="preserve">
-    <value>Cá nhân</value>
+    <value>Profile</value>
   </data>
   <data name="Profile_AccountHeader" xml:space="preserve">
-    <value>Tài khoản</value>
-  </data>
-  <data name="Profile_AccountHint" xml:space="preserve">
-    <value>Nội dung cá nhân sẽ được cập nhật sau.</value>
+    <value>Account</value>
   </data>
   <data name="Profile_LanguageLabel" xml:space="preserve">
-    <value>Ngôn ngữ</value>
+    <value>Language</value>
   </data>
-  <data name="Profile_PoiHistory" xml:space="preserve">
-    <value>Lịch sử xem POI</value>
-  </data>
-  <data name="PoiHistory_Title" xml:space="preserve">
-    <value>Lịch sử xem POI</value>
-  </data>
-  <data name="PoiHistory_Hint" xml:space="preserve">
-    <value>Chạm một mục để mở lại trên bản đồ.</value>
-  </data>
-  <data name="PoiHistory_Empty" xml:space="preserve">
-    <value>Chưa có lịch sử xem.</value>
-  </data>
+
   <data name="Main_ExploreVinhKhanh" xml:space="preserve">
-    <value>Khám phá Vĩnh Khánh</value>
+    <value>Explore Vinh Khanh</value>
   </data>
   <data name="Main_SearchPlaceholder" xml:space="preserve">
-    <value>Tìm địa điểm, món ăn...</value>
+    <value>Search places, food...</value>
   </data>
   <data name="Main_SheetNoPlaceSelected" xml:space="preserve">
-    <value>Chưa chọn địa điểm</value>
+    <value>No place selected</value>
   </data>
   <data name="Main_SheetHintSelectPlace" xml:space="preserve">
-    <value>Nhập từ khóa và chọn địa điểm để xem thông tin.</value>
+    <value>Type a keyword and select a place to see details.</value>
   </data>
   <data name="Main_Volume" xml:space="preserve">
-    <value>Âm lượng</value>
+    <value>Volume</value>
   </data>
   <data name="Main_Directions" xml:space="preserve">
-    <value>Chỉ đường</value>
+    <value>Directions</value>
   </data>
   <data name="Main_PlayAudio" xml:space="preserve">
-    <value>Phát audio</value>
+    <value>Play audio</value>
   </data>
   <data name="Main_Save" xml:space="preserve">
-    <value>Lưu</value>
+    <value>Save</value>
   </data>
   <data name="Main_Share" xml:space="preserve">
-    <value>Chia sẻ</value>
+    <value>Share</value>
   </data>
   <data name="Main_NowPlaying" xml:space="preserve">
-    <value>Đang phát</value>
+    <value>Now playing</value>
   </data>
   <data name="Main_PlaybackQueue" xml:space="preserve">
-    <value>Danh sách phát</value>
+    <value>Playback queue</value>
   </data>
+
   <data name="Home_HeaderTitle" xml:space="preserve">
-    <value>Vĩnh Khánh</value>
+    <value>Vinh Khanh</value>
   </data>
   <data name="Home_HeaderSubtitle" xml:space="preserve">
-    <value>Thiên Đường Ẩm Thực Đường Phố</value>
+    <value>Street Food Paradise</value>
   </data>
   <data name="Home_SearchPlaceholder" xml:space="preserve">
-    <value>Tìm món ăn, quán ăn...</value>
+    <value>Search food, restaurants...</value>
   </data>
   <data name="Home_CategoriesTitle" xml:space="preserve">
-    <value>Danh Mục</value>
+    <value>Categories</value>
   </data>
   <data name="Home_ViewAll" xml:space="preserve">
-    <value>Xem tất cả →</value>
+    <value>View all →</value>
   </data>
   <data name="Home_CategoryPhoBun" xml:space="preserve">
-    <value>Phở &amp; Bún</value>
+    <value>Pho &amp; Noodles</value>
   </data>
   <data name="Home_CategoryBanhMi" xml:space="preserve">
-    <value>Bánh Mì</value>
+    <value>Banh Mi</value>
   </data>
   <data name="Home_CategoryCom" xml:space="preserve">
-    <value>Cơm</value>
+    <value>Rice</value>
   </data>
   <data name="Home_CategoryCoffee" xml:space="preserve">
-    <value>Cà Phê</value>
+    <value>Coffee</value>
   </data>
   <data name="Home_CategoryDessert" xml:space="preserve">
-    <value>Tráng Miệng</value>
+    <value>Dessert</value>
   </data>
   <data name="Home_CategoryDrinks" xml:space="preserve">
-    <value>Giải Khát</value>
+    <value>Drinks</value>
   </data>
   <data name="Home_FeaturedTitle" xml:space="preserve">
-    <value>Quán Ăn Nổi Bật</value>
+    <value>Featured Places</value>
   </data>
   <data name="Home_RatingLocation" xml:space="preserve">
-    <value>4.8 · Vĩnh Khánh</value>
+    <value>4.8 · Vinh Khanh</value>
   </data>
   <data name="Home_PromoToday" xml:space="preserve">
-    <value>🎉 Ưu đãi hôm nay</value>
+    <value>🎉 Today's deals</value>
   </data>
   <data name="Home_PromoDiscount" xml:space="preserve">
-    <value>Giảm 20% đơn đầu tiên</value>
+    <value>20% off your first order</value>
   </data>
   <data name="Home_PromoValidUntil" xml:space="preserve">
-    <value>Áp dụng đến hết 28/02</value>
+    <value>Valid until 28/02</value>
   </data>
   <data name="Home_PromoUseNow" xml:space="preserve">
-    <value>Dùng ngay</value>
+    <value>Use now</value>
   </data>
   <data name="Main_RadiusFallbackMeters" xml:space="preserve">
-    <value>Ban kinh: {0} m</value>
+    <value>Radius: {0} m</value>
   </data>
   <data name="Main_DistanceMetersFormat" xml:space="preserve">
-    <value>Khoang cach: {0} m</value>
+    <value>Distance: {0} m</value>
   </data>
   <data name="Home_FeaturedItem1" xml:space="preserve">
     <value>Oc Dao</value>
@@ -137,5 +125,114 @@
   </data>
   <data name="Home_FeaturedItem4" xml:space="preserve">
     <value>Lau Thai Mama</value>
+  </data>
+
+  <data name="Profile_PoiHistory" xml:space="preserve">
+    <value>POI viewing history</value>
+  </data>
+  <data name="PoiHistory_Title" xml:space="preserve">
+    <value>Viewing history</value>
+  </data>
+  <data name="PoiHistory_Hint" xml:space="preserve">
+    <value>Tap an item to reopen it on the map.</value>
+  </data>
+  <data name="PoiHistory_Empty" xml:space="preserve">
+    <value>No viewing history yet.</value>
+  </data>
+  <data name="Onboarding_Title" xml:space="preserve">
+    <value>Choose language</value>
+  </data>
+  <data name="Onboarding_Subtitle" xml:space="preserve">
+    <value>Select the app display language. You can change it later in Profile.</value>
+  </data>
+  <data name="Onboarding_Continue" xml:space="preserve">
+    <value>Continue</value>
+  </data>
+  <data name="Auth_Title" xml:space="preserve">
+    <value>Sign in</value>
+  </data>
+  <data name="Auth_RegisterPageTitle" xml:space="preserve">
+    <value>Create account</value>
+  </data>
+  <data name="Auth_NoAccountPrompt" xml:space="preserve">
+    <value>Don't have an account?</value>
+  </data>
+  <data name="Auth_LinkRegister" xml:space="preserve">
+    <value>Register</value>
+  </data>
+  <data name="Auth_AlreadyHaveAccount" xml:space="preserve">
+    <value>Already have an account?</value>
+  </data>
+  <data name="Auth_LinkLogin" xml:space="preserve">
+    <value>Sign in</value>
+  </data>
+  <data name="Auth_ServerLabel" xml:space="preserve">
+    <value>API server</value>
+  </data>
+  <data name="Auth_LoginSection" xml:space="preserve">
+    <value>Sign in (username or phone)</value>
+  </data>
+  <data name="Auth_RegisterSection" xml:space="preserve">
+    <value>Create account</value>
+  </data>
+  <data name="Auth_UserOrPhone" xml:space="preserve">
+    <value>Username or phone number</value>
+  </data>
+  <data name="Auth_Password" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="Auth_Login" xml:space="preserve">
+    <value>Sign in</value>
+  </data>
+  <data name="Auth_Register" xml:space="preserve">
+    <value>Register</value>
+  </data>
+  <data name="Auth_RegUsername" xml:space="preserve">
+    <value>Username</value>
+  </data>
+  <data name="Auth_RegFullName" xml:space="preserve">
+    <value>Full name</value>
+  </data>
+  <data name="Auth_RegPhone" xml:space="preserve">
+    <value>Phone number</value>
+  </data>
+  <data name="Profile_PersonalInfo" xml:space="preserve">
+    <value>Personal information</value>
+  </data>
+  <data name="Profile_FieldId" xml:space="preserve">
+    <value>ID:</value>
+  </data>
+  <data name="Profile_FieldUsername" xml:space="preserve">
+    <value>Username:</value>
+  </data>
+  <data name="Profile_FieldFullName" xml:space="preserve">
+    <value>Full name:</value>
+  </data>
+  <data name="Profile_FieldPhone" xml:space="preserve">
+    <value>Phone:</value>
+  </data>
+  <data name="Profile_ChangePassword" xml:space="preserve">
+    <value>Change password</value>
+  </data>
+  <data name="Profile_CurrentPassword" xml:space="preserve">
+    <value>Current password</value>
+  </data>
+  <data name="Profile_NewPassword" xml:space="preserve">
+    <value>New password</value>
+  </data>
+  <data name="Profile_ConfirmPassword" xml:space="preserve">
+    <value>Confirm new password</value>
+  </data>
+  <data name="Profile_SubmitPassword" xml:space="preserve">
+    <value>Save new password</value>
+  </data>
+  <data name="Profile_Logout" xml:space="preserve">
+    <value>Sign out</value>
+  </data>
+  <data name="Profile_NotSignedIn" xml:space="preserve">
+    <value>You are not signed in. Sign in to sync and use all features.</value>
+  </data>
+  <data name="Profile_GoLogin" xml:space="preserve">
+    <value>Sign in</value>
   </data>
 </root>

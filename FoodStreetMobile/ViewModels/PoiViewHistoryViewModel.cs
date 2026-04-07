@@ -1,3 +1,4 @@
+using FoodStreetMobile;
 using FoodStreetMobile.Services;
 using Microsoft.Maui.ApplicationModel;
 using System.Collections.ObjectModel;
@@ -133,9 +134,9 @@ public sealed class PoiViewHistoryViewModel : INotifyPropertyChanged
         try
         {
             _deepLinkService.QueuePendingPoiLink(new PendingPoiLink { PoiId = item.PoiId });
-            if (Shell.Current is not null)
+            if (Shell.Current is AppShell shell)
             {
-                await Shell.Current.GoToAsync("//MainPage");
+                shell.NavigateToMainTabsTab(1);
             }
         }
         catch

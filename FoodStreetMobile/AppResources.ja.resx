@@ -19,9 +19,6 @@
   <data name="Profile_AccountHeader" xml:space="preserve">
     <value>アカウント</value>
   </data>
-  <data name="Profile_AccountHint" xml:space="preserve">
-    <value>個人情報は後ほど更新されます。</value>
-  </data>
   <data name="Profile_LanguageLabel" xml:space="preserve">
     <value>言語</value>
   </data>
@@ -142,5 +139,101 @@
   </data>
   <data name="PoiHistory_Empty" xml:space="preserve">
     <value>閲覧履歴はまだありません。</value>
+  </data>
+  <data name="Onboarding_Title" xml:space="preserve">
+    <value>言語を選択</value>
+  </data>
+  <data name="Onboarding_Subtitle" xml:space="preserve">
+    <value>アプリの表示言語を選びます。あとでプロフィールから変更できます。</value>
+  </data>
+  <data name="Onboarding_Continue" xml:space="preserve">
+    <value>続行</value>
+  </data>
+  <data name="Auth_Title" xml:space="preserve">
+    <value>サインイン</value>
+  </data>
+  <data name="Auth_RegisterPageTitle" xml:space="preserve">
+    <value>アカウント作成</value>
+  </data>
+  <data name="Auth_NoAccountPrompt" xml:space="preserve">
+    <value>アカウントをお持ちでないですか？</value>
+  </data>
+  <data name="Auth_LinkRegister" xml:space="preserve">
+    <value>登録</value>
+  </data>
+  <data name="Auth_AlreadyHaveAccount" xml:space="preserve">
+    <value>すでにアカウントをお持ちですか？</value>
+  </data>
+  <data name="Auth_LinkLogin" xml:space="preserve">
+    <value>サインイン</value>
+  </data>
+  <data name="Auth_ServerLabel" xml:space="preserve">
+    <value>API サーバー</value>
+  </data>
+  <data name="Auth_LoginSection" xml:space="preserve">
+    <value>サインイン（ユーザー名または電話）</value>
+  </data>
+  <data name="Auth_RegisterSection" xml:space="preserve">
+    <value>アカウント作成</value>
+  </data>
+  <data name="Auth_UserOrPhone" xml:space="preserve">
+    <value>ユーザー名または電話番号</value>
+  </data>
+  <data name="Auth_Password" xml:space="preserve">
+    <value>パスワード</value>
+  </data>
+  <data name="Auth_Login" xml:space="preserve">
+    <value>サインイン</value>
+  </data>
+  <data name="Auth_Register" xml:space="preserve">
+    <value>登録</value>
+  </data>
+  <data name="Auth_RegUsername" xml:space="preserve">
+    <value>ユーザー名</value>
+  </data>
+  <data name="Auth_RegFullName" xml:space="preserve">
+    <value>氏名</value>
+  </data>
+  <data name="Auth_RegPhone" xml:space="preserve">
+    <value>電話番号</value>
+  </data>
+  <data name="Profile_PersonalInfo" xml:space="preserve">
+    <value>個人情報</value>
+  </data>
+  <data name="Profile_FieldId" xml:space="preserve">
+    <value>ID:</value>
+  </data>
+  <data name="Profile_FieldUsername" xml:space="preserve">
+    <value>ユーザー名：</value>
+  </data>
+  <data name="Profile_FieldFullName" xml:space="preserve">
+    <value>氏名：</value>
+  </data>
+  <data name="Profile_FieldPhone" xml:space="preserve">
+    <value>電話：</value>
+  </data>
+  <data name="Profile_ChangePassword" xml:space="preserve">
+    <value>パスワードを変更</value>
+  </data>
+  <data name="Profile_CurrentPassword" xml:space="preserve">
+    <value>現在のパスワード</value>
+  </data>
+  <data name="Profile_NewPassword" xml:space="preserve">
+    <value>新しいパスワード</value>
+  </data>
+  <data name="Profile_ConfirmPassword" xml:space="preserve">
+    <value>新しいパスワード（確認）</value>
+  </data>
+  <data name="Profile_SubmitPassword" xml:space="preserve">
+    <value>新しいパスワードを保存</value>
+  </data>
+  <data name="Profile_Logout" xml:space="preserve">
+    <value>サインアウト</value>
+  </data>
+  <data name="Profile_NotSignedIn" xml:space="preserve">
+    <value>サインインしていません。サインインして同期し、すべての機能をご利用ください。</value>
+  </data>
+  <data name="Profile_GoLogin" xml:space="preserve">
+    <value>サインイン</value>
   </data>
 </root>

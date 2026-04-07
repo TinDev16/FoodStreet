@@ -19,9 +19,6 @@
   <data name="Profile_AccountHeader" xml:space="preserve">
     <value>Аккаунт</value>
   </data>
-  <data name="Profile_AccountHint" xml:space="preserve">
-    <value>Личные данные будут обновлены позже.</value>
-  </data>
   <data name="Profile_LanguageLabel" xml:space="preserve">
     <value>Язык</value>
   </data>
@@ -142,5 +139,101 @@
   </data>
   <data name="PoiHistory_Empty" xml:space="preserve">
     <value>История просмотров пуста.</value>
+  </data>
+  <data name="Onboarding_Title" xml:space="preserve">
+    <value>Выберите язык</value>
+  </data>
+  <data name="Onboarding_Subtitle" xml:space="preserve">
+    <value>Выберите язык интерфейса приложения. Позже можно изменить в профиле.</value>
+  </data>
+  <data name="Onboarding_Continue" xml:space="preserve">
+    <value>Продолжить</value>
+  </data>
+  <data name="Auth_Title" xml:space="preserve">
+    <value>Вход</value>
+  </data>
+  <data name="Auth_RegisterPageTitle" xml:space="preserve">
+    <value>Создать аккаунт</value>
+  </data>
+  <data name="Auth_NoAccountPrompt" xml:space="preserve">
+    <value>Нет аккаунта?</value>
+  </data>
+  <data name="Auth_LinkRegister" xml:space="preserve">
+    <value>Регистрация</value>
+  </data>
+  <data name="Auth_AlreadyHaveAccount" xml:space="preserve">
+    <value>Уже есть аккаунт?</value>
+  </data>
+  <data name="Auth_LinkLogin" xml:space="preserve">
+    <value>Войти</value>
+  </data>
+  <data name="Auth_ServerLabel" xml:space="preserve">
+    <value>Сервер API</value>
+  </data>
+  <data name="Auth_LoginSection" xml:space="preserve">
+    <value>Вход (имя пользователя или телефон)</value>
+  </data>
+  <data name="Auth_RegisterSection" xml:space="preserve">
+    <value>Создать аккаунт</value>
+  </data>
+  <data name="Auth_UserOrPhone" xml:space="preserve">
+    <value>Имя пользователя или телефон</value>
+  </data>
+  <data name="Auth_Password" xml:space="preserve">
+    <value>Пароль</value>
+  </data>
+  <data name="Auth_Login" xml:space="preserve">
+    <value>Войти</value>
+  </data>
+  <data name="Auth_Register" xml:space="preserve">
+    <value>Регистрация</value>
+  </data>
+  <data name="Auth_RegUsername" xml:space="preserve">
+    <value>Имя пользователя</value>
+  </data>
+  <data name="Auth_RegFullName" xml:space="preserve">
+    <value>Полное имя</value>
+  </data>
+  <data name="Auth_RegPhone" xml:space="preserve">
+    <value>Телефон</value>
+  </data>
+  <data name="Profile_PersonalInfo" xml:space="preserve">
+    <value>Личная информация</value>
+  </data>
+  <data name="Profile_FieldId" xml:space="preserve">
+    <value>ID:</value>
+  </data>
+  <data name="Profile_FieldUsername" xml:space="preserve">
+    <value>Имя пользователя:</value>
+  </data>
+  <data name="Profile_FieldFullName" xml:space="preserve">
+    <value>Полное имя:</value>
+  </data>
+  <data name="Profile_FieldPhone" xml:space="preserve">
+    <value>Телефон:</value>
+  </data>
+  <data name="Profile_ChangePassword" xml:space="preserve">
+    <value>Сменить пароль</value>
+  </data>
+  <data name="Profile_CurrentPassword" xml:space="preserve">
+    <value>Текущий пароль</value>
+  </data>
+  <data name="Profile_NewPassword" xml:space="preserve">
+    <value>Новый пароль</value>
+  </data>
+  <data name="Profile_ConfirmPassword" xml:space="preserve">
+    <value>Подтвердите новый пароль</value>
+  </data>
+  <data name="Profile_SubmitPassword" xml:space="preserve">
+    <value>Сохранить новый пароль</value>
+  </data>
+  <data name="Profile_Logout" xml:space="preserve">
+    <value>Выйти</value>
+  </data>
+  <data name="Profile_NotSignedIn" xml:space="preserve">
+    <value>Вы не вошли. Войдите для синхронизации и полного доступа.</value>
+  </data>
+  <data name="Profile_GoLogin" xml:space="preserve">
+    <value>Войти</value>
   </data>
 </root>

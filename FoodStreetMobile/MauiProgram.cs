@@ -1,3 +1,4 @@
+using CommunityToolkit.Maui;
 using FoodStreetMobile.Services;
 using FoodStreetMobile.ViewModels;
 using Microsoft.Extensions.Logging;
@@ -17,6 +18,7 @@ public static class MauiProgram
         var builder = MauiApp.CreateBuilder();
         builder
             .UseMauiApp<App>()
+            .UseMauiCommunityToolkit()
             .UseMauiMaps()
             .ConfigureMauiHandlers(handlers =>
             {
@@ -36,6 +38,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<AppDatabase>();
         builder.Services.AddSingleton<PoiViewHistoryService>();
         builder.Services.AddSingleton<PoiSyncService>();
+        builder.Services.AddSingleton<AuthService>();
+        builder.Services.AddSingleton<ToastNotificationService>();
         builder.Services.AddSingleton<PlaceSearchService>();
         builder.Services.AddSingleton<DeepLinkService>();
         builder.Services.AddSingleton<AppLanguageService>();
@@ -44,10 +48,13 @@ public static class MauiProgram
         builder.Services.AddSingleton<LocationTracker>();
         builder.Services.AddSingleton<MainViewModel>();
         builder.Services.AddSingleton<ProfileViewModel>();
+        builder.Services.AddSingleton<AuthViewModel>();
         builder.Services.AddTransient<PoiViewHistoryViewModel>();
         builder.Services.AddSingleton<HomePage>();
         builder.Services.AddSingleton<MainPage>();
         builder.Services.AddSingleton<ProfilePage>();
+        builder.Services.AddSingleton<AuthPage>();
+        builder.Services.AddSingleton<RegisterPage>();
         builder.Services.AddTransient<PoiViewHistoryPage>();
         builder.Services.AddSingleton<AppShell>();
 
