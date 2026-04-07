@@ -25,6 +25,16 @@ if (string.IsNullOrWhiteSpace(jwtSecret) || jwtSecret.Length < 32)
 {
     jwtSecret = "FoodStreetDevJwtSecretKey32CharsMin!!";
 }
+var bootstrapSuperAdminUser = Environment.GetEnvironmentVariable("FOODSTREET_SUPERADMIN_USER")?.Trim();
+if (string.IsNullOrWhiteSpace(bootstrapSuperAdminUser))
+{
+    bootstrapSuperAdminUser = "admin";
+}
+var bootstrapSuperAdminPassword = Environment.GetEnvironmentVariable("FOODSTREET_SUPERADMIN_PASSWORD")?.Trim();
+if (string.IsNullOrWhiteSpace(bootstrapSuperAdminPassword))
+{
+    bootstrapSuperAdminPassword = "admin123";
+}
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -76,6 +86,7 @@ if (string.IsNullOrWhiteSpace(translationApiKey))
 }
 
 await InitializeDatabaseAsync(connectionString);
+await EnsureBootstrapSuperAdminAsync(connectionString, bootstrapSuperAdminUser, bootstrapSuperAdminPassword);
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
@@ -116,6 +127,139 @@ app.Use(async (context, next) =>
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapPost("/api/admin/auth/login", async (AdminLoginRequest? req) =>
+{
+    if (req is null || string.IsNullOrWhiteSpace(req.Username) || string.IsNullOrWhiteSpace(req.Password))
+    {
+        return Results.BadRequest(new { error = "Thieu username hoac password." });
+    }
+
+    var admin = await FindAdminForLoginAsync(connectionString, req.Username.Trim(), req.Password);
+    if (admin is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var token = CreateAdminJwt(admin.Value.Id, admin.Value.Username, admin.Value.Role, admin.Value.FullName, jwtSecret);
+    return Results.Ok(new
+    {
+        token,
+        user = new
+        {
+            id = admin.Value.Id,
+            username = admin.Value.Username,
+            role = admin.Value.Role,
+            fullName = admin.Value.FullName
+        }
+    });
+});
+
+app.MapPost("/api/admin/auth/logout", () => Results.Ok(new { message = "Dang xuat phia client (xoa token)." }));
+
+app.MapGet("/api/admin/auth/me", (HttpContext context) =>
+{
+    if (!TryGetAdminActor(context.User, out var actor))
+    {
+        return Results.Unauthorized();
+    }
+
+    return Results.Ok(new
+    {
+        id = actor.Id,
+        username = actor.Username,
+        role = actor.Role,
+        fullName = actor.FullName
+    });
+}).RequireAuthorization();
+
+app.MapGet("/api/admin/owners", async (HttpContext context) =>
+{
+    if (!TryGetAdminActor(context.User, out var actor))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!IsSuperAdmin(actor))
+    {
+        return Results.Forbid();
+    }
+
+    var owners = await GetOwnerAccountsAsync(connectionString);
+    return Results.Ok(owners);
+}).RequireAuthorization();
+
+app.MapPost("/api/admin/owners", async (HttpContext context, AdminCreateOwnerRequest? req) =>
+{
+    if (!TryGetAdminActor(context.User, out var actor))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!IsSuperAdmin(actor))
+    {
+        return Results.Forbid();
+    }
+
+    if (req is null || string.IsNullOrWhiteSpace(req.Username) || string.IsNullOrWhiteSpace(req.Password))
+    {
+        return Results.BadRequest(new { error = "Thieu username hoac password." });
+    }
+
+    if (req.Password.Trim().Length < 6)
+    {
+        return Results.BadRequest(new { error = "Password phai co it nhat 6 ky tu." });
+    }
+
+    try
+    {
+        var ownerId = await CreateOwnerAccountAsync(connectionString, req.Username.Trim(), req.Password.Trim(), req.FullName?.Trim() ?? string.Empty);
+        return Results.Ok(new { id = ownerId.ToString(CultureInfo.InvariantCulture) });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+}).RequireAuthorization();
+
+app.MapPost("/api/admin/pois/{id}/assign-owner", async (HttpContext context, string id, AssignPoiOwnerRequest? req) =>
+{
+    if (!TryGetAdminActor(context.User, out var actor))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!IsSuperAdmin(actor))
+    {
+        return Results.Forbid();
+    }
+
+    if (!TryParsePoiId(id, out var poiId))
+    {
+        return Results.BadRequest(new { error = "Invalid id." });
+    }
+
+    long? ownerId = null;
+    if (!string.IsNullOrWhiteSpace(req?.OwnerId))
+    {
+        if (!long.TryParse(req.OwnerId.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedOwner) || parsedOwner <= 0)
+        {
+            return Results.BadRequest(new { error = "ownerId khong hop le." });
+        }
+
+        ownerId = parsedOwner;
+    }
+
+    try
+    {
+        var ok = await AssignOwnerToPoiAsync(connectionString, poiId, ownerId);
+        return ok ? Results.Ok(new { id, ownerId = ownerId?.ToString(CultureInfo.InvariantCulture) }) : Results.NotFound();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+}).RequireAuthorization();
 
 app.MapPost("/api/mobile/auth/register", async (MobileRegisterRequest? req) =>
 {
@@ -247,6 +391,11 @@ app.MapGet("/api/public/base-url", async (HttpContext context) =>
 
 app.MapPost("/api/uploads", async (HttpContext context) =>
 {
+    if (!TryGetAdminActor(context.User, out _))
+    {
+        return Results.Unauthorized();
+    }
+
     await TryEnsureAdbReverseAsync();
 
     if (!context.Request.HasFormContentType)
@@ -303,7 +452,7 @@ app.MapPost("/api/uploads", async (HttpContext context) =>
     var url = $"/uploads/{fileName}";
     var contentType = file.ContentType ?? string.Empty;
     return Results.Ok(new { url, kind, lang = safeLang, contentType, size = file.Length });
-});
+}).RequireAuthorization();
 
 app.MapGet("/api/pois", async (HttpContext context) =>
 {
@@ -313,17 +462,27 @@ app.MapGet("/api/pois", async (HttpContext context) =>
     return Results.Ok(items);
 });
 
-// Admin list (includes inactive).
-app.MapGet("/api/pois/admin", async () =>
+// Admin list (includes inactive) with role-based ownership filter.
+app.MapGet("/api/pois/admin", async (HttpContext context) =>
 {
-    await TryEnsureAdbReverseAsync();
-    var items = await GetPoisForAdminListAsync(connectionString);
-    return Results.Ok(items);
-});
+    if (!TryGetAdminActor(context.User, out var actor))
+    {
+        return Results.Unauthorized();
+    }
 
-// Admin: load core + all translations.
-app.MapGet("/api/pois/{id}", async (string id) =>
+    await TryEnsureAdbReverseAsync();
+    var items = await GetPoisForAdminListAsync(connectionString, actor);
+    return Results.Ok(items);
+}).RequireAuthorization();
+
+// Admin: load core + all translations with ownership filter.
+app.MapGet("/api/pois/{id}", async (HttpContext context, string id) =>
 {
+    if (!TryGetAdminActor(context.User, out var actor))
+    {
+        return Results.Unauthorized();
+    }
+
     await TryEnsureAdbReverseAsync();
     if (string.IsNullOrWhiteSpace(id))
     {
@@ -336,9 +495,9 @@ app.MapGet("/api/pois/{id}", async (string id) =>
         return Results.BadRequest(new { error = "Invalid id." });
     }
 
-    var core = await GetPoiAdminAsync(connection, poiId);
+    var core = await GetPoiAdminAsync(connection, poiId, actor);
     return core is null ? Results.NotFound() : Results.Ok(core);
-});
+}).RequireAuthorization();
 
 // Mobile: load localized view (fallback to Vietnamese when missing).
 app.MapGet("/api/pois/{id}/localized", async (HttpContext context, string id) =>
@@ -381,6 +540,11 @@ app.MapGet("/api/public/pois/{id}", async (HttpContext context, string id) =>
 
 app.MapGet("/api/pois/{id}/public-link", async (HttpContext context, string id) =>
 {
+    if (!TryGetAdminActor(context.User, out var actor))
+    {
+        return Results.Unauthorized();
+    }
+
     await TryEnsureAdbReverseAsync();
     if (!TryParsePoiId(id, out var poiId))
     {
@@ -388,7 +552,7 @@ app.MapGet("/api/pois/{id}/public-link", async (HttpContext context, string id) 
     }
 
     await using var connection = await OpenConnectionAsync(connectionString);
-    var core = await GetPoiAdminAsync(connection, poiId);
+    var core = await GetPoiAdminAsync(connection, poiId, actor);
     if (core is null)
     {
         return Results.NotFound();
@@ -403,10 +567,15 @@ app.MapGet("/api/pois/{id}/public-link", async (HttpContext context, string id) 
 
     var publicUrl = BuildPublicPoiUrl(baseUrl, poiId, lang);
     return Results.Ok(new { id = poiId.ToString(CultureInfo.InvariantCulture), url = publicUrl, baseUrl });
-});
+}).RequireAuthorization();
 
 app.MapGet("/api/pois/{id}/qr.png", async (HttpContext context, string id) =>
 {
+    if (!TryGetAdminActor(context.User, out var actor))
+    {
+        return Results.Unauthorized();
+    }
+
     await TryEnsureAdbReverseAsync();
     if (!TryParsePoiId(id, out var poiId))
     {
@@ -414,7 +583,7 @@ app.MapGet("/api/pois/{id}/qr.png", async (HttpContext context, string id) =>
     }
 
     await using var connection = await OpenConnectionAsync(connectionString);
-    var core = await GetPoiAdminAsync(connection, poiId);
+    var core = await GetPoiAdminAsync(connection, poiId, actor);
     if (core is null)
     {
         return Results.NotFound();
@@ -447,10 +616,15 @@ app.MapGet("/api/pois/{id}/qr.png", async (HttpContext context, string id) =>
     }
 
     return Results.File(pngBytes, "image/png");
-});
+}).RequireAuthorization();
 
-app.MapPost("/api/pois", async (PoiAdminUpsertRequest request) =>
+app.MapPost("/api/pois", async (HttpContext context, PoiAdminUpsertRequest request) =>
 {
+    if (!TryGetAdminActor(context.User, out var actor))
+    {
+        return Results.Unauthorized();
+    }
+
     await TryEnsureAdbReverseAsync();
 
     if (request.Latitude is < -90 or > 90 || request.Longitude is < -180 or > 180)
@@ -584,6 +758,15 @@ app.MapPost("/api/pois", async (PoiAdminUpsertRequest request) =>
 
     await using var connection = await OpenConnectionAsync(connectionString);
 
+    if (poiId is not null)
+    {
+        var existsForActor = await HasPoiAccessAsync(connection, poiId.Value, actor);
+        if (!existsForActor)
+        {
+            return Results.NotFound();
+        }
+    }
+
     await using var transaction = await connection.BeginTransactionAsync();
 
     var savedId = await UpsertPoiCoreAsync(connection, transaction, new PoiCoreUpsert
@@ -596,7 +779,8 @@ app.MapPost("/api/pois", async (PoiAdminUpsertRequest request) =>
         MapLink = mapLink,
         ImageUrl = (request.ImageUrl ?? string.Empty).Trim(),
         AudioUrl = (request.AudioUrl ?? string.Empty).Trim(),
-        IsActive = request.IsActive
+        IsActive = request.IsActive,
+        OwnerAdminId = IsOwner(actor) ? actor.Id : null
     });
 
     foreach (var t in normalizedTranslations)
@@ -615,10 +799,15 @@ app.MapPost("/api/pois", async (PoiAdminUpsertRequest request) =>
     await transaction.CommitAsync();
 
     return Results.Ok(new { id = savedId.ToString(CultureInfo.InvariantCulture) });
-});
+}).RequireAuthorization();
 
-app.MapDelete("/api/pois/{id}", async (string id) =>
+app.MapDelete("/api/pois/{id}", async (HttpContext context, string id) =>
 {
+    if (!TryGetAdminActor(context.User, out var actor))
+    {
+        return Results.Unauthorized();
+    }
+
     await TryEnsureAdbReverseAsync();
     if (string.IsNullOrWhiteSpace(id))
     {
@@ -630,17 +819,27 @@ app.MapDelete("/api/pois/{id}", async (string id) =>
         return Results.BadRequest(new { error = "Invalid id." });
     }
 
-    var result = await DeletePoiAsync(connectionString, uploadDirectory, poiId);
+    var result = await DeletePoiAsync(connectionString, uploadDirectory, poiId, actor);
     return result switch
     {
         DeletePoiResult.Deleted => Results.Ok(new { id }),
         DeletePoiResult.NotFound => Results.NotFound(),
         _ => Results.Problem("Delete failed.")
     };
-});
+}).RequireAuthorization();
 
-app.MapPost("/api/pois/{id}/restore", async (string id) =>
+app.MapPost("/api/pois/{id}/restore", async (HttpContext context, string id) =>
 {
+    if (!TryGetAdminActor(context.User, out var actor))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!IsSuperAdmin(actor))
+    {
+        return Results.Forbid();
+    }
+
     await TryEnsureAdbReverseAsync();
     if (string.IsNullOrWhiteSpace(id))
     {
@@ -654,7 +853,7 @@ app.MapPost("/api/pois/{id}/restore", async (string id) =>
 
     var restored = await RestorePoiAsync(connectionString, poiId);
     return restored ? Results.Ok(new { id, restored = true }) : Results.NotFound();
-});
+}).RequireAuthorization();
 
 // Legacy endpoints for older mobile build.
 app.MapGet("/api/shops", async (HttpContext context) =>
@@ -781,7 +980,8 @@ app.MapPost("/api/shops/upsert", async (ShopUpsertJsonRequest request) =>
         MapLink = mapLink,
         ImageUrl = currentImageUrl,
         AudioUrl = currentAudioUrl,
-        IsActive = true
+        IsActive = true,
+        OwnerAdminId = null
     });
     await UpsertTranslationAsync(
         connection,
@@ -810,7 +1010,7 @@ app.MapDelete("/api/shops/{id}", async (string id) =>
         return Results.BadRequest(new { error = "Invalid id." });
     }
 
-    var result = await DeletePoiAsync(connectionString, uploadDirectory, poiId);
+    var result = await DeletePoiAsync(connectionString, uploadDirectory, poiId, new AdminActor(0, "system", "superadmin", "System"));
     return result switch
     {
         DeletePoiResult.Deleted => Results.Ok(new { id }),
@@ -1014,9 +1214,11 @@ static async Task InitializeDatabaseAsync(string connectionString)
             image_url TEXT,
             audio_url TEXT,
             is_active INTEGER,
+            owner_admin_id INTEGER,
             is_deleted INTEGER NOT NULL DEFAULT 0,
             deleted_at TEXT,
-            delete_status TEXT NOT NULL DEFAULT 'ACTIVE'
+            delete_status TEXT NOT NULL DEFAULT 'ACTIVE',
+            FOREIGN KEY(owner_admin_id) REFERENCES admin_accounts(id)
         );
 
         CREATE TABLE IF NOT EXISTS poi_translations (
@@ -1029,6 +1231,17 @@ static async Task InitializeDatabaseAsync(string connectionString)
             audio_url TEXT,
             FOREIGN KEY(poi_id) REFERENCES pois(id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS admin_accounts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL COLLATE NOCASE,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL,
+            full_name TEXT NOT NULL DEFAULT '',
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_admin_accounts_username ON admin_accounts(username);
         ";
 
     await using (var command = new SqliteCommand(sql, connection))
@@ -1075,6 +1288,21 @@ static async Task InitializeDatabaseAsync(string connectionString)
     catch
     {
         // Ignore when the column already exists.
+    }
+
+    try
+    {
+        await using var migrate = new SqliteCommand("ALTER TABLE pois ADD COLUMN owner_admin_id INTEGER;", connection);
+        await migrate.ExecuteNonQueryAsync();
+    }
+    catch
+    {
+        // Ignore when the column already exists.
+    }
+
+    await using (var createOwnerIndex = new SqliteCommand("CREATE INDEX IF NOT EXISTS ix_pois_owner_admin_id ON pois(owner_admin_id);", connection))
+    {
+        await createOwnerIndex.ExecuteNonQueryAsync();
     }
 
     // Backfill status based on is_deleted for old rows.
@@ -1139,6 +1367,199 @@ static async Task<SqliteConnection> OpenConnectionAsync(string connectionString)
     return connection;
 }
 
+static bool TryGetAdminActor(ClaimsPrincipal user, out AdminActor actor)
+{
+    actor = default!;
+    var idStr = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? user.FindFirstValue(JwtRegisteredClaimNames.Sub);
+    if (!long.TryParse(idStr, NumberStyles.Integer, CultureInfo.InvariantCulture, out var adminId) || adminId <= 0)
+    {
+        return false;
+    }
+
+    var username = user.FindFirstValue("admin_username") ?? string.Empty;
+    var role = user.FindFirstValue("admin_role") ?? string.Empty;
+    if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(role))
+    {
+        return false;
+    }
+
+    actor = new AdminActor(
+        adminId,
+        username,
+        role.Trim().ToLowerInvariant(),
+        user.FindFirstValue("admin_full_name") ?? string.Empty);
+    return true;
+}
+
+static bool IsSuperAdmin(AdminActor actor) => string.Equals(actor.Role, "superadmin", StringComparison.OrdinalIgnoreCase);
+static bool IsOwner(AdminActor actor) => string.Equals(actor.Role, "owner", StringComparison.OrdinalIgnoreCase);
+
+static async Task EnsureBootstrapSuperAdminAsync(string connectionString, string username, string password)
+{
+    await using var connection = await OpenConnectionAsync(connectionString);
+    await using var check = new SqliteCommand("SELECT COUNT(1) FROM admin_accounts WHERE role = 'superadmin';", connection);
+    var countRaw = await check.ExecuteScalarAsync();
+    var count = Convert.ToInt32(countRaw ?? 0, CultureInfo.InvariantCulture);
+    if (count > 0)
+    {
+        return;
+    }
+
+    var hash = BCrypt.Net.BCrypt.HashPassword(password);
+    await using var insert = new SqliteCommand("""
+        INSERT INTO admin_accounts (username, password_hash, role, full_name, is_active, created_at)
+        VALUES ($u, $h, 'superadmin', 'Super Admin', 1, $createdAt);
+        """, connection);
+    insert.Parameters.AddWithValue("$u", username);
+    insert.Parameters.AddWithValue("$h", hash);
+    insert.Parameters.AddWithValue("$createdAt", DateTimeOffset.UtcNow.ToString("O"));
+    await insert.ExecuteNonQueryAsync();
+}
+
+static string CreateAdminJwt(long adminId, string username, string role, string fullName, string secret)
+{
+    var claims = new List<Claim>
+    {
+        new(JwtRegisteredClaimNames.Sub, adminId.ToString(CultureInfo.InvariantCulture)),
+        new(ClaimTypes.NameIdentifier, adminId.ToString(CultureInfo.InvariantCulture)),
+        new("admin_username", username),
+        new("admin_role", role),
+        new("admin_full_name", fullName ?? string.Empty),
+    };
+
+    var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
+    var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+    var token = new JwtSecurityToken(
+        issuer: "FoodStreetPoiAdmin",
+        audience: "FoodStreetMobile",
+        claims: claims,
+        expires: DateTime.UtcNow.AddDays(7),
+        signingCredentials: creds);
+    return new JwtSecurityTokenHandler().WriteToken(token);
+}
+
+static async Task<(long Id, string Username, string Role, string FullName)?> FindAdminForLoginAsync(string connectionString, string username, string password)
+{
+    await using var connection = await OpenConnectionAsync(connectionString);
+    await using var cmd = new SqliteCommand("""
+        SELECT id, username, password_hash, role, full_name, is_active
+        FROM admin_accounts
+        WHERE lower(username) = lower($u)
+        LIMIT 1;
+        """, connection);
+    cmd.Parameters.AddWithValue("$u", username);
+    await using var reader = await cmd.ExecuteReaderAsync();
+    if (!await reader.ReadAsync())
+    {
+        return null;
+    }
+
+    var isActive = reader.IsDBNull(5) || reader.GetInt32(5) != 0;
+    if (!isActive)
+    {
+        return null;
+    }
+
+    var hash = reader.IsDBNull(2) ? string.Empty : reader.GetString(2);
+    if (string.IsNullOrWhiteSpace(hash) || !BCrypt.Net.BCrypt.Verify(password, hash))
+    {
+        return null;
+    }
+
+    return (
+        reader.GetInt64(0),
+        reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+        reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+        reader.IsDBNull(4) ? string.Empty : reader.GetString(4));
+}
+
+static async Task<List<OwnerAccountDto>> GetOwnerAccountsAsync(string connectionString)
+{
+    await using var connection = await OpenConnectionAsync(connectionString);
+    await using var cmd = new SqliteCommand("""
+        SELECT id, username, full_name
+        FROM admin_accounts
+        WHERE role = 'owner' AND COALESCE(is_active, 1) = 1
+        ORDER BY username ASC;
+        """, connection);
+    await using var reader = await cmd.ExecuteReaderAsync();
+    var result = new List<OwnerAccountDto>();
+    while (await reader.ReadAsync())
+    {
+        result.Add(new OwnerAccountDto
+        {
+            Id = reader.GetInt64(0).ToString(CultureInfo.InvariantCulture),
+            Username = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+            FullName = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+        });
+    }
+
+    return result;
+}
+
+static async Task<long> CreateOwnerAccountAsync(string connectionString, string username, string password, string fullName)
+{
+    await using var connection = await OpenConnectionAsync(connectionString);
+    await using var exists = new SqliteCommand("SELECT 1 FROM admin_accounts WHERE lower(username) = lower($u) LIMIT 1;", connection);
+    exists.Parameters.AddWithValue("$u", username);
+    if (await exists.ExecuteScalarAsync() is not null)
+    {
+        throw new InvalidOperationException("Username da ton tai.");
+    }
+
+    var hash = BCrypt.Net.BCrypt.HashPassword(password);
+    await using var insert = new SqliteCommand("""
+        INSERT INTO admin_accounts (username, password_hash, role, full_name, is_active, created_at)
+        VALUES ($u, $h, 'owner', $fullName, 1, $createdAt);
+        SELECT last_insert_rowid();
+        """, connection);
+    insert.Parameters.AddWithValue("$u", username);
+    insert.Parameters.AddWithValue("$h", hash);
+    insert.Parameters.AddWithValue("$fullName", fullName ?? string.Empty);
+    insert.Parameters.AddWithValue("$createdAt", DateTimeOffset.UtcNow.ToString("O"));
+    var raw = await insert.ExecuteScalarAsync();
+    return Convert.ToInt64(raw, CultureInfo.InvariantCulture);
+}
+
+static async Task<bool> HasPoiAccessAsync(SqliteConnection connection, long poiId, AdminActor actor)
+{
+    if (IsSuperAdmin(actor))
+    {
+        await using var exists = new SqliteCommand("SELECT 1 FROM pois WHERE id = $id LIMIT 1;", connection);
+        exists.Parameters.AddWithValue("$id", poiId);
+        return await exists.ExecuteScalarAsync() is not null;
+    }
+
+    await using var ownerCheck = new SqliteCommand("SELECT 1 FROM pois WHERE id = $id AND owner_admin_id = $ownerId LIMIT 1;", connection);
+    ownerCheck.Parameters.AddWithValue("$id", poiId);
+    ownerCheck.Parameters.AddWithValue("$ownerId", actor.Id);
+    return await ownerCheck.ExecuteScalarAsync() is not null;
+}
+
+static async Task<bool> AssignOwnerToPoiAsync(string connectionString, long poiId, long? ownerId)
+{
+    await using var connection = await OpenConnectionAsync(connectionString);
+    if (ownerId is not null)
+    {
+        await using var ownerExists = new SqliteCommand("""
+            SELECT 1 FROM admin_accounts
+            WHERE id = $ownerId AND role = 'owner' AND COALESCE(is_active, 1) = 1
+            LIMIT 1;
+            """, connection);
+        ownerExists.Parameters.AddWithValue("$ownerId", ownerId.Value);
+        if (await ownerExists.ExecuteScalarAsync() is null)
+        {
+            throw new InvalidOperationException("Owner khong ton tai hoac da bi khoa.");
+        }
+    }
+
+    await using var update = new SqliteCommand("UPDATE pois SET owner_admin_id = $ownerId WHERE id = $id;", connection);
+    update.Parameters.AddWithValue("$ownerId", ownerId.HasValue ? ownerId.Value : DBNull.Value);
+    update.Parameters.AddWithValue("$id", poiId);
+    var affected = await update.ExecuteNonQueryAsync();
+    return affected > 0;
+}
+
 static async Task<List<PoiMobileDto>> GetPoisForMobileAsync(string connectionString, string requestedLang)
 {
     await using var connection = await OpenConnectionAsync(connectionString);
@@ -1192,11 +1613,11 @@ static async Task<List<PoiMobileDto>> GetPoisForMobileAsync(string connectionStr
     return result;
 }
 
-static async Task<List<PoiAdminListItemDto>> GetPoisForAdminListAsync(string connectionString)
+static async Task<List<PoiAdminListItemDto>> GetPoisForAdminListAsync(string connectionString, AdminActor actor)
 {
     await using var connection = await OpenConnectionAsync(connectionString);
 
-    const string sql = @"
+    var sql = @"
         SELECT
             p.id,
             p.latitude,
@@ -1210,14 +1631,26 @@ static async Task<List<PoiAdminListItemDto>> GetPoisForAdminListAsync(string con
             COALESCE(NULLIF(t_vi.name, ''), '') AS name_vi,
             COALESCE(p.is_deleted, 0) AS is_deleted,
             p.deleted_at,
-            COALESCE(p.delete_status, CASE WHEN COALESCE(p.is_deleted, 0) = 1 THEN 'DELETED' ELSE 'ACTIVE' END) AS delete_status
+            COALESCE(p.delete_status, CASE WHEN COALESCE(p.is_deleted, 0) = 1 THEN 'DELETED' ELSE 'ACTIVE' END) AS delete_status,
+            COALESCE(a.username, '') AS owner_username,
+            COALESCE(a.full_name, '') AS owner_full_name
         FROM pois p
         LEFT JOIN poi_translations t_vi ON p.id = t_vi.poi_id AND t_vi.lang_code = 'vi'
+        LEFT JOIN admin_accounts a ON p.owner_admin_id = a.id
         ORDER BY p.priority DESC, p.id ASC;
         ";
 
+    if (IsOwner(actor))
+    {
+        sql = sql.Replace("ORDER BY", "WHERE p.owner_admin_id = $ownerId ORDER BY", StringComparison.Ordinal);
+    }
+
     var result = new List<PoiAdminListItemDto>();
     await using var command = new SqliteCommand(sql, connection);
+    if (IsOwner(actor))
+    {
+        command.Parameters.AddWithValue("$ownerId", actor.Id);
+    }
     await using var reader = await command.ExecuteReaderAsync();
     while (await reader.ReadAsync())
     {
@@ -1236,6 +1669,8 @@ static async Task<List<PoiAdminListItemDto>> GetPoisForAdminListAsync(string con
             IsDeleted = !reader.IsDBNull(10) && reader.GetInt32(10) != 0,
             DeletedAt = reader.IsDBNull(11) ? null : reader.GetString(11),
             DeleteStatus = reader.IsDBNull(12) ? "ACTIVE" : reader.GetString(12),
+            OwnerUsername = reader.IsDBNull(13) ? string.Empty : reader.GetString(13),
+            OwnerFullName = reader.IsDBNull(14) ? string.Empty : reader.GetString(14),
         });
     }
 
@@ -1342,10 +1777,10 @@ static async Task<PoiMobileDto?> GetPoiForPublicAsync(SqliteConnection connectio
     };
 }
 
-static async Task<PoiAdminDto?> GetPoiAdminAsync(SqliteConnection connection, long id)
+static async Task<PoiAdminDto?> GetPoiAdminAsync(SqliteConnection connection, long id, AdminActor actor)
 {
     const string coreSql = @"
-        SELECT id, latitude, longitude, radius_meters, priority, map_link, image_url, audio_url, is_active
+        SELECT id, latitude, longitude, radius_meters, priority, map_link, image_url, audio_url, is_active, owner_admin_id
         FROM pois
         WHERE id = $id;
         ";
@@ -1356,6 +1791,11 @@ static async Task<PoiAdminDto?> GetPoiAdminAsync(SqliteConnection connection, lo
         command.Parameters.AddWithValue("$id", id);
         await using var reader = await command.ExecuteReaderAsync();
         if (!await reader.ReadAsync())
+        {
+            return null;
+        }
+        var ownerAdminId = reader.IsDBNull(9) ? (long?)null : reader.GetInt64(9);
+        if (IsOwner(actor) && ownerAdminId != actor.Id)
         {
             return null;
         }
@@ -1371,6 +1811,7 @@ static async Task<PoiAdminDto?> GetPoiAdminAsync(SqliteConnection connection, lo
             ImageUrl = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
             AudioUrl = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
             IsActive = reader.GetInt32(8) != 0,
+            OwnerAdminId = ownerAdminId?.ToString(CultureInfo.InvariantCulture),
         };
     }
 
@@ -1408,8 +1849,8 @@ static async Task<long> UpsertPoiCoreAsync(SqliteConnection connection, System.D
     if (request.Id is null)
     {
         const string insertSql = @"
-            INSERT INTO pois (latitude, longitude, radius_meters, priority, map_link, image_url, audio_url, is_active, is_deleted, deleted_at, delete_status)
-            VALUES ($latitude, $longitude, $radius, $priority, $map_link, $image_url, $audio_url, $is_active, 0, NULL, 'ACTIVE');
+            INSERT INTO pois (latitude, longitude, radius_meters, priority, map_link, image_url, audio_url, is_active, owner_admin_id, is_deleted, deleted_at, delete_status)
+            VALUES ($latitude, $longitude, $radius, $priority, $map_link, $image_url, $audio_url, $is_active, $owner_admin_id, 0, NULL, 'ACTIVE');
             SELECT last_insert_rowid();
             ";
 
@@ -1423,13 +1864,14 @@ static async Task<long> UpsertPoiCoreAsync(SqliteConnection connection, System.D
         insert.Parameters.AddWithValue("$image_url", request.ImageUrl ?? string.Empty);
         insert.Parameters.AddWithValue("$audio_url", request.AudioUrl ?? string.Empty);
         insert.Parameters.AddWithValue("$is_active", request.IsActive ? 1 : 0);
+        insert.Parameters.AddWithValue("$owner_admin_id", request.OwnerAdminId.HasValue ? request.OwnerAdminId.Value : DBNull.Value);
         var raw = await insert.ExecuteScalarAsync();
         return Convert.ToInt64(raw, CultureInfo.InvariantCulture);
     }
 
     const string upsertSql = @"
-        INSERT INTO pois (id, latitude, longitude, radius_meters, priority, map_link, image_url, audio_url, is_active, is_deleted, deleted_at, delete_status)
-        VALUES ($id, $latitude, $longitude, $radius, $priority, $map_link, $image_url, $audio_url, $is_active, 0, NULL, 'ACTIVE')
+        INSERT INTO pois (id, latitude, longitude, radius_meters, priority, map_link, image_url, audio_url, is_active, owner_admin_id, is_deleted, deleted_at, delete_status)
+        VALUES ($id, $latitude, $longitude, $radius, $priority, $map_link, $image_url, $audio_url, $is_active, $owner_admin_id, 0, NULL, 'ACTIVE')
         ON CONFLICT(id) DO UPDATE SET
             latitude = excluded.latitude,
             longitude = excluded.longitude,
@@ -1439,6 +1881,7 @@ static async Task<long> UpsertPoiCoreAsync(SqliteConnection connection, System.D
             image_url = excluded.image_url,
             audio_url = excluded.audio_url,
             is_active = excluded.is_active,
+            owner_admin_id = COALESCE(pois.owner_admin_id, excluded.owner_admin_id),
             is_deleted = 0,
             deleted_at = NULL,
             delete_status = 'ACTIVE';
@@ -1455,6 +1898,7 @@ static async Task<long> UpsertPoiCoreAsync(SqliteConnection connection, System.D
     command.Parameters.AddWithValue("$image_url", request.ImageUrl ?? string.Empty);
     command.Parameters.AddWithValue("$audio_url", request.AudioUrl ?? string.Empty);
     command.Parameters.AddWithValue("$is_active", request.IsActive ? 1 : 0);
+    command.Parameters.AddWithValue("$owner_admin_id", request.OwnerAdminId.HasValue ? request.OwnerAdminId.Value : DBNull.Value);
     await command.ExecuteNonQueryAsync();
     return request.Id.Value;
 }
@@ -1490,9 +1934,14 @@ static async Task UpsertTranslationAsync(
     await command.ExecuteNonQueryAsync();
 }
 
-static async Task<DeletePoiResult> DeletePoiAsync(string connectionString, string uploadDirectory, long id)
+static async Task<DeletePoiResult> DeletePoiAsync(string connectionString, string uploadDirectory, long id, AdminActor actor)
 {
     await using var connection = await OpenConnectionAsync(connectionString);
+    if (!await HasPoiAccessAsync(connection, id, actor))
+    {
+        return DeletePoiResult.NotFound;
+    }
+
     const string softDeleteSql = """
         UPDATE pois
         SET is_deleted = 1,
@@ -1815,6 +2264,8 @@ enum DeletePoiResult
     Deleted = 2
 }
 
+readonly record struct AdminActor(long Id, string Username, string Role, string FullName);
+
 sealed class SupportedLanguage
 {
     public required string Code { get; init; }
@@ -1863,6 +2314,8 @@ sealed class PoiAdminListItemDto
     public bool IsDeleted { get; set; }
     public string? DeletedAt { get; set; }
     public string DeleteStatus { get; set; } = "ACTIVE";
+    public string OwnerUsername { get; set; } = string.Empty;
+    public string OwnerFullName { get; set; } = string.Empty;
 }
 
 sealed class PoiTranslationDto
@@ -1885,7 +2338,33 @@ sealed class PoiAdminDto
     public string ImageUrl { get; set; } = string.Empty;
     public string AudioUrl { get; set; } = string.Empty;
     public bool IsActive { get; set; } = true;
+    public string? OwnerAdminId { get; set; }
     public List<PoiTranslationDto> Translations { get; set; } = [];
+}
+
+sealed class OwnerAccountDto
+{
+    public string Id { get; set; } = string.Empty;
+    public string Username { get; set; } = string.Empty;
+    public string FullName { get; set; } = string.Empty;
+}
+
+sealed class AdminLoginRequest
+{
+    public string? Username { get; set; }
+    public string? Password { get; set; }
+}
+
+sealed class AdminCreateOwnerRequest
+{
+    public string? Username { get; set; }
+    public string? Password { get; set; }
+    public string? FullName { get; set; }
+}
+
+sealed class AssignPoiOwnerRequest
+{
+    public string? OwnerId { get; set; }
 }
 
 sealed class PoiAdminUpsertRequest
@@ -1917,6 +2396,7 @@ sealed class PoiCoreUpsert
     public required string ImageUrl { get; init; }
     public required string AudioUrl { get; init; }
     public required bool IsActive { get; init; }
+    public required long? OwnerAdminId { get; init; }
 }
 
 sealed class ShopDto

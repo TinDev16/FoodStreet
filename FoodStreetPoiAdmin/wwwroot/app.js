@@ -20,6 +20,19 @@
   const tabHistoryBtn = $("#tabHistoryBtn");
   const activeTable = $("#activeTable");
   const historyTable = $("#historyTable");
+  const authDialogEl = $("#authDialog");
+  const authFormEl = $("#authForm");
+  const authStatusEl = $("#authStatus");
+  const logoutBtn = $("#logoutBtn");
+  const sidebarUserNameEl = $("#sidebarUserName");
+  const sidebarUserRoleEl = $("#sidebarUserRole");
+  const sidebarUserAvatarEl = $("#sidebarUserAvatar");
+  const ownerManagementCardEl = $("#ownerManagementCard");
+  const ownerCreateFormEl = $("#ownerCreateForm");
+  const ownerAssignFormEl = $("#ownerAssignForm");
+  const assignPoiIdEl = $("#assignPoiId");
+  const assignOwnerIdEl = $("#assignOwnerId");
+  const ownerManageNavEl = $("#ownerManageNav");
 
   const state = {
     languages: [],
@@ -36,6 +49,11 @@
       translationsByLang: {},
     },
     activeTab: "active",
+    auth: {
+      token: (localStorage.getItem("adminToken") || "").trim(),
+      user: null,
+    },
+    owners: [],
   };
 
   const setStatus = (msg, isError = false) => {
@@ -52,8 +70,16 @@
     }
   };
 
+  const authHeaders = (extra = {}) => {
+    const headers = { Accept: "application/json", ...extra };
+    if (state.auth.token) {
+      headers.Authorization = `Bearer ${state.auth.token}`;
+    }
+    return headers;
+  };
+
   const apiGet = async (url) => {
-    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    const res = await fetch(url, { headers: authHeaders() });
     if (!res.ok) throw new Error(await safeError(res));
     return res.json();
   };
@@ -61,7 +87,7 @@
   const apiPostJson = async (url, body) => {
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(await safeError(res));
@@ -69,13 +95,13 @@
   };
 
   const apiDelete = async (url) => {
-    const res = await fetch(url, { method: "DELETE", headers: { Accept: "application/json" } });
+    const res = await fetch(url, { method: "DELETE", headers: authHeaders() });
     if (!res.ok) throw new Error(await safeError(res));
     return res.json().catch(() => ({}));
   };
 
   const apiPost = async (url) => {
-    const res = await fetch(url, { method: "POST", headers: { Accept: "application/json" } });
+    const res = await fetch(url, { method: "POST", headers: authHeaders() });
     if (!res.ok) throw new Error(await safeError(res));
     return res.json();
   };
@@ -97,6 +123,14 @@
     if (baseUrl) qs.set("baseUrl", baseUrl);
     const data = await apiGet(`/api/pois/${encodeURIComponent(poiId)}/public-link?${qs.toString()}`);
     return data?.url || "";
+  };
+
+  const fetchQrPngBlobUrl = async (poiId, langCode, download = false) => {
+    const url = buildQrImageUrl(poiId, langCode, download);
+    const res = await fetch(url, { headers: authHeaders() });
+    if (!res.ok) throw new Error(await safeError(res));
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
   };
 
   const ensureTranslationState = (langCode) => {
@@ -219,12 +253,15 @@
 
     for (const item of deletedItems) {
       const tr = document.createElement("tr");
+      const restoreAction = isSuperAdmin()
+        ? `<button type="button" class="secondary icon-only" title="Khôi phục" data-action="restore" data-id="${escapeAttr(item.id)}"><i class="fa-solid fa-rotate-left pointer-events-none"></i></button>`
+        : "";
       tr.innerHTML = `
         <td class="mono">${escapeHtml(item.id)}</td>
         <td class="fw-500">${escapeHtml(item.nameVi || "")}</td>
         <td>${escapeHtml(item.deletedAt || "")}</td>
         <td class="actions-cell">
-          <button type="button" class="secondary icon-only" title="Khôi phục" data-action="restore" data-id="${escapeAttr(item.id)}"><i class="fa-solid fa-rotate-left pointer-events-none"></i></button>
+          ${restoreAction}
         </td>
       `;
       deletedRowsEl.appendChild(tr);
@@ -246,6 +283,7 @@
   const loadList = async () => {
     const items = await apiGet("/api/pois/admin");
     renderList(items);
+    reloadOwnerOptions();
   };
 
   const resetForm = () => {
@@ -322,7 +360,11 @@
     const qs = new URLSearchParams({ kind });
     if (lang) qs.set("lang", lang);
 
-    const res = await fetch(`/api/uploads?${qs.toString()}`, { method: "POST", body: fd });
+    const res = await fetch(`/api/uploads?${qs.toString()}`, {
+      method: "POST",
+      body: fd,
+      headers: state.auth.token ? { Authorization: `Bearer ${state.auth.token}` } : {},
+    });
     if (!res.ok) throw new Error(await safeError(res));
     const j = await res.json();
     return j.url;
@@ -396,7 +438,147 @@
     }
   };
 
+  const isSuperAdmin = () => (state.auth.user?.role || "").toLowerCase() === "superadmin";
+
+  const updateIdentityUi = () => {
+    const username = state.auth.user?.username || "Guest";
+    const role = state.auth.user?.role || "";
+    const fullName = state.auth.user?.fullName || username;
+    sidebarUserNameEl.textContent = fullName;
+    sidebarUserRoleEl.textContent = role ? role.toUpperCase() : "Chua dang nhap";
+    sidebarUserAvatarEl.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=4f46e5&color=fff&rounded=true`;
+
+    const showOwnerMgmt = isSuperAdmin();
+    ownerManagementCardEl.hidden = !showOwnerMgmt;
+    ownerManageNavEl.hidden = !showOwnerMgmt;
+  };
+
+  const requireLogin = async () => {
+    if (!state.auth.token) {
+      authDialogEl.showModal();
+      return false;
+    }
+
+    try {
+      const me = await apiGet("/api/admin/auth/me");
+      state.auth.user = me || null;
+      updateIdentityUi();
+      return true;
+    } catch {
+      localStorage.removeItem("adminToken");
+      state.auth.token = "";
+      state.auth.user = null;
+      updateIdentityUi();
+      authDialogEl.showModal();
+      return false;
+    }
+  };
+
+  const reloadOwnerOptions = () => {
+    if (!assignOwnerIdEl || !assignPoiIdEl) return;
+    assignOwnerIdEl.innerHTML = "";
+    const unassignOpt = document.createElement("option");
+    unassignOpt.value = "";
+    unassignOpt.textContent = "— Bỏ gán owner —";
+    assignOwnerIdEl.appendChild(unassignOpt);
+
+    for (const owner of state.owners) {
+      const opt = document.createElement("option");
+      opt.value = owner.id;
+      opt.textContent = owner.fullName ? `${owner.username} (${owner.fullName})` : owner.username;
+      assignOwnerIdEl.appendChild(opt);
+    }
+
+    assignPoiIdEl.innerHTML = "";
+    for (const row of rowsEl.querySelectorAll("button[data-action='edit']")) {
+      const id = row.dataset.id;
+      if (!id) continue;
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = `POI #${id}`;
+      assignPoiIdEl.appendChild(opt);
+    }
+  };
+
+  const loadOwners = async () => {
+    if (!isSuperAdmin()) {
+      state.owners = [];
+      reloadOwnerOptions();
+      return;
+    }
+
+    state.owners = await apiGet("/api/admin/owners");
+    reloadOwnerOptions();
+  };
+
   const wireEvents = () => {
+    authFormEl?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const username = ($("#authUsername")?.value || "").trim();
+      const password = ($("#authPassword")?.value || "").trim();
+      if (!username || !password) return;
+
+      authStatusEl.textContent = "Dang dang nhap...";
+      try {
+        const data = await apiPostJson("/api/admin/auth/login", { username, password });
+        state.auth.token = (data?.token || "").trim();
+        state.auth.user = data?.user || null;
+        if (!state.auth.token) throw new Error("Dang nhap that bai.");
+        localStorage.setItem("adminToken", state.auth.token);
+        authStatusEl.textContent = "";
+        if (authDialogEl.open) authDialogEl.close();
+        updateIdentityUi();
+        await loadOwners();
+        await loadList();
+      } catch (err) {
+        authStatusEl.textContent = err?.message || String(err);
+      }
+    });
+
+    logoutBtn?.addEventListener("click", async () => {
+      try { await apiPost("/api/admin/auth/logout"); } catch {}
+      state.auth.token = "";
+      state.auth.user = null;
+      localStorage.removeItem("adminToken");
+      updateIdentityUi();
+      authDialogEl.showModal();
+    });
+
+    ownerCreateFormEl?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      try {
+        await apiPostJson("/api/admin/owners", {
+          username: ($("#ownerUsername")?.value || "").trim(),
+          fullName: ($("#ownerFullName")?.value || "").trim(),
+          password: ($("#ownerPassword")?.value || "").trim(),
+        });
+        ownerCreateFormEl.reset();
+        await loadOwners();
+        setStatus("Da tao owner.");
+      } catch (err) {
+        setStatus(err?.message || String(err), true);
+      }
+    });
+
+    ownerAssignFormEl?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const poiId = (assignPoiIdEl?.value || "").trim();
+      if (!poiId) {
+        setStatus("Chon POI can gan owner.", true);
+        return;
+      }
+
+      try {
+        await apiPostJson(`/api/admin/pois/${encodeURIComponent(poiId)}/assign-owner`, {
+          ownerId: (assignOwnerIdEl?.value || "").trim() || null,
+        });
+        setStatus("Da cap nhat owner cho POI.");
+        await loadList();
+      } catch (err) {
+        setStatus(err?.message || String(err), true);
+      }
+    });
+
     sourceLangSelect.addEventListener("change", () => setActiveSourceLang(sourceLangSelect.value || "vi"));
 
     const gpsInput = formEl.elements.namedItem("gps");
@@ -473,6 +655,15 @@
       await refreshQrDialog();
     });
 
+    qrDialogEl?.addEventListener("close", () => {
+      try {
+        if (state.qr.previewBlobUrl) URL.revokeObjectURL(state.qr.previewBlobUrl);
+        if (state.qr.downloadBlobUrl) URL.revokeObjectURL(state.qr.downloadBlobUrl);
+      } catch {}
+      state.qr.previewBlobUrl = "";
+      state.qr.downloadBlobUrl = "";
+    });
+
     qrCopyBtn.addEventListener("click", async () => {
       const text = (qrPublicUrlEl.value || "").trim();
       if (!text) return;
@@ -507,6 +698,7 @@
 
   const init = async () => {
     setStatus("Loading...");
+    updateIdentityUi();
     state.languages = await apiGet("/api/languages");
     buildSourceLangOptions();
 
@@ -521,7 +713,11 @@
     wireEvents();
     setTab("active");
     resetForm();
-    await loadList();
+    const ok = await requireLogin();
+    if (ok) {
+      await loadOwners();
+      await loadList();
+    }
     setStatus("");
   };
 
@@ -539,8 +735,18 @@
     const publicUrl = await buildPublicLinkUrl(poiId, langCode);
 
     qrPublicUrlEl.value = publicUrl;
-    qrPreviewImageEl.src = buildQrImageUrl(poiId, langCode, false);
-    qrDownloadBtn.href = buildQrImageUrl(poiId, langCode, true);
+    if (state.qr.previewBlobUrl) {
+      URL.revokeObjectURL(state.qr.previewBlobUrl);
+    }
+    if (state.qr.downloadBlobUrl) {
+      URL.revokeObjectURL(state.qr.downloadBlobUrl);
+    }
+
+    state.qr.previewBlobUrl = await fetchQrPngBlobUrl(poiId, langCode, false);
+    state.qr.downloadBlobUrl = await fetchQrPngBlobUrl(poiId, langCode, true);
+
+    qrPreviewImageEl.src = state.qr.previewBlobUrl;
+    qrDownloadBtn.href = state.qr.downloadBlobUrl;
     qrDownloadBtn.setAttribute("download", `poi-${poiId}.png`);
   };
 
@@ -579,6 +785,14 @@
     }
     qrPreviewImageEl.removeAttribute("src");
     qrPublicUrlEl.value = "";
+    if (state.qr.previewBlobUrl) {
+      URL.revokeObjectURL(state.qr.previewBlobUrl);
+      state.qr.previewBlobUrl = "";
+    }
+    if (state.qr.downloadBlobUrl) {
+      URL.revokeObjectURL(state.qr.downloadBlobUrl);
+      state.qr.downloadBlobUrl = "";
+    }
 
     qrDialogEl.showModal();
     setStatus("Dang tao QR...");
