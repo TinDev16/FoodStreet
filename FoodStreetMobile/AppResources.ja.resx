@@ -67,47 +67,11 @@
   <data name="Home_SearchPlaceholder" xml:space="preserve">
     <value>料理やお店を検索...</value>
   </data>
-  <data name="Home_CategoriesTitle" xml:space="preserve">
-    <value>カテゴリ</value>
-  </data>
-  <data name="Home_ViewAll" xml:space="preserve">
-    <value>すべて見る →</value>
-  </data>
-  <data name="Home_CategoryPhoBun" xml:space="preserve">
-    <value>フォー &amp; 麺</value>
-  </data>
-  <data name="Home_CategoryBanhMi" xml:space="preserve">
-    <value>バインミー</value>
-  </data>
-  <data name="Home_CategoryCom" xml:space="preserve">
-    <value>ご飯</value>
-  </data>
-  <data name="Home_CategoryCoffee" xml:space="preserve">
-    <value>コーヒー</value>
-  </data>
-  <data name="Home_CategoryDessert" xml:space="preserve">
-    <value>デザート</value>
-  </data>
-  <data name="Home_CategoryDrinks" xml:space="preserve">
-    <value>ドリンク</value>
-  </data>
   <data name="Home_FeaturedTitle" xml:space="preserve">
     <value>おすすめ</value>
   </data>
   <data name="Home_RatingLocation" xml:space="preserve">
     <value>4.8 · ヴィン・カイン</value>
-  </data>
-  <data name="Home_PromoToday" xml:space="preserve">
-    <value>🎉 本日の特典</value>
-  </data>
-  <data name="Home_PromoDiscount" xml:space="preserve">
-    <value>初回注文 20% OFF</value>
-  </data>
-  <data name="Home_PromoValidUntil" xml:space="preserve">
-    <value>28/02 まで有効</value>
-  </data>
-  <data name="Home_PromoUseNow" xml:space="preserve">
-    <value>今すぐ使う</value>
   </data>
   <data name="Main_RadiusFallbackMeters" xml:space="preserve">
     <value>半径: {0} m</value>

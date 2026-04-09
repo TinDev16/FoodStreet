@@ -35,6 +35,9 @@ public sealed class PoiSyncService
         Preferences.Set(MobileJwtPreferenceKey, token ?? string.Empty);
     }
 
+    public IReadOnlyList<string> GetPreferredBaseUrlsSnapshot()
+        => GetPreferredBaseUrls().ToList();
+
     private void AttachBearerIfAny(HttpRequestMessage request)
     {
         var token = Preferences.Get(MobileJwtPreferenceKey, string.Empty);

@@ -1634,6 +1634,63 @@ public partial class MainPage : ContentPage
         await StartPoiPlaybackAsync(_selectedPoi, allowInterrupt: true);
     }
 
+    private async Task TryRecordAudioPlayAsync(PoiViewModel poi)
+    {
+        if (poi is null || string.IsNullOrWhiteSpace(poi.Id))
+        {
+            return;
+        }
+
+        foreach (var baseUrl in GetConfiguredBackendBaseUrls())
+        {
+            try
+            {
+                using var request = new HttpRequestMessage(
+                    HttpMethod.Post,
+                    $"{baseUrl}/api/pois/{Uri.EscapeDataString(poi.Id)}/audio-play");
+                using var response = await HttpClient.SendAsync(request);
+                if (response.IsSuccessStatusCode)
+                {
+                    return;
+                }
+            }
+            catch
+            {
+                // Ignore logging failures so audio playback still starts immediately.
+            }
+        }
+    }
+
+    private IEnumerable<string> GetConfiguredBackendBaseUrls()
+    {
+        var raw = _viewModel.GetConfiguredBaseUrls();
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            yield break;
+        }
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var parts = raw.Split([';', '\n', '\r', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var part in parts)
+        {
+            if (!Uri.TryCreate(part, UriKind.Absolute, out var uri))
+            {
+                continue;
+            }
+
+            if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+            {
+                continue;
+            }
+
+            var normalized = uri.ToString().TrimEnd('/');
+            if (seen.Add(normalized))
+            {
+                yield return normalized;
+            }
+        }
+    }
+
     private async Task RequestAutoPlaybackAsync(PoiViewModel poi)
     {
         if (!HasPlayableAudio(poi))
@@ -1724,6 +1781,7 @@ public partial class MainPage : ContentPage
                 return;
             }
 
+            _ = TryRecordAudioPlayAsync(poi);
             _currentPlaybackSource = PlaybackSourceKind.AudioWeb;
             ShowAudioPlayerHtml(BuildAudioPlayerHtml(audioUri.ToString()));
             return;
@@ -1736,6 +1794,7 @@ public partial class MainPage : ContentPage
             return;
         }
 
+        _ = TryRecordAudioPlayAsync(poi);
         _currentPlaybackSource = PlaybackSourceKind.TtsNative;
         await StartTtsPlayerAsync(narration);
     }

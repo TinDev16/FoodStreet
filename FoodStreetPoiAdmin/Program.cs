@@ -564,6 +564,43 @@ app.MapGet("/api/pois/admin", async (HttpContext context) =>
     return Results.Ok(items);
 }).RequireAuthorization();
 
+app.MapGet("/api/admin/reports/audio-plays", async (HttpContext context) =>
+{
+    if (!TryGetAdminActor(context.User, out var actor))
+    {
+        return Results.Unauthorized();
+    }
+
+    await TryEnsureAdbReverseAsync();
+
+    var sort = NormalizeAudioPlaySort(context.Request.Query["sort"].ToString());
+    var fromDate = ParseDateOnlyFilter(context.Request.Query["from"].ToString());
+    var toDate = ParseDateOnlyFilter(context.Request.Query["to"].ToString());
+    if (!string.IsNullOrWhiteSpace(context.Request.Query["from"]) && fromDate is null)
+    {
+        return Results.BadRequest(new { error = "Gia tri 'from' khong hop le. Dinh dang dung: yyyy-MM-dd." });
+    }
+
+    if (!string.IsNullOrWhiteSpace(context.Request.Query["to"]) && toDate is null)
+    {
+        return Results.BadRequest(new { error = "Gia tri 'to' khong hop le. Dinh dang dung: yyyy-MM-dd." });
+    }
+
+    var fromUtc = fromDate?.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).ToString("O");
+    var toExclusiveUtc = toDate?.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).ToString("O");
+    var items = await GetPoiAudioPlayStatsAsync(connectionString, actor, fromUtc, toExclusiveUtc, sort);
+    return Results.Ok(new
+    {
+        items,
+        filter = new
+        {
+            from = fromDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            to = toDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            sort
+        }
+    });
+}).RequireAuthorization();
+
 // Admin: load core + all translations with ownership filter.
 app.MapGet("/api/pois/{id}", async (HttpContext context, string id) =>
 {
@@ -606,6 +643,20 @@ app.MapGet("/api/pois/{id}/localized", async (HttpContext context, string id) =>
 
     var item = await GetPoiForMobileAsync(connection, poiId, requestedLang);
     return item is null ? Results.NotFound() : Results.Ok(item);
+});
+
+app.MapGet("/api/public/featured-pois", async (HttpContext context) =>
+{
+    await TryEnsureAdbReverseAsync();
+    var requestedLang = NormalizeLanguageOrFallback(context.Request.Query["lang"].ToString(), supportedLanguageSet);
+    var limit = 4;
+    if (int.TryParse(context.Request.Query["limit"].ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedLimit))
+    {
+        limit = Math.Clamp(parsedLimit, 1, 20);
+    }
+
+    var items = await GetFeaturedPoisForPublicAsync(connectionString, requestedLang, limit);
+    return Results.Ok(items);
 });
 
 app.MapGet("/api/public/pois/{id}", async (HttpContext context, string id) =>
@@ -949,6 +1000,18 @@ app.MapPost("/api/pois/{id}/restore", async (HttpContext context, string id) =>
     return restored ? Results.Ok(new { id, restored = true }) : Results.NotFound();
 }).RequireAuthorization();
 
+app.MapPost("/api/pois/{id}/audio-play", async (string id) =>
+{
+    await TryEnsureAdbReverseAsync();
+    if (!TryParsePoiId(id, out var poiId))
+    {
+        return Results.BadRequest(new { error = "Invalid id." });
+    }
+
+    var recorded = await RecordPoiAudioPlayAsync(connectionString, poiId);
+    return recorded ? Results.Ok(new { id, recorded = true }) : Results.NotFound();
+});
+
 // Legacy endpoints for older mobile build.
 app.MapGet("/api/shops", async (HttpContext context) =>
 {
@@ -1169,6 +1232,21 @@ static bool TryParsePoiId(string? raw, out long poiId)
     return long.TryParse(raw.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out poiId)
            && poiId > 0;
 }
+
+static DateOnly? ParseDateOnlyFilter(string? raw)
+{
+    if (string.IsNullOrWhiteSpace(raw))
+    {
+        return null;
+    }
+
+    return DateOnly.TryParseExact(raw.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var value)
+        ? value
+        : null;
+}
+
+static string NormalizeAudioPlaySort(string? raw)
+    => string.Equals(raw, "asc", StringComparison.OrdinalIgnoreCase) ? "asc" : "desc";
 
 async Task<(string? BaseUrl, string? Error)> ResolvePublicBaseUrlForRequestAsync(HttpContext context)
 {
@@ -1447,8 +1525,16 @@ static async Task InitializeDatabaseAsync(string connectionString)
             phone_digits TEXT NOT NULL,
             created_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS poi_audio_play_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            poi_id INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(poi_id) REFERENCES pois(id) ON DELETE CASCADE
+        );
         CREATE UNIQUE INDEX IF NOT EXISTS ux_app_users_username ON app_users(username);
         CREATE UNIQUE INDEX IF NOT EXISTS ux_app_users_phone_digits ON app_users(phone_digits);
+        CREATE INDEX IF NOT EXISTS ix_poi_audio_play_events_poi_created_at ON poi_audio_play_events(poi_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS ix_poi_audio_play_events_created_at ON poi_audio_play_events(created_at DESC);
         """, connection))
     {
         await createUsers.ExecuteNonQueryAsync();
@@ -1772,6 +1858,32 @@ static async Task<bool> HasPoiAccessAsync(SqliteConnection connection, long poiI
     return await ownerCheck.ExecuteScalarAsync() is not null;
 }
 
+static async Task<bool> RecordPoiAudioPlayAsync(string connectionString, long poiId)
+{
+    await using var connection = await OpenConnectionAsync(connectionString);
+    await using var existsCommand = new SqliteCommand("""
+        SELECT 1
+        FROM pois
+        WHERE id = $id
+          AND COALESCE(is_deleted, 0) = 0
+        LIMIT 1;
+        """, connection);
+    existsCommand.Parameters.AddWithValue("$id", poiId);
+    if (await existsCommand.ExecuteScalarAsync() is null)
+    {
+        return false;
+    }
+
+    await using var insert = new SqliteCommand("""
+        INSERT INTO poi_audio_play_events (poi_id, created_at)
+        VALUES ($poiId, $createdAt);
+        """, connection);
+    insert.Parameters.AddWithValue("$poiId", poiId);
+    insert.Parameters.AddWithValue("$createdAt", DateTimeOffset.UtcNow.ToString("O"));
+    await insert.ExecuteNonQueryAsync();
+    return true;
+}
+
 static async Task<bool> AssignOwnerToPoiAsync(string connectionString, long poiId, long? ownerId)
 {
     await using var connection = await OpenConnectionAsync(connectionString);
@@ -1843,6 +1955,94 @@ static async Task<List<PoiMobileDto>> GetPoisForMobileAsync(string connectionStr
             Name = reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
             Description = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
             TtsText = reader.IsDBNull(10) ? string.Empty : reader.GetString(10),
+        });
+    }
+
+    return result;
+}
+
+static async Task<List<PoiAudioPlayStatDto>> GetPoiAudioPlayStatsAsync(
+    string connectionString,
+    AdminActor actor,
+    string? fromUtc,
+    string? toExclusiveUtc,
+    string sort)
+{
+    await using var connection = await OpenConnectionAsync(connectionString);
+    var countOrder = string.Equals(sort, "asc", StringComparison.OrdinalIgnoreCase) ? "ASC" : "DESC";
+    var sql = $"""
+        SELECT
+            p.id,
+            COALESCE(NULLIF(t_vi.name, ''), '') AS name_vi,
+            COUNT(e.id) AS play_count,
+            MAX(e.created_at) AS last_played_at
+        FROM pois p
+        LEFT JOIN poi_translations t_vi ON p.id = t_vi.poi_id AND t_vi.lang_code = 'vi'
+        LEFT JOIN poi_audio_play_events e ON e.poi_id = p.id
+            AND ($fromUtc IS NULL OR e.created_at >= $fromUtc)
+            AND ($toExclusiveUtc IS NULL OR e.created_at < $toExclusiveUtc)
+        WHERE COALESCE(p.is_deleted, 0) = 0
+        {(IsOwner(actor) ? "AND p.owner_admin_id = $ownerId" : string.Empty)}
+        GROUP BY p.id, name_vi
+        ORDER BY play_count {countOrder}, p.id ASC;
+        """;
+
+    var result = new List<PoiAudioPlayStatDto>();
+    await using var command = new SqliteCommand(sql, connection);
+    command.Parameters.AddWithValue("$fromUtc", string.IsNullOrWhiteSpace(fromUtc) ? DBNull.Value : fromUtc);
+    command.Parameters.AddWithValue("$toExclusiveUtc", string.IsNullOrWhiteSpace(toExclusiveUtc) ? DBNull.Value : toExclusiveUtc);
+    if (IsOwner(actor))
+    {
+        command.Parameters.AddWithValue("$ownerId", actor.Id);
+    }
+
+    await using var reader = await command.ExecuteReaderAsync();
+    while (await reader.ReadAsync())
+    {
+        result.Add(new PoiAudioPlayStatDto
+        {
+            PoiId = reader.GetInt64(0).ToString(CultureInfo.InvariantCulture),
+            PoiName = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+            PlayCount = reader.IsDBNull(2) ? 0 : reader.GetInt64(2),
+            LastPlayedAt = reader.IsDBNull(3) ? null : reader.GetString(3)
+        });
+    }
+
+    return result;
+}
+
+static async Task<List<FeaturedPoiDto>> GetFeaturedPoisForPublicAsync(string connectionString, string requestedLang, int limit)
+{
+    await using var connection = await OpenConnectionAsync(connectionString);
+    const string sql = """
+        SELECT
+            p.id,
+            COALESCE(NULLIF(t_req.name, ''), t_vi.name, '') AS name,
+            p.image_url,
+            COUNT(e.id) AS play_count
+        FROM pois p
+        LEFT JOIN poi_translations t_req ON p.id = t_req.poi_id AND t_req.lang_code = $lang_code
+        LEFT JOIN poi_translations t_vi ON p.id = t_vi.poi_id AND t_vi.lang_code = 'vi'
+        LEFT JOIN poi_audio_play_events e ON e.poi_id = p.id
+        WHERE p.is_active = 1 AND COALESCE(p.is_deleted, 0) = 0
+        GROUP BY p.id, name, p.image_url, p.priority
+        ORDER BY play_count DESC, p.priority DESC, p.id ASC
+        LIMIT $limit;
+        """;
+
+    var result = new List<FeaturedPoiDto>();
+    await using var command = new SqliteCommand(sql, connection);
+    command.Parameters.AddWithValue("$lang_code", requestedLang);
+    command.Parameters.AddWithValue("$limit", limit);
+    await using var reader = await command.ExecuteReaderAsync();
+    while (await reader.ReadAsync())
+    {
+        result.Add(new FeaturedPoiDto
+        {
+            Id = reader.GetInt64(0).ToString(CultureInfo.InvariantCulture),
+            Name = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+            ImageUrl = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+            PlayCount = reader.IsDBNull(3) ? 0 : reader.GetInt64(3)
         });
     }
 
@@ -2555,6 +2755,22 @@ sealed class PoiAdminListItemDto
     public string? OwnerAdminId { get; set; }
     public string OwnerUsername { get; set; } = string.Empty;
     public string OwnerFullName { get; set; } = string.Empty;
+}
+
+sealed class PoiAudioPlayStatDto
+{
+    public string PoiId { get; set; } = string.Empty;
+    public string PoiName { get; set; } = string.Empty;
+    public long PlayCount { get; set; }
+    public string? LastPlayedAt { get; set; }
+}
+
+sealed class FeaturedPoiDto
+{
+    public string Id { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string ImageUrl { get; set; } = string.Empty;
+    public long PlayCount { get; set; }
 }
 
 sealed class PoiTranslationDto

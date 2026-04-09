@@ -30,6 +30,13 @@
   const ownerManageNavEl = $("#ownerManageNav");
   const navClientPoiEl = $("#navClientPoi");
   const poiFormCardEl = $("#poiFormCard");
+  const audioStatsRowsEl = $("#audioStatsRows");
+  const audioStatsCardEl = $("#audioStatsCard");
+  const audioStatsSummaryEl = $("#audioStatsSummary");
+  const audioStatsFromEl = $("#audioStatsFrom");
+  const audioStatsToEl = $("#audioStatsTo");
+  const audioStatsSortEl = $("#audioStatsSort");
+  const audioStatsReloadBtn = $("#audioStatsReloadBtn");
 
   const state = {
     languages: [],
@@ -52,6 +59,7 @@
     },
     owners: [],
     poiItems: [],
+    audioStats: [],
   };
 
   const setStatus = (msg, isError = false) => {
@@ -266,6 +274,39 @@
     }
   };
 
+  const formatAudioStatsTime = (value) => {
+    if (!value) return "Chưa có";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleString("vi-VN");
+  };
+
+  const renderAudioStats = (items) => {
+    if (!audioStatsRowsEl) return;
+    audioStatsRowsEl.innerHTML = "";
+    const rows = Array.isArray(items) ? items : [];
+    const totalPlays = rows.reduce((sum, item) => sum + Number(item?.playCount || 0), 0);
+    if (audioStatsSummaryEl) {
+      audioStatsSummaryEl.textContent = `${rows.length} POI, tổng ${totalPlays} lượt bấm phát audio.`;
+    }
+
+    if (!rows.length) {
+      audioStatsRowsEl.innerHTML = `<tr><td colspan="4" class="muted">Chưa có dữ liệu thống kê trong khoảng thời gian đã chọn.</td></tr>`;
+      return;
+    }
+
+    for (const item of rows) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="mono">${escapeHtml(item.poiId || "")}</td>
+        <td class="fw-500">${escapeHtml(item.poiName || "") || '<span class="muted">Chưa đặt tên</span>'}</td>
+        <td>${escapeHtml(String(item.playCount || 0))}</td>
+        <td>${escapeHtml(formatAudioStatsTime(item.lastPlayedAt))}</td>
+      `;
+      audioStatsRowsEl.appendChild(tr);
+    }
+  };
+
   const setTab = (tab) => {
     state.activeTab = tab === "history" ? "history" : "active";
     const isHistory = state.activeTab === "history";
@@ -283,6 +324,21 @@
     state.poiItems = Array.isArray(items) ? items : [];
     renderList(items);
     reloadOwnerOptions();
+  };
+
+  const loadAudioStats = async () => {
+    if (!audioStatsRowsEl || audioStatsCardEl?.hidden) return;
+    const qs = new URLSearchParams();
+    const from = (audioStatsFromEl?.value || "").trim();
+    const to = (audioStatsToEl?.value || "").trim();
+    const sort = (audioStatsSortEl?.value || "desc").trim() || "desc";
+    if (from) qs.set("from", from);
+    if (to) qs.set("to", to);
+    qs.set("sort", sort);
+
+    const data = await apiGet(`/api/admin/reports/audio-plays?${qs.toString()}`);
+    state.audioStats = Array.isArray(data?.items) ? data.items : [];
+    renderAudioStats(state.audioStats);
   };
 
   const resetForm = () => {
@@ -531,6 +587,7 @@
         updateIdentityUi();
         await loadOwners();
         await loadList();
+        await loadAudioStats();
       } catch (err) {
         const msg = err?.message || String(err);
         authStatusEl.textContent = msg.includes("401")
@@ -564,6 +621,12 @@
       setTab("history");
       loadList().catch((err) => setStatus(err?.message || String(err), true));
     });
+    audioStatsReloadBtn?.addEventListener("click", () => {
+      loadAudioStats().catch((err) => setStatus(err?.message || String(err), true));
+    });
+    audioStatsSortEl?.addEventListener("change", () => {
+      loadAudioStats().catch((err) => setStatus(err?.message || String(err), true));
+    });
     generateQrBtn?.addEventListener("click", async () => {
       const currentId = (state.current.id || formEl.elements.namedItem("id").value || "").trim();
       if (!currentId) {
@@ -596,6 +659,7 @@
           setStatus("Soft deleting...");
           await apiDelete(`/api/pois/${encodeURIComponent(id)}`);
           await loadList();
+          await loadAudioStats();
           resetForm();
           setStatus(`Soft deleted POI #${id}`);
         } else if (action === "restore") {
@@ -603,6 +667,7 @@
           setStatus("Restoring...");
           await apiPost(`/api/pois/${encodeURIComponent(id)}/restore`);
           await loadList();
+          await loadAudioStats();
           setStatus(`Restored POI #${id}`);
         }
       } catch (err) {
@@ -664,6 +729,7 @@
         const payload = await buildPayloadAndUpload();
         const res = await apiPostJson("/api/pois", payload);
         await loadList();
+        await loadAudioStats();
         await loadPoi(res.id);
         setStatus(`Saved POI #${res.id}`);
       } catch (err) {
@@ -693,6 +759,7 @@
     if (ok) {
       await loadOwners();
       await loadList();
+      await loadAudioStats();
       if ((state.auth.user?.role || "").toLowerCase() === "owner" && poiFormCardEl) {
         poiFormCardEl.hidden = true;
       }

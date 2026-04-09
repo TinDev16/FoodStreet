@@ -157,130 +157,17 @@
                 <!-- ─────────────────────────────
                      SECTION: Danh Mục
                 ──────────────────────────────── -->
-                <VerticalStackLayout Padding="24,28,24,0" Spacing="16">
-
-                    <Grid ColumnDefinitions="*,Auto">
-                        <Label Grid.Column="0"
-                               Text="{loc:Translate Key=Home_CategoriesTitle}"
-                               FontSize="22"
-                               FontAttributes="Bold"
-                               TextColor="#1A0E0B" />
-                        <Label Grid.Column="1"
-                               Text="{loc:Translate Key=Home_ViewAll}"
-                               FontSize="13"
-                               TextColor="#FF6B35"
-                               VerticalOptions="Center" />
-                    </Grid>
-
-                    <Grid ColumnDefinitions="*,*,*"
-                          RowDefinitions="Auto,Auto"
-                          ColumnSpacing="12"
-                          RowSpacing="12">
-
-                        <Border Grid.Row="0" Grid.Column="0"
-                                BackgroundColor="White" StrokeThickness="0"
-                                StrokeShape="RoundRectangle 20"
-                                Padding="8,18" HeightRequest="110">
-                            <Border.Shadow>
-                                <Shadow Brush="#22FF6B35" Offset="0,4" Radius="14" Opacity="0.10" />
-                            </Border.Shadow>
-                            <VerticalStackLayout Spacing="6" HorizontalOptions="Center" VerticalOptions="Center">
-                                <Label Text="🍜" FontSize="28" HorizontalTextAlignment="Center" />
-                                <Label Text="{loc:Translate Key=Home_CategoryPhoBun}" FontSize="12" FontAttributes="Bold"
-                                       HorizontalTextAlignment="Center" TextColor="#3D2016" />
-                            </VerticalStackLayout>
-                        </Border>
-
-                        <Border Grid.Row="0" Grid.Column="1"
-                                BackgroundColor="White" StrokeThickness="0"
-                                StrokeShape="RoundRectangle 20"
-                                Padding="8,18" HeightRequest="110">
-                            <Border.Shadow>
-                                <Shadow Brush="#22FF6B35" Offset="0,4" Radius="14" Opacity="0.10" />
-                            </Border.Shadow>
-                            <VerticalStackLayout Spacing="6" HorizontalOptions="Center" VerticalOptions="Center">
-                                <Label Text="🥖" FontSize="28" HorizontalTextAlignment="Center" />
-                                <Label Text="{loc:Translate Key=Home_CategoryBanhMi}" FontSize="12" FontAttributes="Bold"
-                                       HorizontalTextAlignment="Center" TextColor="#3D2016" />
-                            </VerticalStackLayout>
-                        </Border>
-
-                        <Border Grid.Row="0" Grid.Column="2"
-                                BackgroundColor="White" StrokeThickness="0"
-                                StrokeShape="RoundRectangle 20"
-                                Padding="8,18" HeightRequest="110">
-                            <Border.Shadow>
-                                <Shadow Brush="#22FF6B35" Offset="0,4" Radius="14" Opacity="0.10" />
-                            </Border.Shadow>
-                            <VerticalStackLayout Spacing="6" HorizontalOptions="Center" VerticalOptions="Center">
-                                <Label Text="🍚" FontSize="28" HorizontalTextAlignment="Center" />
-                                <Label Text="{loc:Translate Key=Home_CategoryCom}" FontSize="12" FontAttributes="Bold"
-                                       HorizontalTextAlignment="Center" TextColor="#3D2016" />
-                            </VerticalStackLayout>
-                        </Border>
-
-                        <Border Grid.Row="1" Grid.Column="0"
-                                BackgroundColor="White" StrokeThickness="0"
-                                StrokeShape="RoundRectangle 20"
-                                Padding="8,18" HeightRequest="110">
-                            <Border.Shadow>
-                                <Shadow Brush="#22FF6B35" Offset="0,4" Radius="14" Opacity="0.10" />
-                            </Border.Shadow>
-                            <VerticalStackLayout Spacing="6" HorizontalOptions="Center" VerticalOptions="Center">
-                                <Label Text="☕" FontSize="28" HorizontalTextAlignment="Center" />
-                                <Label Text="{loc:Translate Key=Home_CategoryCoffee}" FontSize="12" FontAttributes="Bold"
-                                       HorizontalTextAlignment="Center" TextColor="#3D2016" />
-                            </VerticalStackLayout>
-                        </Border>
-
-                        <Border Grid.Row="1" Grid.Column="1"
-                                BackgroundColor="White" StrokeThickness="0"
-                                StrokeShape="RoundRectangle 20"
-                                Padding="8,18" HeightRequest="110">
-                            <Border.Shadow>
-                                <Shadow Brush="#22FF6B35" Offset="0,4" Radius="14" Opacity="0.10" />
-                            </Border.Shadow>
-                            <VerticalStackLayout Spacing="6" HorizontalOptions="Center" VerticalOptions="Center">
-                                <Label Text="🍮" FontSize="28" HorizontalTextAlignment="Center" />
-                                <Label Text="{loc:Translate Key=Home_CategoryDessert}" FontSize="11" FontAttributes="Bold"
-                                       HorizontalTextAlignment="Center" TextColor="#3D2016" />
-                            </VerticalStackLayout>
-                        </Border>
-
-                        <Border Grid.Row="1" Grid.Column="2"
-                                BackgroundColor="White" StrokeThickness="0"
-                                StrokeShape="RoundRectangle 20"
-                                Padding="8,18" HeightRequest="110">
-                            <Border.Shadow>
-                                <Shadow Brush="#22FF6B35" Offset="0,4" Radius="14" Opacity="0.10" />
-                            </Border.Shadow>
-                            <VerticalStackLayout Spacing="6" HorizontalOptions="Center" VerticalOptions="Center">
-                                <Label Text="🧃" FontSize="28" HorizontalTextAlignment="Center" />
-                                <Label Text="{loc:Translate Key=Home_CategoryDrinks}" FontSize="12" FontAttributes="Bold"
-                                       HorizontalTextAlignment="Center" TextColor="#3D2016" />
-                            </VerticalStackLayout>
-                        </Border>
-
-                    </Grid>
-                </VerticalStackLayout>
 
                 <!-- ─────────────────────────────
                      SECTION: Quán Ăn Nổi Bật
                 ──────────────────────────────── -->
                 <VerticalStackLayout Padding="24,28,0,28" Spacing="16">
 
-                    <Grid ColumnDefinitions="*,Auto" Margin="0,0,24,0">
-                        <Label Grid.Column="0"
-                               Text="{loc:Translate Key=Home_FeaturedTitle}"
-                               FontSize="22"
-                               FontAttributes="Bold"
-                               TextColor="#1A0E0B" />
-                        <Label Grid.Column="1"
-                               Text="{loc:Translate Key=Home_ViewAll}"
-                               FontSize="13"
-                               TextColor="#FF6B35"
-                               VerticalOptions="Center" />
-                    </Grid>
+                    <Label Text="{loc:Translate Key=Home_FeaturedTitle}"
+                           Margin="0,0,24,0"
+                           FontSize="22"
+                           FontAttributes="Bold"
+                           TextColor="#1A0E0B" />
 
                     <CollectionView x:Name="FeaturedPlacesCollection"
                                     ItemsLayout="HorizontalList"
@@ -317,7 +204,7 @@
                                         <VerticalStackLayout Grid.Row="1"
                                                              Padding="12,10,12,12"
                                                              Spacing="2">
-                                            <Label Text="{Binding .}"
+                                            <Label Text="{Binding Name}"
                                                    FontSize="13"
                                                    FontAttributes="Bold"
                                                    TextColor="#2C1C19"
@@ -325,7 +212,7 @@
                                                    LineBreakMode="TailTruncation" />
                                             <HorizontalStackLayout Spacing="4">
                                                 <Label Text="⭐" FontSize="11" VerticalOptions="Center" />
-                                                <Label Text="{loc:Translate Key=Home_RatingLocation}"
+                                                <Label Text="{Binding MetaText}"
                                                        FontSize="11"
                                                        TextColor="#9A7D69"
                                                        VerticalOptions="Center" />
@@ -342,47 +229,6 @@
                 <!-- ─────────────────────────────
                      SECTION: Banner Khuyến Mãi
                 ──────────────────────────────── -->
-                <Grid Margin="24,0,24,36">
-                    <Border StrokeThickness="0"
-                            StrokeShape="RoundRectangle 24"
-                            Padding="22,20">
-                        <Border.Background>
-                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                <GradientStop Color="#FF6B35" Offset="0"/>
-                                <GradientStop Color="#C93A20" Offset="1"/>
-                            </LinearGradientBrush>
-                        </Border.Background>
-                        <Border.Shadow>
-                            <Shadow Brush="#44FF6B35" Offset="0,8" Radius="24" Opacity="0.30" />
-                        </Border.Shadow>
-                        <Grid ColumnDefinitions="*,Auto">
-                            <VerticalStackLayout Grid.Column="0" Spacing="6" VerticalOptions="Center">
-                                <Label Text="{loc:Translate Key=Home_PromoToday}"
-                                       FontSize="12"
-                                       TextColor="#FFD4BC"
-                                       FontAttributes="Bold" />
-                                <Label Text="{loc:Translate Key=Home_PromoDiscount}"
-                                       FontSize="18"
-                                       FontAttributes="Bold"
-                                       TextColor="White" />
-                                <Label Text="{loc:Translate Key=Home_PromoValidUntil}"
-                                       FontSize="12"
-                                       TextColor="#FFBFA8" />
-                            </VerticalStackLayout>
-                            <Border Grid.Column="1"
-                                    BackgroundColor="White"
-                                    StrokeThickness="0"
-                                    StrokeShape="RoundRectangle 14"
-                                    Padding="14,10"
-                                    VerticalOptions="Center">
-                                <Label Text="{loc:Translate Key=Home_PromoUseNow}"
-                                       FontSize="13"
-                                       FontAttributes="Bold"
-                                       TextColor="#FF6B35" />
-                            </Border>
-                        </Grid>
-                    </Border>
-                </Grid>
 
             </VerticalStackLayout>
         </ScrollView>

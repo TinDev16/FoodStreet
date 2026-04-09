@@ -4,17 +4,21 @@ using FoodStreetMobile.Services;
 using FoodStreetMobile.ViewModels;
 using Microsoft.Maui.Devices.Sensors;
 using System.Collections.ObjectModel;
+using System.Net.Http;
+using System.Net.Http.Json;
 using MauiLocation = Microsoft.Maui.Devices.Sensors.Location;
 
 namespace FoodStreetMobile;
 
 public partial class HomePage : ContentPage
 {
+    private static readonly HttpClient HttpClient = new();
     private readonly AppLanguageService _languageService;
     private readonly MainViewModel _viewModel;
     private readonly PlaceSearchService _placeSearchService;
     private readonly DeepLinkService _deepLinkService;
-    private readonly ObservableCollection<string> _featuredPlaces = new();
+    private readonly PoiSyncService _poiSyncService;
+    private readonly ObservableCollection<FeaturedPlaceCard> _featuredPlaces = new();
     private readonly ObservableCollection<SearchPlaceResult> _searchResults = new();
     private CancellationTokenSource? _searchTypingCts;
     private MauiLocation? _lastUserLocation;
@@ -25,18 +29,20 @@ public partial class HomePage : ContentPage
         AppLanguageService languageService,
         MainViewModel viewModel,
         PlaceSearchService placeSearchService,
-        DeepLinkService deepLinkService)
+        DeepLinkService deepLinkService,
+        PoiSyncService poiSyncService)
     {
         InitializeComponent();
         _languageService = languageService;
         _viewModel = viewModel;
         _placeSearchService = placeSearchService;
         _deepLinkService = deepLinkService;
+        _poiSyncService = poiSyncService;
         FeaturedPlacesCollection.ItemsSource = _featuredPlaces;
         HomeSearchResultsView.ItemsSource = _searchResults;
         HomeSearchEntry.TextChanged += OnHomeSearchTextChanged;
 
-        RefreshFeaturedPlaces();
+        SetFeaturedPlacesFallback();
         _languageService.LanguageChanged += OnLanguageChanged;
     }
 
@@ -50,15 +56,15 @@ public partial class HomePage : ContentPage
     {
         base.OnAppearing();
 
-        if (_hasInitializedPoiData)
-        {
-            return;
-        }
-
         try
         {
-            await _viewModel.EnsureDataInitializedAsync();
-            _hasInitializedPoiData = true;
+            if (!_hasInitializedPoiData)
+            {
+                await _viewModel.EnsureDataInitializedAsync();
+                _hasInitializedPoiData = true;
+            }
+
+            await RefreshFeaturedPlacesAsync();
         }
         catch (Exception ex)
         {
@@ -68,16 +74,74 @@ public partial class HomePage : ContentPage
 
     private void OnLanguageChanged(string _)
     {
-        MainThread.BeginInvokeOnMainThread(RefreshFeaturedPlaces);
+        MainThread.BeginInvokeOnMainThread(async () =>
+        {
+            try
+            {
+                await RefreshFeaturedPlacesAsync();
+            }
+            catch (Exception ex)
+            {
+                CrashLogger.Write("HomePage.OnLanguageChanged", ex);
+            }
+        });
     }
 
-    private void RefreshFeaturedPlaces()
+    private async Task RefreshFeaturedPlacesAsync()
+    {
+        var featured = await TryLoadFeaturedPlacesFromStatsAsync();
+        if (featured.Count > 0)
+        {
+            _featuredPlaces.Clear();
+            foreach (var item in featured)
+            {
+                _featuredPlaces.Add(item);
+            }
+            return;
+        }
+
+        SetFeaturedPlacesFallback();
+    }
+
+    private void SetFeaturedPlacesFallback()
     {
         _featuredPlaces.Clear();
-        _featuredPlaces.Add(LocalizationResourceManager.Instance["Home_FeaturedItem1"]);
-        _featuredPlaces.Add(LocalizationResourceManager.Instance["Home_FeaturedItem2"]);
-        _featuredPlaces.Add(LocalizationResourceManager.Instance["Home_FeaturedItem3"]);
-        _featuredPlaces.Add(LocalizationResourceManager.Instance["Home_FeaturedItem4"]);
+        _featuredPlaces.Add(new FeaturedPlaceCard(LocalizationResourceManager.Instance["Home_FeaturedItem1"], "Pho bien"));
+        _featuredPlaces.Add(new FeaturedPlaceCard(LocalizationResourceManager.Instance["Home_FeaturedItem2"], "Pho bien"));
+        _featuredPlaces.Add(new FeaturedPlaceCard(LocalizationResourceManager.Instance["Home_FeaturedItem3"], "Pho bien"));
+        _featuredPlaces.Add(new FeaturedPlaceCard(LocalizationResourceManager.Instance["Home_FeaturedItem4"], "Pho bien"));
+    }
+
+    private async Task<List<FeaturedPlaceCard>> TryLoadFeaturedPlacesFromStatsAsync()
+    {
+        var requestedLang = AppLanguageService.NormalizeLanguageCode(_languageService.CurrentLanguage) ?? "vi";
+        foreach (var baseUrl in _poiSyncService.GetPreferredBaseUrlsSnapshot())
+        {
+            try
+            {
+                using var response = await HttpClient.GetAsync(
+                    $"{baseUrl}/api/public/featured-pois?lang={Uri.EscapeDataString(requestedLang)}&limit=4");
+                if (!response.IsSuccessStatusCode)
+                {
+                    continue;
+                }
+
+                var items = await response.Content.ReadFromJsonAsync<List<FeaturedPoiDto>>() ?? [];
+                return items
+                    .Where(x => !string.IsNullOrWhiteSpace(x.Name))
+                    .Select(x => new FeaturedPlaceCard(
+                        x.Name.Trim(),
+                        x.PlayCount > 0 ? $"{x.PlayCount} luot phat" : "Pho bien",
+                        x.ImageUrl?.Trim() ?? string.Empty))
+                    .ToList();
+            }
+            catch
+            {
+                // Ignore endpoint errors and fall back to the bundled placeholders.
+            }
+        }
+
+        return [];
     }
 
     private async void OnHomeSearchCompleted(object? sender, EventArgs e)
@@ -300,6 +364,28 @@ public partial class HomePage : ContentPage
         }
 
         return value;
+    }
+
+    private sealed class FeaturedPlaceCard
+    {
+        public FeaturedPlaceCard(string name, string metaText, string? imageUrl = null)
+        {
+            Name = name;
+            MetaText = metaText;
+            ImageUrl = imageUrl ?? string.Empty;
+        }
+
+        public string Name { get; }
+        public string MetaText { get; }
+        public string ImageUrl { get; }
+    }
+
+    private sealed class FeaturedPoiDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string ImageUrl { get; set; } = string.Empty;
+        public long PlayCount { get; set; }
     }
 
     private void BindSearchResults(IReadOnlyList<SearchPlaceResult> results)

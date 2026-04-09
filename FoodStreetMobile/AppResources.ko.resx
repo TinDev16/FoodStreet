@@ -67,47 +67,11 @@
   <data name="Home_SearchPlaceholder" xml:space="preserve">
     <value>음식, 식당 검색...</value>
   </data>
-  <data name="Home_CategoriesTitle" xml:space="preserve">
-    <value>카테고리</value>
-  </data>
-  <data name="Home_ViewAll" xml:space="preserve">
-    <value>모두 보기 →</value>
-  </data>
-  <data name="Home_CategoryPhoBun" xml:space="preserve">
-    <value>퍼 &amp; 국수</value>
-  </data>
-  <data name="Home_CategoryBanhMi" xml:space="preserve">
-    <value>반미</value>
-  </data>
-  <data name="Home_CategoryCom" xml:space="preserve">
-    <value>밥</value>
-  </data>
-  <data name="Home_CategoryCoffee" xml:space="preserve">
-    <value>커피</value>
-  </data>
-  <data name="Home_CategoryDessert" xml:space="preserve">
-    <value>디저트</value>
-  </data>
-  <data name="Home_CategoryDrinks" xml:space="preserve">
-    <value>음료</value>
-  </data>
   <data name="Home_FeaturedTitle" xml:space="preserve">
     <value>추천</value>
   </data>
   <data name="Home_RatingLocation" xml:space="preserve">
     <value>4.8 · 빈카인</value>
-  </data>
-  <data name="Home_PromoToday" xml:space="preserve">
-    <value>🎉 오늘의 혜택</value>
-  </data>
-  <data name="Home_PromoDiscount" xml:space="preserve">
-    <value>첫 주문 20% 할인</value>
-  </data>
-  <data name="Home_PromoValidUntil" xml:space="preserve">
-    <value>28/02까지 적용</value>
-  </data>
-  <data name="Home_PromoUseNow" xml:space="preserve">
-    <value>지금 사용</value>
   </data>
   <data name="Main_RadiusFallbackMeters" xml:space="preserve">
     <value>반경: {0} m</value>
