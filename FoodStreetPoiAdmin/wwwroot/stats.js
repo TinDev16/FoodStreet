@@ -109,7 +109,7 @@
     audioStatsRowsEl.innerHTML = "";
     const rows = Array.isArray(state.audioStats) ? state.audioStats : [];
     const totalPlays = rows.reduce((sum, item) => sum + Number(item?.playCount || 0), 0);
-    audioStatsSummaryEl.textContent = `${rows.length} POI, tong ${totalPlays} luot bam phat audio.`;
+    audioStatsSummaryEl.textContent = `${rows.length} POI, tong ${totalPlays} lượt bấm phát audio.`;
 
     if (!rows.length) {
       audioStatsRowsEl.innerHTML = `<tr><td colspan="4" class="muted">Chua co du lieu thong ke trong khoang thoi gian da chon.</td></tr>`;
@@ -194,7 +194,7 @@
     });
 
     logoutBtn?.addEventListener("click", async () => {
-      try { await apiPost("/api/admin/auth/logout"); } catch {}
+      try { await apiPost("/api/admin/auth/logout"); } catch { }
       state.token = "";
       state.me = null;
       localStorage.removeItem("adminToken");

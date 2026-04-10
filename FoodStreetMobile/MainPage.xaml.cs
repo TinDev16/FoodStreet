@@ -1,4 +1,4 @@
-﻿using FoodStreetMobile.ViewModels;
+using FoodStreetMobile.ViewModels;
 using FoodStreetMobile.Services;
 using FoodStreetMobile.Models;
 using Microsoft.Maui.ApplicationModel;
@@ -623,7 +623,7 @@ public partial class MainPage : ContentPage
     }
 
 
-    private void OnPlaceSearchTextChanged(object sender, Microsoft.Maui.Controls.TextChangedEventArgs e)
+    private void OnPlaceSearchTextChanged(object? sender, Microsoft.Maui.Controls.TextChangedEventArgs e)
     {
         _ = HandlePlaceSearchTextChangedAsync(e.NewTextValue);
     }
@@ -1976,8 +1976,8 @@ public partial class MainPage : ContentPage
             return;
         }
 
-        QueuedPoiNameLabel.Text = _queuedPlaybackPoi.Name;
-        if (_queuedPlaybackPoi.DistanceMeters > 0)
+        QueuedPoiNameLabel.Text = _queuedPlaybackPoi?.Name ?? string.Empty;
+        if (_queuedPlaybackPoi?.DistanceMeters > 0)
         {
             QueuedPoiDistanceLabel.Text = $"{Math.Round(_queuedPlaybackPoi.DistanceMeters)} m";
             QueuedPoiDistanceLabel.IsVisible = true;

@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="vi">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -10,6 +11,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
+
 <body>
   <div class="dashboard">
     <aside class="sidebar">
@@ -33,7 +35,8 @@
       </nav>
       <div class="sidebar-footer">
         <div class="user-profile">
-          <img id="sidebarUserAvatar" src="https://ui-avatars.com/api/?name=Admin&background=4f46e5&color=fff&rounded=true" alt="Admin" />
+          <img id="sidebarUserAvatar"
+            src="https://ui-avatars.com/api/?name=Admin&background=4f46e5&color=fff&rounded=true" alt="Admin" />
           <div class="user-info">
             <span class="user-name" id="sidebarUserName">Super Admin</span>
             <span class="user-role" id="sidebarUserRole">Hệ thống</span>
@@ -46,10 +49,10 @@
       <header class="topbar">
         <div class="topbar-title">Bảng điều khiển (Dashboard)</div>
         <div class="topbar-actions">
-          <a href="/stats.html" class="button-link secondary"><i class="fa-solid fa-chart-column"></i> Thong ke Audio</a>
-          <button class="topbar-btn"><i class="fa-regular fa-bell"></i></button>
-          <button class="topbar-btn"><i class="fa-solid fa-gear"></i></button>
-          <button class="topbar-btn" id="logoutBtn" title="Đăng xuất"><i class="fa-solid fa-right-from-bracket"></i></button>
+          <a href="/stats.html" class="button-link secondary"><i class="fa-solid fa-chart-column"></i> Thống kê
+            Audio</a>
+          <button class="topbar-btn" id="logoutBtn" title="Đăng xuất"><i
+              class="fa-solid fa-right-from-bracket"></i></button>
         </div>
       </header>
 
@@ -83,7 +86,8 @@
               </div>
               <div class="actions">
                 <button type="submit"><i class="fa-solid fa-floppy-disk"></i> Lưu owner</button>
-                <button type="button" id="ownerResetBtn" class="secondary"><i class="fa-solid fa-rotate-right"></i> Làm mới</button>
+                <button type="button" id="ownerResetBtn" class="secondary"><i class="fa-solid fa-rotate-right"></i> Làm
+                  mới</button>
               </div>
               <p id="ownerStatus"></p>
             </form>
@@ -96,7 +100,8 @@
                 <h2>Danh sách tài khoản Owner</h2>
               </div>
               <div class="header-actions tab-floating-group">
-                <button type="button" id="ownerTabActiveBtn" class="secondary tab-floating active">Danh sách owner</button>
+                <button type="button" id="ownerTabActiveBtn" class="secondary tab-floating active">Danh sách
+                  owner</button>
                 <button type="button" id="ownerTabHistoryBtn" class="secondary tab-floating">Lịch sử owner</button>
               </div>
             </header>
@@ -211,11 +216,13 @@
         </table>
       </div>
       <div class="actions mt-10">
-        <button type="button" id="ownerPoiTabsCloseBtn" class="secondary"><i class="fa-solid fa-xmark"></i> Đóng</button>
+        <button type="button" id="ownerPoiTabsCloseBtn" class="secondary"><i class="fa-solid fa-xmark"></i>
+          Đóng</button>
       </div>
     </form>
   </dialog>
 
   <script src="/owner.js?v=20260407-owner-eye-overlay"></script>
 </body>
+
 </html>

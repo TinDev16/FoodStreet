@@ -1094,7 +1094,6 @@ E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify_audio_st
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify_audio_stats_page\runtimes\win-x86\native\e_sqlite3.dll
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\k9mnuggnn9-{0}-ylzo7r0hsm-ylzo7r0hsm.gz
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\ypiyamc441-{0}-5s16mtv92g-5s16mtv92g.gz
-E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\3sodcubq1x-{0}-yshbdehx73-yshbdehx73.gz
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\kahzvbzhqw-{0}-h19uaug3zt-h19uaug3zt.gz
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify_featured_from_stats\appsettings.Development.json
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify_featured_from_stats\appsettings.json
@@ -1142,3 +1141,4 @@ E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify_featured
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify_featured_from_stats\runtimes\win-x64\native\e_sqlite3.dll
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify_featured_from_stats\runtimes\win-x86\native\e_sqlite3.dll
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\iiupjbvgp1-{0}-h68cb2sybt-h68cb2sybt.gz
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\3sodcubq1x-{0}-vvdu54e9s7-vvdu54e9s7.gz

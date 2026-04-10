@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Data.Sqlite;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -2025,7 +2025,7 @@ static async Task<List<FeaturedPoiDto>> GetFeaturedPoisForPublicAsync(string con
         LEFT JOIN poi_translations t_vi ON p.id = t_vi.poi_id AND t_vi.lang_code = 'vi'
         LEFT JOIN poi_audio_play_events e ON e.poi_id = p.id
         WHERE p.is_active = 1 AND COALESCE(p.is_deleted, 0) = 0
-        GROUP BY p.id, name, p.image_url, p.priority
+        GROUP BY p.id, COALESCE(NULLIF(t_req.name, ''), t_vi.name, ''), p.image_url, p.priority
         ORDER BY play_count DESC, p.priority DESC, p.id ASC
         LIMIT $limit;
         """;

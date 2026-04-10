@@ -42,7 +42,6 @@ public partial class HomePage : ContentPage
         HomeSearchResultsView.ItemsSource = _searchResults;
         HomeSearchEntry.TextChanged += OnHomeSearchTextChanged;
 
-        SetFeaturedPlacesFallback();
         _languageService.LanguageChanged += OnLanguageChanged;
     }
 
@@ -90,26 +89,26 @@ public partial class HomePage : ContentPage
     private async Task RefreshFeaturedPlacesAsync()
     {
         var featured = await TryLoadFeaturedPlacesFromStatsAsync();
-        if (featured.Count > 0)
+        _featuredPlaces.Clear();
+        foreach (var item in featured)
         {
-            _featuredPlaces.Clear();
-            foreach (var item in featured)
-            {
-                _featuredPlaces.Add(item);
-            }
-            return;
+            _featuredPlaces.Add(item);
         }
-
-        SetFeaturedPlacesFallback();
+        FeaturedPlacesContainer.IsVisible = _featuredPlaces.Count > 0;
     }
 
-    private void SetFeaturedPlacesFallback()
+    private static string NormalizeAssetUrl(string baseUrl, string? value)
     {
-        _featuredPlaces.Clear();
-        _featuredPlaces.Add(new FeaturedPlaceCard(LocalizationResourceManager.Instance["Home_FeaturedItem1"], "Pho bien"));
-        _featuredPlaces.Add(new FeaturedPlaceCard(LocalizationResourceManager.Instance["Home_FeaturedItem2"], "Pho bien"));
-        _featuredPlaces.Add(new FeaturedPlaceCard(LocalizationResourceManager.Instance["Home_FeaturedItem3"], "Pho bien"));
-        _featuredPlaces.Add(new FeaturedPlaceCard(LocalizationResourceManager.Instance["Home_FeaturedItem4"], "Pho bien"));
+        if (string.IsNullOrWhiteSpace(value))
+            return string.Empty;
+
+        if (value.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            value.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            return value;
+
+        var normalizedBase = baseUrl.TrimEnd('/');
+        var normalizedValue = value.StartsWith("/") ? value : "/" + value;
+        return $"{normalizedBase}{normalizedValue}";
     }
 
     private async Task<List<FeaturedPlaceCard>> TryLoadFeaturedPlacesFromStatsAsync()
@@ -130,9 +129,10 @@ public partial class HomePage : ContentPage
                 return items
                     .Where(x => !string.IsNullOrWhiteSpace(x.Name))
                     .Select(x => new FeaturedPlaceCard(
+                        x.Id,
                         x.Name.Trim(),
-                        x.PlayCount > 0 ? $"{x.PlayCount} luot phat" : "Pho bien",
-                        x.ImageUrl?.Trim() ?? string.Empty))
+                        x.PlayCount > 0 ? $"{x.PlayCount} lượt phát" : "Pho bien",
+                        NormalizeAssetUrl(baseUrl, x.ImageUrl)))
                     .ToList();
             }
             catch
@@ -162,7 +162,7 @@ public partial class HomePage : ContentPage
     private async Task HandleHomeSearchTextChangedAsync(string? newTextValue)
     {
         _searchTypingCts?.Cancel();
-        _searchTypingCts?.Dispose();
+        // Do NOT Dispose the CTS here. Task.Delay might be unwinding concurrently.
 
         var query = newTextValue?.Trim() ?? string.Empty;
         if (query.Length < 2)
@@ -303,8 +303,8 @@ public partial class HomePage : ContentPage
             .Select(p => new PoiSearchCandidate
             {
                 PoiId = p.Id,
-                Name = p.Name,
-                Address = p.Description,
+                Name = p.Name ?? string.Empty,
+                Address = p.Description ?? string.Empty,
                 Latitude = p.Latitude,
                 Longitude = p.Longitude,
                 ImageUrl = NormalizeRemoteImageUrl(p.ImageUrl)
@@ -366,18 +366,41 @@ public partial class HomePage : ContentPage
         return value;
     }
 
+    public void OnFeaturedPlaceTapped(object? sender, TappedEventArgs e)
+    {
+        if (e.Parameter is FeaturedPlaceCard card && !string.IsNullOrWhiteSpace(card.Id))
+        {
+            _deepLinkService.QueuePendingPlaceSelection(new PendingPlaceSelection
+            {
+                Name = card.Name,
+                Address = card.MetaText,
+                PoiId = card.Id,
+                ImageUrl = card.ImageUrl
+            });
+
+            if (Shell.Current is AppShell shell)
+            {
+                shell.NavigateToMainTabsTab(1);
+            }
+        }
+    }
+
     private sealed class FeaturedPlaceCard
     {
-        public FeaturedPlaceCard(string name, string metaText, string? imageUrl = null)
+        public FeaturedPlaceCard(string id, string name, string metaText, string? imageUrl = null)
         {
+            Id = id;
             Name = name;
             MetaText = metaText;
             ImageUrl = imageUrl ?? string.Empty;
         }
 
+        public string Id { get; }
         public string Name { get; }
         public string MetaText { get; }
         public string ImageUrl { get; }
+        public bool HasImage => !string.IsNullOrWhiteSpace(ImageUrl);
+        public bool ShowPlaceholder => string.IsNullOrWhiteSpace(ImageUrl);
     }
 
     private sealed class FeaturedPoiDto

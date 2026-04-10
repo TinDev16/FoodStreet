@@ -241,3 +241,82 @@ Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 1: 'ambiguous c
    at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
    at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
    at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-10T11:08:38.8102666+07:00
+Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 1: 'ambiguous column name: name'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteCommand.PrepareAndEnumerateStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync()
+   at Program.<<Main>$>g__GetFeaturedPoisForPublicAsync|0_67(String connectionString, String requestedLang, Int32 limit) in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 2037
+   at Program.<<Main>$>g__GetFeaturedPoisForPublicAsync|0_67(String connectionString, String requestedLang, Int32 limit) in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 2049
+   at Program.<<Main>$>g__GetFeaturedPoisForPublicAsync|0_67(String connectionString, String requestedLang, Int32 limit) in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 2049
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__27>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 658
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-10T11:15:40.0199619+07:00
+Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 1: 'ambiguous column name: name'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteCommand.PrepareAndEnumerateStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync()
+   at Program.<<Main>$>g__GetFeaturedPoisForPublicAsync|0_67(String connectionString, String requestedLang, Int32 limit) in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 2037
+   at Program.<<Main>$>g__GetFeaturedPoisForPublicAsync|0_67(String connectionString, String requestedLang, Int32 limit) in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 2049
+   at Program.<<Main>$>g__GetFeaturedPoisForPublicAsync|0_67(String connectionString, String requestedLang, Int32 limit) in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 2049
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__27>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 658
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-10T11:15:46.7623675+07:00
+Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 1: 'ambiguous column name: name'.
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteCommand.PrepareAndEnumerateStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync()
+   at Program.<<Main>$>g__GetFeaturedPoisForPublicAsync|0_67(String connectionString, String requestedLang, Int32 limit) in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 2037
+   at Program.<<Main>$>g__GetFeaturedPoisForPublicAsync|0_67(String connectionString, String requestedLang, Int32 limit) in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 2049
+   at Program.<<Main>$>g__GetFeaturedPoisForPublicAsync|0_67(String connectionString, String requestedLang, Int32 limit) in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 2049
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__27>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 658
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-10T11:16:19.1532220+07:00
+Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 1: 'ambiguous column name: name'.
+   at Microsoft.Data.Sqlite.SqliteCommand.PrepareAndEnumerateStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync()
+   at Program.<<Main>$>g__GetFeaturedPoisForPublicAsync|0_67(String connectionString, String requestedLang, Int32 limit) in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 2037
+   at Program.<<Main>$>g__GetFeaturedPoisForPublicAsync|0_67(String connectionString, String requestedLang, Int32 limit) in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 2049
+   at Program.<<Main>$>g__GetFeaturedPoisForPublicAsync|0_67(String connectionString, String requestedLang, Int32 limit) in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 2049
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__27>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 658
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
