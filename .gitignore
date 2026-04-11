@@ -2,5 +2,8 @@
 .nuget/
 bin/
 obj/
+**/bin/
+**/obj/
+FoodStreetMobile/obj/
 .vs/
 App_Data/*.log
