@@ -11,6 +11,7 @@ public sealed class PoiSyncService
     public const string MobileJwtPreferenceKey = "mobile_auth_jwt";
 
     private const string BaseUrlsPreferenceKey = "admin_base_urls";
+    private static readonly SemaphoreSlim _syncLock = new(1, 1);
     private readonly AppDatabase _database;
     private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(8) };
     private string? _lastSuccessfulBaseUrl;
@@ -49,61 +50,69 @@ public sealed class PoiSyncService
 
     public async Task<bool> TrySyncAsync(string? languageCode = null)
     {
-        LastError = null;
-        var requestedLang = NormalizeAppLanguageCode(languageCode) ?? "vi";
-        var errors = new List<string>();
-        foreach (var baseUrl in GetPreferredBaseUrls())
+        await _syncLock.WaitAsync();
+        try
         {
-            try
+            LastError = null;
+            var requestedLang = NormalizeAppLanguageCode(languageCode) ?? "vi";
+            var errors = new List<string>();
+            foreach (var baseUrl in GetPreferredBaseUrls())
             {
-                var pois = await TryFetchPoisAsync(baseUrl, requestedLang);
-                if (pois is null)
+                try
                 {
-                    errors.Add($"{baseUrl}: empty response");
-                    continue;
+                    var pois = await TryFetchPoisAsync(baseUrl, requestedLang);
+                    if (pois is null)
+                    {
+                        errors.Add($"{baseUrl}: empty response");
+                        continue;
+                    }
+
+                    await ApplyRemoteDataAsync(baseUrl, requestedLang, pois);
+                    _lastSuccessfulBaseUrl = baseUrl;
+                    LastError = null;
+                    return true;
                 }
-
-                await ApplyRemoteDataAsync(baseUrl, requestedLang, pois);
-                _lastSuccessfulBaseUrl = baseUrl;
-                LastError = null;
-                return true;
-            }
-            catch (Exception ex)
-            {
-                errors.Add($"{baseUrl}: {ex.Message}");
-            }
-        }
-
-        if (errors.Count > 0)
-        {
-            LastError = string.Join(" | ", errors);
-        }
-        else
-        {
-            LastError = "No backend endpoint candidate.";
-        }
-
-        var canReadAdminDbFile =
-            OperatingSystem.IsWindows()
-            || OperatingSystem.IsLinux()
-            || OperatingSystem.IsMacOS();
-
-        if (canReadAdminDbFile)
-        {
-            var syncedFromFile = await TrySyncFromAdminDbFileAsync(requestedLang, errors);
-            if (syncedFromFile)
-            {
-                LastError = null;
-                return true;
+                catch (Exception ex)
+                {
+                    errors.Add($"{baseUrl}: {ex.Message}");
+                }
             }
 
             if (errors.Count > 0)
             {
                 LastError = string.Join(" | ", errors);
             }
-        }
+            else
+            {
+                LastError = "No backend endpoint candidate.";
+            }
 
-        return false;
+            var canReadAdminDbFile =
+                OperatingSystem.IsWindows()
+                || OperatingSystem.IsLinux()
+                || OperatingSystem.IsMacOS();
+
+            if (canReadAdminDbFile)
+            {
+                var syncedFromFile = await TrySyncFromAdminDbFileAsync(requestedLang, errors);
+                if (syncedFromFile)
+                {
+                    LastError = null;
+                    return true;
+                }
+
+                if (errors.Count > 0)
+                {
+                    LastError = string.Join(" | ", errors);
+                }
+            }
+
+            return false;
+        }
+        finally
+        {
+            _syncLock.Release();
+        }
     }
 
     private async Task<List<PoiSyncDto>?> TryFetchPoisAsync(string baseUrl, string requestedLang)
@@ -252,50 +261,56 @@ public sealed class PoiSyncService
     {
         var connection = await _database.GetConnectionAsync();
 
-        foreach (var poi in pois)
+        await connection.RunInTransactionAsync(conn =>
         {
-            var normalizedName = string.IsNullOrWhiteSpace(poi.Name)
-                ? poi.Id
-                : poi.Name.Trim();
-            var normalizedDescription = poi.Description?.Trim() ?? string.Empty;
-            var normalizedAudioUrl = NormalizeAssetUrl(baseUrl, poi.AudioUrl);
-            var normalizedTtsText = poi.TtsText?.Trim() ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(normalizedTtsText) && string.IsNullOrWhiteSpace(normalizedAudioUrl) && !string.IsNullOrWhiteSpace(normalizedDescription))
+            // Deactivate all first (This handles deletions on server)
+            conn.Execute("UPDATE pois SET is_active = 0;");
+
+            foreach (var poi in pois)
             {
-                normalizedTtsText = normalizedDescription;
+                var normalizedName = string.IsNullOrWhiteSpace(poi.Name)
+                    ? poi.Id
+                    : poi.Name.Trim();
+                var normalizedDescription = poi.Description?.Trim() ?? string.Empty;
+                var normalizedAudioUrl = NormalizeAssetUrl(baseUrl, poi.AudioUrl);
+                var normalizedTtsText = poi.TtsText?.Trim() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(normalizedTtsText) && string.IsNullOrWhiteSpace(normalizedAudioUrl) && !string.IsNullOrWhiteSpace(normalizedDescription))
+                {
+                    normalizedTtsText = normalizedDescription;
+                }
+
+                conn.InsertOrReplace(new PoiEntity
+                {
+                    Id = poi.Id,
+                    Latitude = poi.Latitude,
+                    Longitude = poi.Longitude,
+                    RadiusMeters = poi.RadiusMeters,
+                    Priority = poi.Priority,
+                    MapLink = !string.IsNullOrWhiteSpace(poi.MapLink)
+                        ? poi.MapLink
+                        : $"https://maps.google.com/?q={poi.Latitude},{poi.Longitude}",
+                    ImageUrl = NormalizeAssetUrl(baseUrl, poi.ImageUrl),
+                    AudioUrl = normalizedAudioUrl,
+                    IsActive = true
+                });
+
+                const string upsertTranslationSql = """
+                    INSERT INTO poi_translations (poi_id, lang_code, name, description, tts_text)
+                    VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(poi_id, lang_code) DO UPDATE SET
+                        name = excluded.name,
+                        description = excluded.description,
+                        tts_text = excluded.tts_text;
+                    """;
+                conn.Execute(
+                    upsertTranslationSql,
+                    poi.Id,
+                    requestedLang,
+                    normalizedName,
+                    normalizedDescription,
+                    normalizedTtsText);
             }
-
-            await connection.InsertOrReplaceAsync(new PoiEntity
-            {
-                Id = poi.Id,
-                Latitude = poi.Latitude,
-                Longitude = poi.Longitude,
-                RadiusMeters = poi.RadiusMeters,
-                Priority = poi.Priority,
-                MapLink = !string.IsNullOrWhiteSpace(poi.MapLink)
-                    ? poi.MapLink
-                    : $"https://maps.google.com/?q={poi.Latitude},{poi.Longitude}",
-                ImageUrl = NormalizeAssetUrl(baseUrl, poi.ImageUrl),
-                AudioUrl = normalizedAudioUrl,
-                IsActive = true
-            });
-
-            const string upsertTranslationSql = """
-                INSERT INTO poi_translations (poi_id, lang_code, name, description, tts_text)
-                VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(poi_id, lang_code) DO UPDATE SET
-                    name = excluded.name,
-                    description = excluded.description,
-                    tts_text = excluded.tts_text;
-                """;
-            await connection.ExecuteAsync(
-                upsertTranslationSql,
-                poi.Id,
-                requestedLang,
-                normalizedName,
-                normalizedDescription,
-                normalizedTtsText);
-        }
+        });
     }
 
     private IEnumerable<string> GetPreferredBaseUrls()

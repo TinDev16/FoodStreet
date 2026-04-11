@@ -199,4 +199,19 @@
   <data name="Profile_GoLogin" xml:space="preserve">
     <value>Sign in</value>
   </data>
+  <data name="PoiHistory_Clear" xml:space="preserve">
+    <value>Clear history</value>
+  </data>
+  <data name="PoiHistory_ClearConfirm" xml:space="preserve">
+    <value>Are you sure you want to clear your entire viewing history?</value>
+  </data>
+  <data name="General_Yes" xml:space="preserve">
+    <value>Yes</value>
+  </data>
+  <data name="General_No" xml:space="preserve">
+    <value>No</value>
+  </data>
+  <data name="General_Confirm" xml:space="preserve">
+    <value>Confirm</value>
+  </data>
 </root>

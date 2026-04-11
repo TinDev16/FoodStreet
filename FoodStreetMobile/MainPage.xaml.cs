@@ -64,6 +64,7 @@ public partial class MainPage : ContentPage
     private readonly PlaceSearchService _placeSearchService;
     private readonly DeepLinkService _deepLinkService;
     private readonly PoiViewHistoryService _poiViewHistoryService;
+    private readonly AuthService _authService;
     private readonly ObservableCollection<SearchPlaceResult> _searchResults = new();
 
     private bool _hasCenteredOnUser;
@@ -114,13 +115,14 @@ public partial class MainPage : ContentPage
     private const double MapMarginUpdateThresholdPx = 3;
     private const int MapMarginUpdateMinIntervalMs = 16;
 
-    public MainPage(MainViewModel viewModel, PlaceSearchService placeSearchService, DeepLinkService deepLinkService, PoiViewHistoryService poiViewHistoryService)
+    public MainPage(MainViewModel viewModel, PlaceSearchService placeSearchService, DeepLinkService deepLinkService, PoiViewHistoryService poiViewHistoryService, AuthService authService)
     {
         InitializeComponent();
         _viewModel = viewModel;
         _placeSearchService = placeSearchService;
         _deepLinkService = deepLinkService;
         _poiViewHistoryService = poiViewHistoryService;
+        _authService = authService;
         BindingContext = _viewModel;
         SearchResultsView.ItemsSource = _searchResults;
         PlaceSearchEntry.TextChanged += OnPlaceSearchTextChanged;
@@ -294,7 +296,8 @@ public partial class MainPage : ContentPage
     {
         try
         {
-            await _poiViewHistoryService.RecordViewedAsync(poi.Id, poi.Name, poi.ImageUrl);
+            var userId = _authService.CurrentUserId;
+            await _poiViewHistoryService.RecordViewedAsync(userId, poi.Id, poi.Name, poi.ImageUrl);
         }
         catch
         {

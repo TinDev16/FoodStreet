@@ -254,21 +254,41 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private async Task ReloadPoisAsync(string languageCode)
     {
-        var pois = await _poiRepository.GetPoisAsync(languageCode);
-        if (!HasPoiCollectionChanged(pois))
+        var sourcePois = await _poiRepository.GetPoisAsync(languageCode);
+        
+        // Use a more robust check or just proceed to smart update
+        MainThread.BeginInvokeOnMainThread(() =>
         {
-            return;
-        }
+            var currentPoisDict = Pois.ToDictionary(x => x.Id);
+            var sourcePoisDict = sourcePois.ToDictionary(x => x.Id);
 
-        Pois.Clear();
-        foreach (var poi in pois)
-        {
-            Pois.Add(new PoiViewModel(poi));
-        }
+            // 1. Remove items no longer present
+            var toRemove = Pois.Where(p => !sourcePoisDict.ContainsKey(p.Id)).ToList();
+            foreach (var item in toRemove)
+            {
+                Pois.Remove(item);
+            }
 
-        SetActivePoi(null);
-        _currentAutoNarrationPoiId = null;
-        PoisLoaded?.Invoke(Pois);
+            // 2. Update or Add
+            foreach (var source in sourcePois)
+            {
+                if (currentPoisDict.TryGetValue(source.Id, out var existing))
+                {
+                    // Update existing instance to avoid pin recreation
+                    existing.UpdateFrom(source);
+                }
+                else
+                {
+                    // Add new
+                    Pois.Add(new PoiViewModel(source));
+                }
+            }
+
+            // Sort if priority changed significantly or just to maintain order
+            // (Optional, omitted for simplicity unless requested)
+
+            PoisLoaded?.Invoke(Pois);
+        });
     }
 
     private async Task ToggleTrackingAsync()
@@ -376,6 +396,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private bool HasPoiCollectionChanged(IReadOnlyList<Poi> newPois)
     {
+        // This is now less critical since we diff in ReloadPoisAsync, 
+        // but we can keep it as a fast path for "nothing changed" if needed.
         if (Pois.Count != newPois.Count)
         {
             return true;

@@ -6,6 +6,12 @@
              x:Class="FoodStreetMobile.PoiViewHistoryPage"
              BackgroundColor="#F2F2F2"
              Title="{loc:Translate Key=PoiHistory_Title}">
+    
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="{loc:Translate Key=PoiHistory_Clear}"
+                     Command="{Binding ClearHistoryCommand}"
+                     IconImageSource="ic_trash.svg" />
+    </ContentPage.ToolbarItems>
 
     <ContentPage.Resources>
         <ResourceDictionary>

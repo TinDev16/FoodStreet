@@ -33,6 +33,13 @@ public sealed class AppDatabase
             await connection.CreateTableAsync<AppSettingEntity>();
             await connection.CreateTableAsync<PoiViewHistoryEntity>();
             await connection.CreateTableAsync<UserProfileEntity>();
+
+            // Migration: Add server_user_id if it doesn't exist
+            try {
+                await connection.ExecuteAsync("ALTER TABLE poi_view_history ADD COLUMN server_user_id INTEGER DEFAULT 0;");
+            } catch { /* Column likely already exists */ }
+
+            await connection.ExecuteAsync("CREATE INDEX IF NOT EXISTS idx_history_user ON poi_view_history(server_user_id);");
             await connection.ExecuteAsync("CREATE UNIQUE INDEX IF NOT EXISTS ux_poi_lang ON poi_translations(poi_id, lang_code);");
             await CleanupLegacySeedAsync(connection);
             await SeedIfNeededAsync(connection);

@@ -6,6 +6,7 @@ using Microsoft.Maui.Devices.Sensors;
 using System.Collections.ObjectModel;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Text.Json;
 using MauiLocation = Microsoft.Maui.Devices.Sensors.Location;
 
 namespace FoodStreetMobile;
@@ -13,6 +14,9 @@ namespace FoodStreetMobile;
 public partial class HomePage : ContentPage
 {
     private static readonly HttpClient HttpClient = new();
+    private static readonly string FeaturedCacheFilePath =
+        Path.Combine(FileSystem.AppDataDirectory, "featured_places_cache.json");
+
     private readonly AppLanguageService _languageService;
     private readonly MainViewModel _viewModel;
     private readonly PlaceSearchService _placeSearchService;
@@ -126,22 +130,69 @@ public partial class HomePage : ContentPage
                 }
 
                 var items = await response.Content.ReadFromJsonAsync<List<FeaturedPoiDto>>() ?? [];
-                return items
+                var cards = items
                     .Where(x => !string.IsNullOrWhiteSpace(x.Name))
                     .Select(x => new FeaturedPlaceCard(
                         x.Id,
                         x.Name.Trim(),
-                        x.PlayCount > 0 ? $"{x.PlayCount} lượt phát" : "Pho bien",
+                        x.PlayCount > 0 ? $"{x.PlayCount} lượt phát" : "Phổ biến",
                         NormalizeAssetUrl(baseUrl, x.ImageUrl)))
                     .ToList();
+
+                // Save to cache for offline use
+                _ = SaveFeaturedCacheAsync(items, baseUrl);
+                return cards;
             }
             catch
             {
-                // Ignore endpoint errors and fall back to the bundled placeholders.
+                // Ignore endpoint errors, try next URL.
             }
         }
 
-        return [];
+        // All endpoints failed — try offline cache
+        return await LoadFeaturedCacheAsync();
+    }
+
+    private static async Task SaveFeaturedCacheAsync(List<FeaturedPoiDto> items, string baseUrl)
+    {
+        try
+        {
+            var payload = new FeaturedCachePayload { BaseUrl = baseUrl, Items = items };
+            var json = JsonSerializer.Serialize(payload);
+            await File.WriteAllTextAsync(FeaturedCacheFilePath, json).ConfigureAwait(false);
+        }
+        catch
+        {
+            // Non-critical: ignore cache write errors.
+        }
+    }
+
+    private static async Task<List<FeaturedPlaceCard>> LoadFeaturedCacheAsync()
+    {
+        try
+        {
+            if (!File.Exists(FeaturedCacheFilePath))
+                return [];
+
+            var json = await File.ReadAllTextAsync(FeaturedCacheFilePath).ConfigureAwait(false);
+            var payload = JsonSerializer.Deserialize<FeaturedCachePayload>(json);
+            if (payload is null || payload.Items is null || payload.Items.Count == 0)
+                return [];
+
+            return payload.Items
+                .Where(x => !string.IsNullOrWhiteSpace(x.Name))
+                .Select(x => new FeaturedPlaceCard(
+                    x.Id,
+                    x.Name.Trim(),
+                    x.PlayCount > 0 ? $"{x.PlayCount} lượt phát" : "Phổ biến",
+                    NormalizeAssetUrl(payload.BaseUrl, x.ImageUrl),
+                    isFromCache: true))
+                .ToList();
+        }
+        catch
+        {
+            return [];
+        }
     }
 
     private async void OnHomeSearchCompleted(object? sender, EventArgs e)
@@ -387,18 +438,20 @@ public partial class HomePage : ContentPage
 
     private sealed class FeaturedPlaceCard
     {
-        public FeaturedPlaceCard(string id, string name, string metaText, string? imageUrl = null)
+        public FeaturedPlaceCard(string id, string name, string metaText, string? imageUrl = null, bool isFromCache = false)
         {
             Id = id;
             Name = name;
             MetaText = metaText;
             ImageUrl = imageUrl ?? string.Empty;
+            IsFromCache = isFromCache;
         }
 
         public string Id { get; }
         public string Name { get; }
         public string MetaText { get; }
         public string ImageUrl { get; }
+        public bool IsFromCache { get; }
         public bool HasImage => !string.IsNullOrWhiteSpace(ImageUrl);
         public bool ShowPlaceholder => string.IsNullOrWhiteSpace(ImageUrl);
     }
@@ -409,6 +462,12 @@ public partial class HomePage : ContentPage
         public string Name { get; set; } = string.Empty;
         public string ImageUrl { get; set; } = string.Empty;
         public long PlayCount { get; set; }
+    }
+
+    private sealed class FeaturedCachePayload
+    {
+        public string BaseUrl { get; set; } = string.Empty;
+        public List<FeaturedPoiDto> Items { get; set; } = [];
     }
 
     private void BindSearchResults(IReadOnlyList<SearchPlaceResult> results)

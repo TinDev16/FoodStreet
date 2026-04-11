@@ -1390,6 +1390,7 @@ static async Task InitializeDatabaseAsync(string connectionString)
             is_deleted INTEGER NOT NULL DEFAULT 0,
             deleted_at TEXT,
             delete_status TEXT NOT NULL DEFAULT 'ACTIVE',
+            updated_at TEXT,
             FOREIGN KEY(owner_admin_id) REFERENCES admin_accounts(id)
         );
 
@@ -1414,6 +1415,7 @@ static async Task InitializeDatabaseAsync(string connectionString)
             is_deleted INTEGER NOT NULL DEFAULT 0,
             deleted_at TEXT,
             delete_status TEXT NOT NULL DEFAULT 'ACTIVE',
+            updated_at TEXT,
             created_at TEXT NOT NULL
         );
         CREATE UNIQUE INDEX IF NOT EXISTS ux_admin_accounts_username ON admin_accounts(username);
@@ -1468,6 +1470,16 @@ static async Task InitializeDatabaseAsync(string connectionString)
     try
     {
         await using var migrate = new SqliteCommand("ALTER TABLE pois ADD COLUMN owner_admin_id INTEGER;", connection);
+        await migrate.ExecuteNonQueryAsync();
+    }
+    catch
+    {
+        // Ignore when the column already exists.
+    }
+
+    try
+    {
+        await using var migrate = new SqliteCommand("ALTER TABLE pois ADD COLUMN updated_at TEXT;", connection);
         await migrate.ExecuteNonQueryAsync();
     }
     catch

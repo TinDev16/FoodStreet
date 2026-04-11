@@ -10,8 +10,12 @@ public sealed class PoiViewHistoryEntity
     [Column("id")]
     public int Id { get; set; }
 
+    [Indexed]
     [Column("poi_id")]
     public string PoiId { get; set; } = string.Empty;
+
+    [Column("server_user_id")]
+    public long ServerUserId { get; set; }
 
     [Column("poi_name")]
     public string PoiName { get; set; } = string.Empty;

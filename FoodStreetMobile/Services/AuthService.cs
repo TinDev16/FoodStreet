@@ -14,13 +14,24 @@ public sealed class AuthService
 {
     private readonly AppDatabase _database;
     private readonly PoiSyncService _poiSync;
+    private readonly PoiViewHistoryService _history;
     private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(60) };
+    private long _currentUserId;
 
-    public AuthService(AppDatabase database, PoiSyncService poiSync)
+    public AuthService(AppDatabase database, PoiSyncService poiSync, PoiViewHistoryService history)
     {
         _database = database;
         _poiSync = poiSync;
+        _history = history;
+        _ = Task.Run(async () => {
+            try {
+                var profile = await LoadCachedProfileAsync();
+                _currentUserId = profile?.ServerUserId ?? 0;
+            } catch { }
+        });
     }
+
+    public long CurrentUserId => _currentUserId;
 
     public bool IsLoggedIn => !string.IsNullOrWhiteSpace(Preferences.Get(PoiSyncService.MobileJwtPreferenceKey, string.Empty));
 
@@ -266,6 +277,7 @@ public sealed class AuthService
         {
             try
             {
+                _currentUserId = 0;
                 var conn = await _database.GetConnectionAsync();
                 await conn.DeleteAsync<UserProfileEntity>(1);
             }
@@ -284,6 +296,7 @@ public sealed class AuthService
 
     private async Task ApplySuccessAsync(string baseUrl, MobileAuthResponseDto body)
     {
+        _currentUserId = body.UserId;
         Preferences.Set(PoiSyncService.MobileJwtPreferenceKey, body.Token);
         _poiSync.SetConfiguredBaseUrls(baseUrl);
         _poiSync.SetMobileJwtToken(body.Token);

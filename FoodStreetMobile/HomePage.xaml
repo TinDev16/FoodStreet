@@ -225,12 +225,18 @@
                                                    MaxLines="1"
                                                    LineBreakMode="TailTruncation" />
                                             <HorizontalStackLayout Spacing="4">
-                                                <Label Text="⭐" FontSize="11" VerticalOptions="Center" />
+                                                <Label Text="" FontSize="11" VerticalOptions="Center" />
                                                 <Label Text="{Binding MetaText}"
                                                        FontSize="11"
                                                        TextColor="#9A7D69"
                                                        VerticalOptions="Center" />
                                             </HorizontalStackLayout>
+                                            <!-- Offline cache badge -->
+                                            <Label Text="📦 Đã lưu • offline"
+                                                   FontSize="9"
+                                                   FontAttributes="Italic"
+                                                   TextColor="#B0A8A0"
+                                                   IsVisible="{Binding IsFromCache}" />
                                         </VerticalStackLayout>
                                     </Grid>
                                 </Border>

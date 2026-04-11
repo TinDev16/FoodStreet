@@ -11,7 +11,7 @@ public sealed class PoiViewHistoryService
         _database = database;
     }
 
-    public async Task RecordViewedAsync(string poiId, string poiName, string? poiImageUrl, DateTime? viewedAtUtc = null)
+    public async Task RecordViewedAsync(long userId, string poiId, string poiName, string? poiImageUrl, DateTime? viewedAtUtc = null)
     {
         if (string.IsNullOrWhiteSpace(poiId) || string.IsNullOrWhiteSpace(poiName))
         {
@@ -22,7 +22,7 @@ public sealed class PoiViewHistoryService
         var conn = await _database.GetConnectionAsync();
 
         var last = await conn.Table<PoiViewHistoryEntity>()
-            .Where(x => x.PoiId == poiId)
+            .Where(x => x.PoiId == poiId && x.ServerUserId == userId)
             .OrderByDescending(x => x.ViewedAtUtcTicks)
             .FirstOrDefaultAsync();
 
@@ -45,17 +45,20 @@ public sealed class PoiViewHistoryService
             PoiId = poiId.Trim(),
             PoiName = poiName.Trim(),
             PoiImageUrl = poiImageUrl,
-            ViewedAtUtcTicks = nowTicks
+            ViewedAtUtcTicks = nowTicks,
+            ServerUserId = userId
         });
 
         await TrimAsync(conn, maxRows: 300);
+        await PruneGuestHistoryAsync();
     }
 
-    public async Task<IReadOnlyList<PoiViewHistoryEntity>> GetRecentAsync(int limit = 200)
+    public async Task<IReadOnlyList<PoiViewHistoryEntity>> GetRecentAsync(long userId, int limit = 200)
     {
         limit = Math.Clamp(limit, 1, 1000);
         var conn = await _database.GetConnectionAsync();
         var list = await conn.Table<PoiViewHistoryEntity>()
+            .Where(x => x.ServerUserId == userId)
             .OrderByDescending(x => x.ViewedAtUtcTicks)
             .Take(limit)
             .ToListAsync();
@@ -63,10 +66,21 @@ public sealed class PoiViewHistoryService
         return list;
     }
 
-    public async Task ClearAsync()
+    public async Task ClearAsync(long userId)
     {
         var conn = await _database.GetConnectionAsync();
-        await conn.DeleteAllAsync<PoiViewHistoryEntity>();
+        await conn.ExecuteAsync("DELETE FROM poi_view_history WHERE server_user_id = ?", userId);
+    }
+
+    public async Task PruneGuestHistoryAsync()
+    {
+        try
+        {
+            var sevenDaysAgo = DateTime.UtcNow.AddDays(-7).Ticks;
+            var conn = await _database.GetConnectionAsync();
+            await conn.ExecuteAsync("DELETE FROM poi_view_history WHERE server_user_id = 0 AND viewed_at_utc_ticks < ?", sevenDaysAgo);
+        }
+        catch { }
     }
 
     private static async Task TrimAsync(SQLite.SQLiteAsyncConnection conn, int maxRows)

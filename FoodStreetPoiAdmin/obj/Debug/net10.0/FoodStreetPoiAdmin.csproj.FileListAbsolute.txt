@@ -1140,5 +1140,5 @@ E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify_featured
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify_featured_from_stats\runtimes\win-arm64\native\e_sqlite3.dll
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify_featured_from_stats\runtimes\win-x64\native\e_sqlite3.dll
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\bin_verify_featured_from_stats\runtimes\win-x86\native\e_sqlite3.dll
-E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\iiupjbvgp1-{0}-h68cb2sybt-h68cb2sybt.gz
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\3sodcubq1x-{0}-vvdu54e9s7-vvdu54e9s7.gz
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\iiupjbvgp1-{0}-doq4b0r303-doq4b0r303.gz

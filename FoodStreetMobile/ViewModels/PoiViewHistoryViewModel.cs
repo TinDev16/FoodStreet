@@ -1,4 +1,4 @@
-using FoodStreetMobile;
+using FoodStreetMobile.Localization;
 using FoodStreetMobile.Services;
 using Microsoft.Maui.ApplicationModel;
 using System.Collections.ObjectModel;
@@ -13,16 +13,19 @@ public sealed class PoiViewHistoryViewModel : INotifyPropertyChanged
 {
     private readonly PoiViewHistoryService _historyService;
     private readonly DeepLinkService _deepLinkService;
+    private readonly AuthService _authService;
     private bool _isEmpty;
 
-    public PoiViewHistoryViewModel(PoiViewHistoryService historyService, DeepLinkService deepLinkService)
+    public PoiViewHistoryViewModel(PoiViewHistoryService historyService, DeepLinkService deepLinkService, AuthService authService)
     {
         _historyService = historyService;
         _deepLinkService = deepLinkService;
+        _authService = authService;
 
         Items = new ObservableCollection<PoiViewHistoryListItem>();
         RefreshCommand = new Command(async () => await RefreshAsync());
         OpenPoiCommand = new Command<PoiViewHistoryListItem>(async item => await OpenPoiAsync(item));
+        ClearHistoryCommand = new Command(async () => await ClearHistoryAsync(), () => !IsEmpty);
     }
 
     public ObservableCollection<PoiViewHistoryListItem> Items { get; }
@@ -30,6 +33,7 @@ public sealed class PoiViewHistoryViewModel : INotifyPropertyChanged
     public ICommand RefreshCommand { get; }
 
     public ICommand OpenPoiCommand { get; }
+    public ICommand ClearHistoryCommand { get; }
 
     public bool IsEmpty
     {
@@ -43,15 +47,20 @@ public sealed class PoiViewHistoryViewModel : INotifyPropertyChanged
 
             _isEmpty = value;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(IsNotEmpty));
+            ((Command)ClearHistoryCommand).ChangeCanExecute();
         }
     }
+
+    public bool IsNotEmpty => !IsEmpty;
 
     public async Task RefreshAsync()
     {
         IReadOnlyList<Models.PoiViewHistoryEntity> history;
         try
         {
-            history = await _historyService.GetRecentAsync(limit: 250);
+            var userId = _authService.CurrentUserId;
+            history = await _historyService.GetRecentAsync(userId, limit: 250);
         }
         catch
         {
@@ -138,6 +147,29 @@ public sealed class PoiViewHistoryViewModel : INotifyPropertyChanged
             {
                 shell.NavigateToMainTabsTab(1);
             }
+        }
+        catch
+        {
+        }
+    }
+
+    private async Task ClearHistoryAsync()
+    {
+        if (IsEmpty) return;
+
+        bool confirm = await Microsoft.Maui.Controls.Application.Current.MainPage.DisplayAlert(
+            LocalizationResourceManager.Instance["PoiHistory_Clear"],
+            LocalizationResourceManager.Instance["PoiHistory_ClearConfirm"],
+            LocalizationResourceManager.Instance["General_Yes"],
+            LocalizationResourceManager.Instance["General_No"]);
+
+        if (!confirm) return;
+
+        try
+        {
+            var userId = _authService.CurrentUserId;
+            await _historyService.ClearAsync(userId);
+            await RefreshAsync();
         }
         catch
         {
