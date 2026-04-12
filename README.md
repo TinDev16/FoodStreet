@@ -54,12 +54,11 @@ Mobile
 - Text-to-Speech (TTS)
 - SQLite (offline storage)
   
-Backend & Web
-- ASP.NET Core Web API
-- ASP.NET Core MVC
-- Entity Framework Core
-- SQLite
-- RESTful APIs
+Backend & Admin
+- ASP.NET Core MVC (net10.0)
+- JWT Auth (Microsoft.AspNetCore.Authentication.JwtBearer)
+- SQLite (Microsoft.Data.Sqlite)
+- Razor Pages / Controllers
   
 General
 - .NET 8+
@@ -67,29 +66,37 @@ General
 - Clean / Layered Architecture
 
 ## Project Structure (Typical)
-```bash
-FoodStreet
-├── FoodStreet.Mobile        // .NET MAUI mobile app
-│   ├── Views
-│   ├── ViewModels
-│   ├── Services
-│   ├── Models
-│   └── Data (SQLite)
-│
-│
-├── FoodStreet.Web           // ASP.NET Core MVC (Admin & Shop)
-│   ├── Controllers
-│   ├── Views
-│   ├── Models
-│   └── wwwroot
-│
+```mermaid
+graph TD
+    A[FoodStreetMobile<br>.NET MAUI App] --> B[GPS/Geofence<br>Audio Narration]
+    A --> C[Offline SQLite<br>Multi-lang]
+    A --> D[Sync via WiFi<br>to Admin]
+    E[FoodStreetPoiAdmin<br>ASP.NET Core] --> F[POI Management<br>Auth/Stats]
+    E --> G[SQLite DB<br>poi-admin.db3]
+    D --> E
+```
+**Actual Structure:**
+```
+FoodStreet/
+├── FoodStreetMobile/     # MAUI mobile app
+│   ├── Pages/*.xaml(.cs) # HomePage, AuthPage, ProfilePage
+│   ├── Services/         # GPS, Narration, Sync
+│   ├── Models/           # PoiEntity, UserProfileEntity
+│   ├── ViewModels/
+│   ├── Localization/
+│   └── bin/              # APK builds
+├── FoodStreetPoiAdmin/   # Web admin
+│   ├── Controllers/
+│   ├── wwwroot/
+│   └── poi-admin.db3
+├── DoAn.sln
 └── README.md
 ```
 
 ## System Architecture
 
 Mobile App: Offline-first, GPS tracking, geofencing, audio narration
-Backend API: Central data provider, logging, synchronization
+Admin Panel: POI CRUD, user management, stats dashboard
 Web Management: Content & system administration
 Database:
 - SQLite (local & server)
@@ -97,7 +104,7 @@ Database:
 
 ## Prerequisites:
 
-- NET SDK (8.0 or later)
+- .NET SDK 8+ (`dotnet --version`)
 - Visual Studio 2022+
 - Android SDK (for mobile testing)
 - SQLite
@@ -105,29 +112,27 @@ Database:
 
 ## Getting Started
 
-1. Clone the repository:
+### Quick Start (Local)
 
-```bash
-git clone https://github.com/Tindev16/FoodStreet
+**No git clone needed (local project).**
+
+1. Restore solution:
+```
+dotnet restore DoAn.sln
 ```
 
-2. Run Backend API
+2. Run Web Admin
 
-```bash
-cd FoodStreet.API
-dotnet restore
-dotnet run
 ```
-3. Run Web Management
-
-```bash
-dotnet run --project FoodStreetPoiAdmin\FoodStreetPoiAdmin.csproj --urls http://localhost:5187
+dotnet run --project FoodStreetPoiAdmin/FoodStreetPoiAdmin.csproj --urls "http://localhost:5000"
 ```
-4. Run Mobile App
+Visit: http://localhost:5000
 
-- Open FoodStreet.Mobile in Visual Studio
-- Select Android Emulator / Device
-- Run the project
+**Mobile App:**
+- Open **DoAn.sln** in Visual Studio 2022+
+- Right-click **FoodStreetMobile** > Set as Startup
+- Select Android device/emulator
+- Press F5
 
 ## Learning Objectives
 
@@ -148,4 +153,4 @@ Contributions are welcome.
 
 ## License
 
-This project is licensed under the MIT License.
+No License.

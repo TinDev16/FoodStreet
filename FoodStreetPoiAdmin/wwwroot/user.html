@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FoodStreet User Management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+
+<body>
+  <div class="dashboard">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <i class="fa-solid fa-map-location-dot brand-icon"></i>
+        <span>FS Admin</span>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="/" class="nav-item">
+          <i class="fa-solid fa-list-check"></i>
+          <span>Quản lý POI</span>
+        </a>
+        <a href="/stats.html" class="nav-item" id="navAudioStats">
+          <i class="fa-solid fa-chart-column"></i>
+          <span>Thống kê lượt phát Audio</span>
+        </a>
+        <a href="/owner.html" class="nav-item" id="ownerManageNav">
+          <i class="fa-solid fa-user-shield"></i>
+          <span>Quản lý Owner</span>
+        </a>
+        <a href="/user.html" class="nav-item active" id="userManageNav">
+          <i class="fa-solid fa-users"></i>
+          <span>Quản lý User</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-profile">
+          <img id="sidebarUserAvatar"
+            src="https://ui-avatars.com/api/?name=Admin&background=4f46e5&color=fff&rounded=true" alt="Admin" />
+          <div class="user-info">
+            <span class="user-name" id="sidebarUserName">Super Admin</span>
+            <span class="user-role" id="sidebarUserRole">Hệ thống</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <div class="main-board">
+      <header class="topbar">
+        <div class="topbar-title">Quản lý Mobile User</div>
+        <div class="topbar-actions">
+          <a href="/stats.html" class="button-link secondary"><i class="fa-solid fa-chart-column"></i> Thống kê
+            Audio</a>
+          <button class="topbar-btn" id="logoutBtn" title="Đăng xuất"><i
+              class="fa-solid fa-right-from-bracket"></i></button>
+        </div>
+      </header>
+
+      <div class="scroll-container">
+        <main class="layout" style="grid-template-columns: 1fr;">
+          <section class="card">
+            <header class="card-header">
+              <div class="card-title">
+                <i class="fa-solid fa-user-plus"></i>
+                <h2>Thêm / sửa Mobile User</h2>
+              </div>
+            </header>
+            <form id="userForm">
+              <input id="userId" type="hidden" />
+              <div class="grid-2">
+                <div class="form-group">
+                  <label>Username
+                    <input id="userUsername" type="text" required minlength="3" />
+                  </label>
+                </div>
+                <div class="form-group">
+                  <label>Họ tên
+                    <input id="userFullName" type="text" required />
+                  </label>
+                </div>
+              </div>
+              <div class="grid-2">
+                <div class="form-group">
+                  <label>Số điện thoại
+                    <input id="userPhone" type="tel" required />
+                  </label>
+                </div>
+                <div class="form-group">
+                  <label>Email (không bắt buộc)
+                    <input id="userEmail" type="email" />
+                  </label>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Password (bỏ trống khi chỉ sửa thông tin)
+                  <input id="userPassword" type="password" minlength="6" />
+                </label>
+              </div>
+              <div class="actions">
+                <button type="submit"><i class="fa-solid fa-floppy-disk"></i> Lưu user</button>
+                <button type="button" id="userResetBtn" class="secondary"><i class="fa-solid fa-rotate-right"></i> Làm
+                  mới</button>
+              </div>
+              <p id="userStatus"></p>
+            </form>
+          </section>
+
+          <section class="card">
+            <header class="card-header">
+              <div class="card-title">
+                <i class="fa-solid fa-users"></i>
+                <h2>Danh sách Mobile User</h2>
+              </div>
+              <div class="header-actions tab-floating-group">
+                <button type="button" id="userTabActiveBtn" class="secondary tab-floating active">Đang hoạt động</button>
+                <button type="button" id="userTabHistoryBtn" class="secondary tab-floating">Thùng rác (Xóa mềm)</button>
+              </div>
+            </header>
+            <div class="table-responsive">
+              <table id="userActiveTable">
+                <thead>
+                  <tr>
+                    <th width="80">ID</th>
+                    <th>Username</th>
+                    <th>Họ tên</th>
+                    <th>SĐT / Email</th>
+                    <th>Ngày tạo</th>
+                    <th width="130">Hành động</th>
+                  </tr>
+                </thead>
+                <tbody id="userRows"></tbody>
+              </table>
+              <table id="userHistoryTable" hidden>
+                <thead>
+                  <tr>
+                    <th width="80">ID</th>
+                    <th>Username</th>
+                    <th>Họ tên</th>
+                    <th>Thời điểm xóa</th>
+                    <th width="130">Hành động</th>
+                  </tr>
+                </thead>
+                <tbody id="userHistoryRows"></tbody>
+              </table>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+  </div>
+
+  <dialog id="authDialog" class="qr-dialog">
+    <form id="authForm" method="dialog" class="qr-panel">
+      <header class="qr-header">
+        <div class="qr-title">
+          <i class="fa-solid fa-lock"></i>
+          <h3>Đăng nhập quản trị</h3>
+        </div>
+      </header>
+      <div class="form-group">
+        <label>Username
+          <input id="authUsername" type="text" required />
+        </label>
+      </div>
+      <div class="form-group">
+        <label>Password
+          <input id="authPassword" type="password" required />
+        </label>
+      </div>
+      <div class="actions">
+        <button type="submit"><i class="fa-solid fa-right-to-bracket"></i> Đăng nhập</button>
+      </div>
+      <p id="authStatus" class="small muted mt-10"></p>
+    </form>
+  </dialog>
+
+  <script src="/user.js"></script>
+</body>
+
+</html>

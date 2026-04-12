@@ -311,6 +311,141 @@ app.MapPost("/api/admin/owners/{id}/restore", async (HttpContext context, string
     return ok ? Results.Ok(new { id = ownerId.ToString(CultureInfo.InvariantCulture), restored = true }) : Results.NotFound();
 }).RequireAuthorization();
 
+app.MapGet("/api/admin/users", async (HttpContext context) =>
+{
+    if (!TryGetAdminActor(context.User, out var actor))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!IsSuperAdmin(actor))
+    {
+        return Results.Forbid();
+    }
+
+    var status = context.Request.Query["status"].ToString() ?? "active";
+    var users = await GetAppUsersAsync(connectionString, status);
+    return Results.Ok(users);
+}).RequireAuthorization();
+
+app.MapPost("/api/admin/users", async (HttpContext context, AdminCreateUserRequest? req) =>
+{
+    if (!TryGetAdminActor(context.User, out var actor))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!IsSuperAdmin(actor))
+    {
+        return Results.Forbid();
+    }
+
+    if (req is null || string.IsNullOrWhiteSpace(req.Username) || string.IsNullOrWhiteSpace(req.Password))
+    {
+        return Results.BadRequest(new { error = "Thieu username hoac password." });
+    }
+
+    if (req.Password.Trim().Length < 6)
+    {
+        return Results.BadRequest(new { error = "Password phai co it nhat 6 ky tu." });
+    }
+
+    if (string.IsNullOrWhiteSpace(req.FullName) || string.IsNullOrWhiteSpace(req.Phone))
+    {
+        return Results.BadRequest(new { error = "Thieu ho ten hoac so dien thoai." });
+    }
+
+    try
+    {
+        var userId = await CreateAppUserAsync(connectionString, req.Username.Trim(), req.Password.Trim(), req.FullName.Trim(), req.Phone.Trim(), req.Email?.Trim() ?? string.Empty);
+        return Results.Ok(new { id = userId.ToString(CultureInfo.InvariantCulture) });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+}).RequireAuthorization();
+
+app.MapPut("/api/admin/users/{id}", async (HttpContext context, string id, AdminUpdateUserRequest? req) =>
+{
+    if (!TryGetAdminActor(context.User, out var actor))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!IsSuperAdmin(actor))
+    {
+        return Results.Forbid();
+    }
+
+    if (!long.TryParse((id ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var userId) || userId <= 0)
+    {
+        return Results.BadRequest(new { error = "user id khong hop le." });
+    }
+
+    if (req is null)
+    {
+        return Results.BadRequest(new { error = "Thieu du lieu cap nhat user." });
+    }
+
+    if (!string.IsNullOrWhiteSpace(req.Password) && req.Password.Trim().Length < 6)
+    {
+        return Results.BadRequest(new { error = "Password phai co it nhat 6 ky tu." });
+    }
+
+    try
+    {
+        var ok = await UpdateAppUserAsync(connectionString, userId, req.Username?.Trim(), req.FullName?.Trim(), req.Phone?.Trim(), req.Email?.Trim(), req.Password?.Trim());
+        return ok ? Results.Ok(new { id = userId.ToString(CultureInfo.InvariantCulture) }) : Results.NotFound();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+}).RequireAuthorization();
+
+app.MapDelete("/api/admin/users/{id}", async (HttpContext context, string id) =>
+{
+    if (!TryGetAdminActor(context.User, out var actor))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!IsSuperAdmin(actor))
+    {
+        return Results.Forbid();
+    }
+
+    if (!long.TryParse((id ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var userId) || userId <= 0)
+    {
+        return Results.BadRequest(new { error = "user id khong hop le." });
+    }
+
+    var ok = await SoftDeleteUserAsync(connectionString, userId);
+    return ok ? Results.Ok(new { id = userId.ToString(CultureInfo.InvariantCulture) }) : Results.NotFound();
+}).RequireAuthorization();
+
+app.MapPost("/api/admin/users/{id}/restore", async (HttpContext context, string id) =>
+{
+    if (!TryGetAdminActor(context.User, out var actor))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!IsSuperAdmin(actor))
+    {
+        return Results.Forbid();
+    }
+
+    if (!long.TryParse((id ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var userId) || userId <= 0)
+    {
+        return Results.BadRequest(new { error = "user id khong hop le." });
+    }
+
+    var ok = await RestoreUserAsync(connectionString, userId);
+    return ok ? Results.Ok(new { id = userId.ToString(CultureInfo.InvariantCulture), restored = true }) : Results.NotFound();
+}).RequireAuthorization();
+
 app.MapPost("/api/admin/pois/{id}/assign-owner", async (HttpContext context, string id, AssignPoiOwnerRequest? req) =>
 {
     if (!TryGetAdminActor(context.User, out var actor))
@@ -405,21 +540,28 @@ app.MapPost("/api/mobile/auth/login", async (MobileLoginRequest? req) =>
         return Results.BadRequest(new { error = "Thieu thong tin dang nhap." });
     }
 
-    var user = await MobileFindUserForLoginAsync(connectionString, req.UsernameOrPhone.Trim(), req.Password);
-    if (user is null)
+    try
     {
-        return Results.Unauthorized();
-    }
+        var user = await MobileFindUserForLoginAsync(connectionString, req.UsernameOrPhone.Trim(), req.Password);
+        if (user is null)
+        {
+            return Results.Unauthorized();
+        }
 
-    var token = CreateMobileJwt(user.Value.Id, user.Value.Username, user.Value.FullName, user.Value.Phone, jwtSecret);
-    return Results.Ok(new MobileAuthResponse
+        var token = CreateMobileJwt(user.Value.Id, user.Value.Username, user.Value.FullName, user.Value.Phone, jwtSecret);
+        return Results.Ok(new MobileAuthResponse
+        {
+            Token = token,
+            UserId = user.Value.Id,
+            Username = user.Value.Username,
+            FullName = user.Value.FullName,
+            Phone = user.Value.Phone
+        });
+    }
+    catch (InvalidOperationException ex)
     {
-        Token = token,
-        UserId = user.Value.Id,
-        Username = user.Value.Username,
-        FullName = user.Value.FullName,
-        Phone = user.Value.Phone
-    });
+        return Results.Json(new { error = ex.Message }, statusCode: 403);
+    }
 });
 
 app.MapPost("/api/mobile/auth/logout", () => Results.Ok(new { message = "Dang xuat phia client (xoa token)." }));
@@ -1439,7 +1581,28 @@ static async Task<byte[]> RenderQrPngAsync(string content, int size, Cancellatio
     return await response.Content.ReadAsByteArrayAsync(cancellationToken);
 }
 
+static async Task AddColumnIfNotExists(SqliteConnection conn, string table, string column, string definition)
+{
+    await using var checkCmd = new SqliteCommand($"PRAGMA table_info({table});", conn);
+    await using var reader = await checkCmd.ExecuteReaderAsync();
+    bool exists = false;
+    while (await reader.ReadAsync())
+    {
+        if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase))
+        {
+            exists = true;
+            break;
+        }
+    }
+    if (!exists)
+    {
+        await using var alterCmd = new SqliteCommand($"ALTER TABLE {table} ADD COLUMN {column} {definition};", conn);
+        await alterCmd.ExecuteNonQueryAsync();
+    }
+}
+
 static async Task InitializeDatabaseAsync(string connectionString)
+
 {
     await using var connection = new SqliteConnection(connectionString);
     await connection.OpenAsync();
@@ -1619,7 +1782,11 @@ static async Task InitializeDatabaseAsync(string connectionString)
             full_name TEXT NOT NULL DEFAULT '',
             phone TEXT NOT NULL,
             phone_digits TEXT NOT NULL,
-            created_at TEXT NOT NULL
+            email TEXT,
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            deleted_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT
         );
         CREATE TABLE IF NOT EXISTS poi_audio_play_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1644,19 +1811,13 @@ static async Task InitializeDatabaseAsync(string connectionString)
         await createUsers.ExecuteNonQueryAsync();
     }
 
-    try
-    {
-        await using var migrate = new SqliteCommand("ALTER TABLE admin_accounts ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0;", connection);
-        await migrate.ExecuteNonQueryAsync();
-    }
-    catch { }
+    await AddColumnIfNotExists(connection, "app_users", "email", "TEXT");
+    await AddColumnIfNotExists(connection, "app_users", "is_deleted", "INTEGER NOT NULL DEFAULT 0");
+    await AddColumnIfNotExists(connection, "app_users", "deleted_at", "TEXT");
+    await AddColumnIfNotExists(connection, "app_users", "updated_at", "TEXT");
 
-    try
-    {
-        await using var migrate = new SqliteCommand("ALTER TABLE admin_accounts ADD COLUMN deleted_at TEXT;", connection);
-        await migrate.ExecuteNonQueryAsync();
-    }
-    catch { }
+    await AddColumnIfNotExists(connection, "admin_accounts", "is_deleted", "INTEGER NOT NULL DEFAULT 0");
+    await AddColumnIfNotExists(connection, "admin_accounts", "deleted_at", "TEXT");
 
     try
     {
@@ -1956,6 +2117,187 @@ static async Task<bool> RestoreOwnerAccountAsync(string connectionString, long o
         """, connection);
     restore.Parameters.AddWithValue("$id", ownerId);
     var affected = await restore.ExecuteNonQueryAsync();
+    return affected > 0;
+}
+
+static async Task<List<AppUserDto>> GetAppUsersAsync(string connectionString, string status = "active")
+{
+    await using var connection = await OpenConnectionAsync(connectionString);
+    var sql = """
+        SELECT id, username, full_name, phone, email, is_deleted, deleted_at, created_at, updated_at
+        FROM app_users
+        """;
+    
+    var conditions = new List<string>();
+    if (string.Equals(status, "active", StringComparison.OrdinalIgnoreCase))
+    {
+        conditions.Add("COALESCE(is_deleted, 0) = 0");
+    }
+    else if (string.Equals(status, "deleted", StringComparison.OrdinalIgnoreCase))
+    {
+        conditions.Add("COALESCE(is_deleted, 0) = 1");
+    }
+
+    if (conditions.Count > 0)
+    {
+        sql += " WHERE " + string.Join(" AND ", conditions);
+    }
+    
+    sql += " ORDER BY username ASC;";
+    
+    await using var cmd = new SqliteCommand(sql, connection);
+    await using var reader = await cmd.ExecuteReaderAsync();
+    var result = new List<AppUserDto>();
+    while (await reader.ReadAsync())
+    {
+        result.Add(new AppUserDto
+        {
+            Id = reader.GetInt64(0).ToString(CultureInfo.InvariantCulture),
+            Username = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+            FullName = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+            Phone = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+            Email = reader.IsDBNull(4) ? null : reader.GetString(4),
+            IsDeleted = !reader.IsDBNull(5) && reader.GetInt32(5) != 0,
+            DeletedAt = reader.IsDBNull(6) ? null : reader.GetString(6),
+            CreatedAt = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
+            UpdatedAt = reader.IsDBNull(8) ? null : reader.GetString(8),
+        });
+    }
+
+    return result;
+}
+
+static async Task<long> CreateAppUserAsync(string connectionString, string username, string password, string fullName, string phone, string email)
+{
+    await using var connection = await OpenConnectionAsync(connectionString);
+    await using var exists = new SqliteCommand("SELECT 1 FROM app_users WHERE lower(username) = lower($u) LIMIT 1;", connection);
+    exists.Parameters.AddWithValue("$u", username);
+    if (await exists.ExecuteScalarAsync() is not null)
+    {
+        throw new InvalidOperationException("Username da ton tai.");
+    }
+
+    var phoneDigits = NormalizePhoneDigits(phone);
+    await using var checkPhone = new SqliteCommand("SELECT 1 FROM app_users WHERE phone_digits = $p LIMIT 1;", connection);
+    checkPhone.Parameters.AddWithValue("$p", phoneDigits);
+    if (await checkPhone.ExecuteScalarAsync() is not null)
+    {
+        throw new InvalidOperationException("So dien thoai da duoc dang ky.");
+    }
+
+    var hash = BCrypt.Net.BCrypt.HashPassword(password);
+    await using var insert = new SqliteCommand("""
+        INSERT INTO app_users (username, password_hash, full_name, phone, phone_digits, email, is_deleted, created_at)
+        VALUES ($u, $h, $fn, $ph, $pd, $em, 0, $ca);
+        SELECT last_insert_rowid();
+        """, connection);
+    insert.Parameters.AddWithValue("$u", username);
+    insert.Parameters.AddWithValue("$h", hash);
+    insert.Parameters.AddWithValue("$fn", fullName ?? string.Empty);
+    insert.Parameters.AddWithValue("$ph", phone ?? string.Empty);
+    insert.Parameters.AddWithValue("$pd", phoneDigits);
+    insert.Parameters.AddWithValue("$em", email ?? (object)DBNull.Value);
+    insert.Parameters.AddWithValue("$ca", DateTimeOffset.UtcNow.ToString("O"));
+    var raw = await insert.ExecuteScalarAsync();
+    return Convert.ToInt64(raw, CultureInfo.InvariantCulture);
+}
+
+static async Task<bool> UpdateAppUserAsync(string connectionString, long userId, string? username, string? fullName, string? phone, string? email, string? password)
+{
+    await using var connection = await OpenConnectionAsync(connectionString);
+    await using var exists = new SqliteCommand("SELECT 1 FROM app_users WHERE id = $id AND COALESCE(is_deleted, 0) = 0 LIMIT 1;", connection);
+    exists.Parameters.AddWithValue("$id", userId);
+    if (await exists.ExecuteScalarAsync() is null)
+    {
+        return false;
+    }
+
+    if (!string.IsNullOrWhiteSpace(username))
+    {
+        await using var checkUser = new SqliteCommand("SELECT 1 FROM app_users WHERE lower(username) = lower($u) AND id <> $id LIMIT 1;", connection);
+        checkUser.Parameters.AddWithValue("$u", username);
+        checkUser.Parameters.AddWithValue("$id", userId);
+        if (await checkUser.ExecuteScalarAsync() is not null)
+        {
+            throw new InvalidOperationException("Username da ton tai.");
+        }
+    }
+
+    var setSql = new List<string>();
+    await using var cmd = new SqliteCommand { Connection = connection };
+    cmd.Parameters.AddWithValue("$id", userId);
+
+    if (!string.IsNullOrWhiteSpace(username))
+    {
+        setSql.Add("username = $u");
+        cmd.Parameters.AddWithValue("$u", username);
+    }
+
+    if (fullName is not null)
+    {
+        setSql.Add("full_name = $fn");
+        cmd.Parameters.AddWithValue("$fn", fullName);
+    }
+
+    if (!string.IsNullOrWhiteSpace(phone))
+    {
+        setSql.Add("phone = $ph");
+        setSql.Add("phone_digits = $pd");
+        cmd.Parameters.AddWithValue("$ph", phone);
+        cmd.Parameters.AddWithValue("$pd", NormalizePhoneDigits(phone));
+    }
+
+    if (email is not null)
+    {
+        setSql.Add("email = $em");
+        cmd.Parameters.AddWithValue("$em", email);
+    }
+
+    if (!string.IsNullOrWhiteSpace(password))
+    {
+        setSql.Add("password_hash = $h");
+        cmd.Parameters.AddWithValue("$h", BCrypt.Net.BCrypt.HashPassword(password));
+    }
+
+    if (setSql.Count == 0)
+    {
+        return true;
+    }
+
+    setSql.Add("updated_at = $ua");
+    cmd.Parameters.AddWithValue("$ua", DateTimeOffset.UtcNow.ToString("O"));
+
+    cmd.CommandText = $"UPDATE app_users SET {string.Join(", ", setSql)} WHERE id = $id AND COALESCE(is_deleted, 0) = 0;";
+    var affected = await cmd.ExecuteNonQueryAsync();
+    return affected > 0;
+}
+
+static async Task<bool> SoftDeleteUserAsync(string connectionString, long userId)
+{
+    await using var connection = await OpenConnectionAsync(connectionString);
+    await using var cmd = new SqliteCommand("""
+        UPDATE app_users
+        SET is_deleted = 1,
+            deleted_at = $deletedAt
+        WHERE id = $id AND COALESCE(is_deleted, 0) = 0;
+        """, connection);
+    cmd.Parameters.AddWithValue("$id", userId);
+    cmd.Parameters.AddWithValue("$deletedAt", DateTimeOffset.UtcNow.ToString("O"));
+    var affected = await cmd.ExecuteNonQueryAsync();
+    return affected > 0;
+}
+
+static async Task<bool> RestoreUserAsync(string connectionString, long userId)
+{
+    await using var connection = await OpenConnectionAsync(connectionString);
+    await using var cmd = new SqliteCommand("""
+        UPDATE app_users
+        SET is_deleted = 0,
+            deleted_at = NULL
+        WHERE id = $id AND COALESCE(is_deleted, 0) = 1;
+        """, connection);
+    cmd.Parameters.AddWithValue("$id", userId);
+    var affected = await cmd.ExecuteNonQueryAsync();
     return affected > 0;
 }
 
@@ -2811,9 +3153,9 @@ static async Task<(long Id, string Username, string FullName, string Phone)?> Mo
     var phoneMatch = digits.Length >= 8 ? digits : "___no_phone_match___";
 
     const string sql = """
-        SELECT id, username, password_hash, full_name, phone
+        SELECT id, username, password_hash, full_name, phone, COALESCE(is_deleted, 0)
         FROM app_users
-        WHERE lower(username) = lower($u) OR phone_digits = $pd
+        WHERE (lower(username) = lower($u) OR phone_digits = $pd)
         LIMIT 1;
         """;
     await using var cmd = new SqliteCommand(sql, conn);
@@ -2823,6 +3165,12 @@ static async Task<(long Id, string Username, string FullName, string Phone)?> Mo
     if (!await reader.ReadAsync())
     {
         return null;
+    }
+
+    var isDeleted = reader.GetInt32(5) != 0;
+    if (isDeleted)
+    {
+        throw new InvalidOperationException("Tài khoản đã bị khóa.");
     }
 
     var id = reader.GetInt64(0);
@@ -3097,4 +3445,35 @@ sealed class ShopUpsertJsonRequest
     public double RadiusMeters { get; set; } = 40;
     public string? Description { get; set; }
     public string? TtsText { get; set; }
+}
+
+sealed class AppUserDto
+{
+    public string Id { get; set; } = string.Empty;
+    public string Username { get; set; } = string.Empty;
+    public string FullName { get; set; } = string.Empty;
+    public string Phone { get; set; } = string.Empty;
+    public string? Email { get; set; }
+    public bool IsDeleted { get; set; }
+    public string? DeletedAt { get; set; }
+    public string CreatedAt { get; set; } = string.Empty;
+    public string? UpdatedAt { get; set; }
+}
+
+sealed class AdminCreateUserRequest
+{
+    public string? Username { get; set; }
+    public string? Password { get; set; }
+    public string? FullName { get; set; }
+    public string? Phone { get; set; }
+    public string? Email { get; set; }
+}
+
+sealed class AdminUpdateUserRequest
+{
+    public string? Username { get; set; }
+    public string? Password { get; set; }
+    public string? FullName { get; set; }
+    public string? Phone { get; set; }
+    public string? Email { get; set; }
 }

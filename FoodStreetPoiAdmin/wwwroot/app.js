@@ -28,6 +28,7 @@
   const sidebarUserRoleEl = $("#sidebarUserRole");
   const sidebarUserAvatarEl = $("#sidebarUserAvatar");
   const ownerManageNavEl = $("#ownerManageNav");
+  const userManageNavEl = $("#userManageNav");
   const navClientPoiEl = $("#navClientPoi");
   const poiFormCardEl = $("#poiFormCard");
   const audioStatsRowsEl = $("#audioStatsRows");
@@ -523,6 +524,9 @@
     const roleCode = (state.auth.user?.role || "").toLowerCase();
     const isOwnerRole = roleCode === "owner";
     ownerManageNavEl.hidden = !isSuperAdmin();
+    if (userManageNavEl) {
+      userManageNavEl.hidden = !isSuperAdmin();
+    }
     if (navClientPoiEl) {
       navClientPoiEl.hidden = isOwnerRole;
     }
