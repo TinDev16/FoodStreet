@@ -1,22 +1,19 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS restore
-WORKDIR /src
-
-COPY FoodStreetPoiAdmin/FoodStreetPoiAdmin.csproj FoodStreetPoiAdmin/
-RUN dotnet restore FoodStreetPoiAdmin/FoodStreetPoiAdmin.csproj
-
-FROM restore AS publish
-COPY . .
-RUN dotnet restore FoodStreetPoiAdmin/FoodStreetPoiAdmin.csproj --force \
-    && dotnet publish FoodStreetPoiAdmin/FoodStreetPoiAdmin.csproj -c Release -o /app/publish --no-restore
-
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+# Build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /app
 
-COPY --from=publish /app/publish .
-RUN mkdir -p /FoodStreetPoiAdmin/App_Data
+COPY . ./
 
-ENV ASPNETCORE_URLS=http://0.0.0.0:5187
-ENV DOTNET_EnableDiagnostics=0
-EXPOSE 5187
+# Publish API
+RUN dotnet publish FoodStreetPoiAdmin/FoodStreetPoiAdmin.csproj -c Release -o out
 
-ENTRYPOINT ["dotnet", "FoodStreetPoiAdmin.dll"]
+# Runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
+WORKDIR /app
+
+# Copy code đã build
+COPY --from=build /app/out .
+
+COPY FoodStreetPoiAdmin/App_Data/poi-admin.db3 ./App_Data/poi-admin.db3
+
+CMD ["dotnet", "FoodStreetPoiAdmin.dll"]
