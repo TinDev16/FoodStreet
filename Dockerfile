@@ -6,7 +6,8 @@ RUN dotnet restore FoodStreetPoiAdmin/FoodStreetPoiAdmin.csproj
 
 FROM restore AS publish
 COPY . .
-RUN dotnet publish FoodStreetPoiAdmin/FoodStreetPoiAdmin.csproj -c Release -o /app/publish --no-restore
+RUN dotnet restore FoodStreetPoiAdmin/FoodStreetPoiAdmin.csproj --force \
+    && dotnet publish FoodStreetPoiAdmin/FoodStreetPoiAdmin.csproj -c Release -o /app/publish --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
