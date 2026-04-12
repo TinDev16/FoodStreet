@@ -352,8 +352,25 @@
       document.addEventListener("visibilitychange", onVisibilityChange, { once: true });
       window.addEventListener("pagehide", onPageHide, { once: true });
 
-      window.location.href = deepLinkUrl;
-      window.setTimeout(() => finish(document.visibilityState === "hidden"), 1600);
+      const userAgent = (navigator.userAgent || "").toLowerCase();
+      const isAndroid = userAgent.includes("android");
+      const isIos = /iphone|ipad|ipod/.test(userAgent);
+
+      if (isAndroid) {
+        const iframe = document.createElement("iframe");
+        iframe.style.display = "none";
+        iframe.src = deepLinkUrl;
+        document.body.appendChild(iframe);
+        window.setTimeout(() => {
+          try { document.body.removeChild(iframe); } catch { }
+        }, 1200);
+      } else if (isIos) {
+        window.location.href = deepLinkUrl;
+      } else {
+        window.location.href = deepLinkUrl;
+      }
+
+      window.setTimeout(() => finish(document.visibilityState === "hidden"), 1800);
     });
   };
 
@@ -365,12 +382,8 @@
     state.appHandOffDone = true;
     hideInstallPrompt();
 
-    if (shouldDisableInstallPrompt()) {
-      return;
-    }
-
     const opened = await tryOpenAppDeepLink(buildAppDeepLinkUrl(state.poiId, state.lang));
-    if (!opened) {
+    if (!opened && !shouldDisableInstallPrompt()) {
       showInstallPrompt();
     }
   };

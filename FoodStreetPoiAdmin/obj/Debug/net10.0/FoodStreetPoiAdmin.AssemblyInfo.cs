@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("FoodStreetPoiAdmin")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9632d365b73a9f7aef255d5e2432aadf8cb9ffbe")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+570f552ce4d1d502361c783466e1b0bb1b6dff83")]
 [assembly: System.Reflection.AssemblyProductAttribute("FoodStreetPoiAdmin")]
 [assembly: System.Reflection.AssemblyTitleAttribute("FoodStreetPoiAdmin")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
