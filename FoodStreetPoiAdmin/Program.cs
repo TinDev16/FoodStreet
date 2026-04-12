@@ -465,6 +465,32 @@ app.MapPost("/api/mobile/auth/change-password", async (ClaimsPrincipal user, Mob
     return Results.Ok(new { message = "Doi mat khau thanh cong." });
 }).RequireAuthorization();
 
+app.MapPost("/api/mobile/pois/{id}/unlock", async (ClaimsPrincipal user, string id) =>
+{
+    if (!TryParsePoiId(id, out var poiId))
+    {
+        return Results.BadRequest(new { error = "Invalid id." });
+    }
+
+    if (!TryGetMobileUserId(user, out var userId))
+    {
+        return Results.Unauthorized();
+    }
+
+    var unlocked = await UpsertUserPoiAccessAsync(connectionString, userId, poiId, true);
+    if (!unlocked)
+    {
+        return Results.NotFound();
+    }
+
+    return Results.Ok(new
+    {
+        poiId = poiId.ToString(CultureInfo.InvariantCulture),
+        userId,
+        isPaid = true
+    });
+}).RequireAuthorization();
+
 app.MapGet("/api/languages", () => Results.Ok(supportedLanguages));
 
 app.MapGet("/api/public/base-url", async (HttpContext context) =>
@@ -547,7 +573,8 @@ app.MapGet("/api/pois", async (HttpContext context) =>
 {
     await TryEnsureAdbReverseAsync();
     var requestedLang = NormalizeLanguageOrFallback(context.Request.Query["lang"].ToString(), supportedLanguageSet);
-    var items = await GetPoisForMobileAsync(connectionString, requestedLang);
+    _ = TryGetMobileUserId(context.User, out var mobileUserId);
+    var items = await GetPoisForMobileAsync(connectionString, requestedLang, mobileUserId);
     return Results.Ok(items);
 });
 
@@ -641,7 +668,8 @@ app.MapGet("/api/pois/{id}/localized", async (HttpContext context, string id) =>
         return Results.BadRequest(new { error = "Invalid id." });
     }
 
-    var item = await GetPoiForMobileAsync(connection, poiId, requestedLang);
+    _ = TryGetMobileUserId(context.User, out var mobileUserId);
+    var item = await GetPoiForMobileAsync(connection, poiId, requestedLang, mobileUserId);
     return item is null ? Results.NotFound() : Results.Ok(item);
 });
 
@@ -674,8 +702,46 @@ app.MapGet("/api/public/pois/{id}", async (HttpContext context, string id) =>
         return Results.BadRequest(new { error = "Invalid id." });
     }
 
-    var item = await GetPoiForPublicAsync(connection, poiId, requestedLang);
+    long? publicUserId = null;
+    var rawUserId = context.Request.Query["userId"].ToString();
+    if (!string.IsNullOrWhiteSpace(rawUserId))
+    {
+        if (!TryParsePublicUserId(rawUserId, out var parsedUserId))
+        {
+            return Results.BadRequest(new { error = "Invalid userId." });
+        }
+
+        publicUserId = parsedUserId;
+    }
+
+    var item = await GetPoiForPublicAsync(connection, poiId, requestedLang, publicUserId);
     return item is null ? Results.NotFound() : Results.Ok(item);
+});
+
+app.MapPost("/api/public/pois/{id}/unlock", async (string id, PublicPoiUnlockRequest? req) =>
+{
+    if (!TryParsePoiId(id, out var poiId))
+    {
+        return Results.BadRequest(new { error = "Invalid id." });
+    }
+
+    if (req is null || req.UserId <= 0)
+    {
+        return Results.BadRequest(new { error = "userId phai lon hon 0." });
+    }
+
+    var unlocked = await UpsertUserPoiAccessAsync(connectionString, req.UserId, poiId, true);
+    if (!unlocked)
+    {
+        return Results.NotFound();
+    }
+
+    return Results.Ok(new
+    {
+        poiId = poiId.ToString(CultureInfo.InvariantCulture),
+        userId = req.UserId,
+        isPaid = true
+    });
 });
 
 app.MapGet("/api/pois/{id}/public-link", async (HttpContext context, string id) =>
@@ -775,6 +841,11 @@ app.MapPost("/api/pois", async (HttpContext context, PoiAdminUpsertRequest reque
     if (request.RadiusMeters <= 0)
     {
         return Results.BadRequest(new { error = "Radius (m) phai lon hon 0." });
+    }
+
+    if (request.Price < 0)
+    {
+        return Results.BadRequest(new { error = "Gia mo khoa khong duoc am." });
     }
 
     var translations = request.Translations ?? [];
@@ -921,6 +992,7 @@ app.MapPost("/api/pois", async (HttpContext context, PoiAdminUpsertRequest reque
         Longitude = request.Longitude,
         RadiusMeters = request.RadiusMeters,
         Priority = request.Priority,
+        Price = request.Price,
         MapLink = mapLink,
         ImageUrl = (request.ImageUrl ?? string.Empty).Trim(),
         AudioUrl = (request.AudioUrl ?? string.Empty).Trim(),
@@ -1134,6 +1206,7 @@ app.MapPost("/api/shops/upsert", async (ShopUpsertJsonRequest request) =>
         Longitude = request.Longitude,
         RadiusMeters = request.RadiusMeters,
         Priority = 0,
+        Price = 0,
         MapLink = mapLink,
         ImageUrl = currentImageUrl,
         AudioUrl = currentAudioUrl,
@@ -1382,6 +1455,7 @@ static async Task InitializeDatabaseAsync(string connectionString)
             longitude REAL,
             radius_meters REAL,
             priority INTEGER,
+            price REAL NOT NULL DEFAULT 0,
             map_link TEXT,
             image_url TEXT,
             audio_url TEXT,
@@ -1487,6 +1561,16 @@ static async Task InitializeDatabaseAsync(string connectionString)
         // Ignore when the column already exists.
     }
 
+    try
+    {
+        await using var migrate = new SqliteCommand("ALTER TABLE pois ADD COLUMN price REAL NOT NULL DEFAULT 0;", connection);
+        await migrate.ExecuteNonQueryAsync();
+    }
+    catch
+    {
+        // Ignore when the column already exists.
+    }
+
     await using (var createOwnerIndex = new SqliteCommand("CREATE INDEX IF NOT EXISTS ix_pois_owner_admin_id ON pois(owner_admin_id);", connection))
     {
         await createOwnerIndex.ExecuteNonQueryAsync();
@@ -1543,8 +1627,16 @@ static async Task InitializeDatabaseAsync(string connectionString)
             created_at TEXT NOT NULL,
             FOREIGN KEY(poi_id) REFERENCES pois(id) ON DELETE CASCADE
         );
+        CREATE TABLE IF NOT EXISTS user_poi_access (
+            user_id INTEGER NOT NULL,
+            poi_id INTEGER NOT NULL,
+            is_paid INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (user_id, poi_id),
+            FOREIGN KEY(poi_id) REFERENCES pois(id) ON DELETE CASCADE
+        );
         CREATE UNIQUE INDEX IF NOT EXISTS ux_app_users_username ON app_users(username);
         CREATE UNIQUE INDEX IF NOT EXISTS ux_app_users_phone_digits ON app_users(phone_digits);
+        CREATE INDEX IF NOT EXISTS ix_user_poi_access_poi_user ON user_poi_access(poi_id, user_id);
         CREATE INDEX IF NOT EXISTS ix_poi_audio_play_events_poi_created_at ON poi_audio_play_events(poi_id, created_at DESC);
         CREATE INDEX IF NOT EXISTS ix_poi_audio_play_events_created_at ON poi_audio_play_events(created_at DESC);
         """, connection))
@@ -1614,6 +1706,18 @@ static bool TryGetAdminActor(ClaimsPrincipal user, out AdminActor actor)
         role.Trim().ToLowerInvariant(),
         user.FindFirstValue("admin_full_name") ?? string.Empty);
     return true;
+}
+
+static bool TryGetMobileUserId(ClaimsPrincipal user, out long userId)
+{
+    userId = 0;
+    if (user?.Identity?.IsAuthenticated != true)
+    {
+        return false;
+    }
+
+    var idStr = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? user.FindFirstValue(JwtRegisteredClaimNames.Sub);
+    return long.TryParse(idStr, NumberStyles.Integer, CultureInfo.InvariantCulture, out userId) && userId > 0;
 }
 
 static bool IsSuperAdmin(AdminActor actor) => string.Equals(actor.Role, "superadmin", StringComparison.OrdinalIgnoreCase);
@@ -1920,7 +2024,7 @@ static async Task<bool> AssignOwnerToPoiAsync(string connectionString, long poiI
     return affected > 0;
 }
 
-static async Task<List<PoiMobileDto>> GetPoisForMobileAsync(string connectionString, string requestedLang)
+static async Task<List<PoiMobileDto>> GetPoisForMobileAsync(string connectionString, string requestedLang, long? userId = null)
 {
     await using var connection = await OpenConnectionAsync(connectionString);
 
@@ -1931,13 +2035,22 @@ static async Task<List<PoiMobileDto>> GetPoisForMobileAsync(string connectionStr
             p.longitude,
             p.radius_meters,
             p.priority,
+            p.price,
             p.map_link,
             p.image_url,
             p.audio_url,
             COALESCE(NULLIF(t_req.name, ''), t_vi.name, '') AS name,
             COALESCE(NULLIF(t_req.description, ''), t_vi.description, '') AS description,
             COALESCE(NULLIF(t_req.tts_text, ''), NULLIF(t_req.description, ''), NULLIF(t_vi.tts_text, ''), t_vi.description, '') AS tts_text,
-            COALESCE(NULLIF(t_req.audio_url, ''), NULLIF(t_vi.audio_url, ''), '') AS audio_lang
+            COALESCE(NULLIF(t_req.audio_url, ''), NULLIF(t_vi.audio_url, ''), '') AS audio_lang,
+            CASE
+                WHEN p.price <= 0 THEN 1
+                WHEN $user_id IS NOT NULL AND EXISTS (
+                    SELECT 1 FROM user_poi_access upa
+                    WHERE upa.poi_id = p.id AND upa.user_id = $user_id AND COALESCE(upa.is_paid, 0) = 1
+                ) THEN 1
+                ELSE 0
+            END AS is_paid
         FROM pois p
         LEFT JOIN poi_translations t_req ON p.id = t_req.poi_id AND t_req.lang_code = $lang_code
         LEFT JOIN poi_translations t_vi ON p.id = t_vi.poi_id AND t_vi.lang_code = 'vi'
@@ -1948,11 +2061,12 @@ static async Task<List<PoiMobileDto>> GetPoisForMobileAsync(string connectionStr
     var result = new List<PoiMobileDto>();
     await using var command = new SqliteCommand(sql, connection);
     command.Parameters.AddWithValue("$lang_code", requestedLang);
+    command.Parameters.AddWithValue("$user_id", userId.HasValue ? userId.Value : DBNull.Value);
     await using var reader = await command.ExecuteReaderAsync();
     while (await reader.ReadAsync())
     {
-        var coreAudioUrl = reader.IsDBNull(7) ? string.Empty : reader.GetString(7);
-        var translatedAudioUrl = reader.IsDBNull(11) ? string.Empty : reader.GetString(11);
+        var coreAudioUrl = reader.IsDBNull(8) ? string.Empty : reader.GetString(8);
+        var translatedAudioUrl = reader.IsDBNull(12) ? string.Empty : reader.GetString(12);
         result.Add(new PoiMobileDto
         {
             Id = reader.GetInt64(0).ToString(CultureInfo.InvariantCulture),
@@ -1961,12 +2075,14 @@ static async Task<List<PoiMobileDto>> GetPoisForMobileAsync(string connectionStr
             Longitude = reader.GetDouble(2),
             RadiusMeters = reader.GetDouble(3),
             Priority = reader.GetInt32(4),
-            MapLink = reader.IsDBNull(5) ? string.Empty : reader.GetString(5),
-            ImageUrl = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
+            Price = reader.IsDBNull(5) ? 0 : reader.GetDouble(5),
+            MapLink = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
+            ImageUrl = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
             AudioUrl = !string.IsNullOrWhiteSpace(translatedAudioUrl) ? translatedAudioUrl : coreAudioUrl,
-            Name = reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
-            Description = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
-            TtsText = reader.IsDBNull(10) ? string.Empty : reader.GetString(10),
+            Name = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
+            Description = reader.IsDBNull(10) ? string.Empty : reader.GetString(10),
+            TtsText = reader.IsDBNull(11) ? string.Empty : reader.GetString(11),
+            IsPaid = !reader.IsDBNull(13) && reader.GetInt32(13) != 0
         });
     }
 
@@ -2072,6 +2188,7 @@ static async Task<List<PoiAdminListItemDto>> GetPoisForAdminListAsync(string con
             p.longitude,
             p.radius_meters,
             p.priority,
+            p.price,
             p.map_link,
             p.image_url,
             p.audio_url,
@@ -2110,24 +2227,25 @@ static async Task<List<PoiAdminListItemDto>> GetPoisForAdminListAsync(string con
             Longitude = reader.GetDouble(2),
             RadiusMeters = reader.GetDouble(3),
             Priority = reader.GetInt32(4),
-            MapLink = reader.IsDBNull(5) ? string.Empty : reader.GetString(5),
-            ImageUrl = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
-            AudioUrl = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
-            IsActive = reader.GetInt32(8) != 0,
-            NameVi = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
-            IsDeleted = !reader.IsDBNull(10) && reader.GetInt32(10) != 0,
-            DeletedAt = reader.IsDBNull(11) ? null : reader.GetString(11),
-            DeleteStatus = reader.IsDBNull(12) ? "ACTIVE" : reader.GetString(12),
-            OwnerAdminId = reader.IsDBNull(13) ? null : reader.GetInt64(13).ToString(CultureInfo.InvariantCulture),
-            OwnerUsername = reader.IsDBNull(14) ? string.Empty : reader.GetString(14),
-            OwnerFullName = reader.IsDBNull(15) ? string.Empty : reader.GetString(15),
+            Price = reader.IsDBNull(5) ? 0 : reader.GetDouble(5),
+            MapLink = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
+            ImageUrl = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
+            AudioUrl = reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
+            IsActive = reader.GetInt32(9) != 0,
+            NameVi = reader.IsDBNull(10) ? string.Empty : reader.GetString(10),
+            IsDeleted = !reader.IsDBNull(11) && reader.GetInt32(11) != 0,
+            DeletedAt = reader.IsDBNull(12) ? null : reader.GetString(12),
+            DeleteStatus = reader.IsDBNull(13) ? "ACTIVE" : reader.GetString(13),
+            OwnerAdminId = reader.IsDBNull(14) ? null : reader.GetInt64(14).ToString(CultureInfo.InvariantCulture),
+            OwnerUsername = reader.IsDBNull(15) ? string.Empty : reader.GetString(15),
+            OwnerFullName = reader.IsDBNull(16) ? string.Empty : reader.GetString(16),
         });
     }
 
     return result;
 }
 
-static async Task<PoiMobileDto?> GetPoiForMobileAsync(SqliteConnection connection, long id, string requestedLang)
+static async Task<PoiMobileDto?> GetPoiForMobileAsync(SqliteConnection connection, long id, string requestedLang, long? userId = null)
 {
     const string sql = @"
         SELECT
@@ -2136,13 +2254,22 @@ static async Task<PoiMobileDto?> GetPoiForMobileAsync(SqliteConnection connectio
             p.longitude,
             p.radius_meters,
             p.priority,
+            p.price,
             p.map_link,
             p.image_url,
             p.audio_url,
             COALESCE(NULLIF(t_req.name, ''), t_vi.name, '') AS name,
             COALESCE(NULLIF(t_req.description, ''), t_vi.description, '') AS description,
             COALESCE(NULLIF(t_req.tts_text, ''), NULLIF(t_req.description, ''), NULLIF(t_vi.tts_text, ''), t_vi.description, '') AS tts_text,
-            COALESCE(NULLIF(t_req.audio_url, ''), NULLIF(t_vi.audio_url, ''), '') AS audio_lang
+            COALESCE(NULLIF(t_req.audio_url, ''), NULLIF(t_vi.audio_url, ''), '') AS audio_lang,
+            CASE
+                WHEN p.price <= 0 THEN 1
+                WHEN $user_id IS NOT NULL AND EXISTS (
+                    SELECT 1 FROM user_poi_access upa
+                    WHERE upa.poi_id = p.id AND upa.user_id = $user_id AND COALESCE(upa.is_paid, 0) = 1
+                ) THEN 1
+                ELSE 0
+            END AS is_paid
         FROM pois p
         LEFT JOIN poi_translations t_req ON p.id = t_req.poi_id AND t_req.lang_code = $lang_code
         LEFT JOIN poi_translations t_vi ON p.id = t_vi.poi_id AND t_vi.lang_code = 'vi'
@@ -2152,14 +2279,15 @@ static async Task<PoiMobileDto?> GetPoiForMobileAsync(SqliteConnection connectio
     await using var command = new SqliteCommand(sql, connection);
     command.Parameters.AddWithValue("$id", id);
     command.Parameters.AddWithValue("$lang_code", requestedLang);
+    command.Parameters.AddWithValue("$user_id", userId.HasValue ? userId.Value : DBNull.Value);
     await using var reader = await command.ExecuteReaderAsync();
     if (!await reader.ReadAsync())
     {
         return null;
     }
 
-    var coreAudioUrl = reader.IsDBNull(7) ? string.Empty : reader.GetString(7);
-    var translatedAudioUrl = reader.IsDBNull(11) ? string.Empty : reader.GetString(11);
+    var coreAudioUrl = reader.IsDBNull(8) ? string.Empty : reader.GetString(8);
+    var translatedAudioUrl = reader.IsDBNull(12) ? string.Empty : reader.GetString(12);
     return new PoiMobileDto
     {
         Id = reader.GetInt64(0).ToString(CultureInfo.InvariantCulture),
@@ -2168,16 +2296,18 @@ static async Task<PoiMobileDto?> GetPoiForMobileAsync(SqliteConnection connectio
         Longitude = reader.GetDouble(2),
         RadiusMeters = reader.GetDouble(3),
         Priority = reader.GetInt32(4),
-        MapLink = reader.IsDBNull(5) ? string.Empty : reader.GetString(5),
-        ImageUrl = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
+        Price = reader.IsDBNull(5) ? 0 : reader.GetDouble(5),
+        MapLink = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
+        ImageUrl = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
         AudioUrl = !string.IsNullOrWhiteSpace(translatedAudioUrl) ? translatedAudioUrl : coreAudioUrl,
-        Name = reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
-        Description = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
-        TtsText = reader.IsDBNull(10) ? string.Empty : reader.GetString(10),
+        Name = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
+        Description = reader.IsDBNull(10) ? string.Empty : reader.GetString(10),
+        TtsText = reader.IsDBNull(11) ? string.Empty : reader.GetString(11),
+        IsPaid = !reader.IsDBNull(13) && reader.GetInt32(13) != 0,
     };
 }
 
-static async Task<PoiMobileDto?> GetPoiForPublicAsync(SqliteConnection connection, long id, string requestedLang)
+static async Task<PoiMobileDto?> GetPoiForPublicAsync(SqliteConnection connection, long id, string requestedLang, long? userId = null)
 {
     const string sql = @"
         SELECT
@@ -2186,13 +2316,22 @@ static async Task<PoiMobileDto?> GetPoiForPublicAsync(SqliteConnection connectio
             p.longitude,
             p.radius_meters,
             p.priority,
+            p.price,
             p.map_link,
             p.image_url,
             p.audio_url,
             COALESCE(NULLIF(t_req.name, ''), t_vi.name, '') AS name,
             COALESCE(NULLIF(t_req.description, ''), t_vi.description, '') AS description,
             COALESCE(NULLIF(t_req.tts_text, ''), NULLIF(t_req.description, ''), NULLIF(t_vi.tts_text, ''), t_vi.description, '') AS tts_text,
-            COALESCE(NULLIF(t_req.audio_url, ''), NULLIF(t_vi.audio_url, ''), '') AS audio_lang
+            COALESCE(NULLIF(t_req.audio_url, ''), NULLIF(t_vi.audio_url, ''), '') AS audio_lang,
+            CASE
+                WHEN p.price <= 0 THEN 1
+                WHEN $user_id IS NOT NULL AND EXISTS (
+                    SELECT 1 FROM user_poi_access upa
+                    WHERE upa.poi_id = p.id AND upa.user_id = $user_id AND COALESCE(upa.is_paid, 0) = 1
+                ) THEN 1
+                ELSE 0
+            END AS is_paid
         FROM pois p
         LEFT JOIN poi_translations t_req ON p.id = t_req.poi_id AND t_req.lang_code = $lang_code
         LEFT JOIN poi_translations t_vi ON p.id = t_vi.poi_id AND t_vi.lang_code = 'vi'
@@ -2202,14 +2341,15 @@ static async Task<PoiMobileDto?> GetPoiForPublicAsync(SqliteConnection connectio
     await using var command = new SqliteCommand(sql, connection);
     command.Parameters.AddWithValue("$id", id);
     command.Parameters.AddWithValue("$lang_code", requestedLang);
+    command.Parameters.AddWithValue("$user_id", userId.HasValue ? userId.Value : DBNull.Value);
     await using var reader = await command.ExecuteReaderAsync();
     if (!await reader.ReadAsync())
     {
         return null;
     }
 
-    var coreAudioUrl = reader.IsDBNull(7) ? string.Empty : reader.GetString(7);
-    var translatedAudioUrl = reader.IsDBNull(11) ? string.Empty : reader.GetString(11);
+    var coreAudioUrl = reader.IsDBNull(8) ? string.Empty : reader.GetString(8);
+    var translatedAudioUrl = reader.IsDBNull(12) ? string.Empty : reader.GetString(12);
     return new PoiMobileDto
     {
         Id = reader.GetInt64(0).ToString(CultureInfo.InvariantCulture),
@@ -2218,19 +2358,21 @@ static async Task<PoiMobileDto?> GetPoiForPublicAsync(SqliteConnection connectio
         Longitude = reader.GetDouble(2),
         RadiusMeters = reader.GetDouble(3),
         Priority = reader.GetInt32(4),
-        MapLink = reader.IsDBNull(5) ? string.Empty : reader.GetString(5),
-        ImageUrl = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
+        Price = reader.IsDBNull(5) ? 0 : reader.GetDouble(5),
+        MapLink = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
+        ImageUrl = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
         AudioUrl = !string.IsNullOrWhiteSpace(translatedAudioUrl) ? translatedAudioUrl : coreAudioUrl,
-        Name = reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
-        Description = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
-        TtsText = reader.IsDBNull(10) ? string.Empty : reader.GetString(10),
+        Name = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
+        Description = reader.IsDBNull(10) ? string.Empty : reader.GetString(10),
+        TtsText = reader.IsDBNull(11) ? string.Empty : reader.GetString(11),
+        IsPaid = !reader.IsDBNull(13) && reader.GetInt32(13) != 0,
     };
 }
 
 static async Task<PoiAdminDto?> GetPoiAdminAsync(SqliteConnection connection, long id, AdminActor actor)
 {
     const string coreSql = @"
-        SELECT id, latitude, longitude, radius_meters, priority, map_link, image_url, audio_url, is_active, owner_admin_id
+        SELECT id, latitude, longitude, radius_meters, priority, price, map_link, image_url, audio_url, is_active, owner_admin_id
         FROM pois
         WHERE id = $id;
         ";
@@ -2244,7 +2386,7 @@ static async Task<PoiAdminDto?> GetPoiAdminAsync(SqliteConnection connection, lo
         {
             return null;
         }
-        var ownerAdminId = reader.IsDBNull(9) ? (long?)null : reader.GetInt64(9);
+        var ownerAdminId = reader.IsDBNull(10) ? (long?)null : reader.GetInt64(10);
         if (IsOwner(actor) && ownerAdminId != actor.Id)
         {
             return null;
@@ -2257,10 +2399,11 @@ static async Task<PoiAdminDto?> GetPoiAdminAsync(SqliteConnection connection, lo
             Longitude = reader.GetDouble(2),
             RadiusMeters = reader.GetDouble(3),
             Priority = reader.GetInt32(4),
-            MapLink = reader.IsDBNull(5) ? string.Empty : reader.GetString(5),
-            ImageUrl = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
-            AudioUrl = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
-            IsActive = reader.GetInt32(8) != 0,
+            Price = reader.IsDBNull(5) ? 0 : reader.GetDouble(5),
+            MapLink = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
+            ImageUrl = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
+            AudioUrl = reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
+            IsActive = reader.GetInt32(9) != 0,
             OwnerAdminId = ownerAdminId?.ToString(CultureInfo.InvariantCulture),
         };
     }
@@ -2299,8 +2442,8 @@ static async Task<long> UpsertPoiCoreAsync(SqliteConnection connection, System.D
     if (request.Id is null)
     {
         const string insertSql = @"
-            INSERT INTO pois (latitude, longitude, radius_meters, priority, map_link, image_url, audio_url, is_active, owner_admin_id, is_deleted, deleted_at, delete_status)
-            VALUES ($latitude, $longitude, $radius, $priority, $map_link, $image_url, $audio_url, $is_active, $owner_admin_id, 0, NULL, 'ACTIVE');
+            INSERT INTO pois (latitude, longitude, radius_meters, priority, price, map_link, image_url, audio_url, is_active, owner_admin_id, is_deleted, deleted_at, delete_status)
+            VALUES ($latitude, $longitude, $radius, $priority, $price, $map_link, $image_url, $audio_url, $is_active, $owner_admin_id, 0, NULL, 'ACTIVE');
             SELECT last_insert_rowid();
             ";
 
@@ -2310,6 +2453,7 @@ static async Task<long> UpsertPoiCoreAsync(SqliteConnection connection, System.D
         insert.Parameters.AddWithValue("$longitude", request.Longitude);
         insert.Parameters.AddWithValue("$radius", request.RadiusMeters);
         insert.Parameters.AddWithValue("$priority", request.Priority);
+        insert.Parameters.AddWithValue("$price", request.Price >= 0 ? request.Price : 0);
         insert.Parameters.AddWithValue("$map_link", request.MapLink);
         insert.Parameters.AddWithValue("$image_url", request.ImageUrl ?? string.Empty);
         insert.Parameters.AddWithValue("$audio_url", request.AudioUrl ?? string.Empty);
@@ -2320,13 +2464,14 @@ static async Task<long> UpsertPoiCoreAsync(SqliteConnection connection, System.D
     }
 
     const string upsertSql = @"
-        INSERT INTO pois (id, latitude, longitude, radius_meters, priority, map_link, image_url, audio_url, is_active, owner_admin_id, is_deleted, deleted_at, delete_status)
-        VALUES ($id, $latitude, $longitude, $radius, $priority, $map_link, $image_url, $audio_url, $is_active, $owner_admin_id, 0, NULL, 'ACTIVE')
+        INSERT INTO pois (id, latitude, longitude, radius_meters, priority, price, map_link, image_url, audio_url, is_active, owner_admin_id, is_deleted, deleted_at, delete_status)
+        VALUES ($id, $latitude, $longitude, $radius, $priority, $price, $map_link, $image_url, $audio_url, $is_active, $owner_admin_id, 0, NULL, 'ACTIVE')
         ON CONFLICT(id) DO UPDATE SET
             latitude = excluded.latitude,
             longitude = excluded.longitude,
             radius_meters = excluded.radius_meters,
             priority = excluded.priority,
+            price = excluded.price,
             map_link = excluded.map_link,
             image_url = excluded.image_url,
             audio_url = excluded.audio_url,
@@ -2344,6 +2489,7 @@ static async Task<long> UpsertPoiCoreAsync(SqliteConnection connection, System.D
     command.Parameters.AddWithValue("$longitude", request.Longitude);
     command.Parameters.AddWithValue("$radius", request.RadiusMeters);
     command.Parameters.AddWithValue("$priority", request.Priority);
+    command.Parameters.AddWithValue("$price", request.Price >= 0 ? request.Price : 0);
     command.Parameters.AddWithValue("$map_link", request.MapLink);
     command.Parameters.AddWithValue("$image_url", request.ImageUrl ?? string.Empty);
     command.Parameters.AddWithValue("$audio_url", request.AudioUrl ?? string.Empty);
@@ -2382,6 +2528,46 @@ static async Task UpsertTranslationAsync(
     command.Parameters.AddWithValue("$tts_text", ttsText ?? string.Empty);
     command.Parameters.AddWithValue("$audio_url", audioUrl ?? string.Empty);
     await command.ExecuteNonQueryAsync();
+}
+
+static bool TryParsePublicUserId(string? raw, out long userId)
+{
+    userId = 0;
+    if (string.IsNullOrWhiteSpace(raw))
+    {
+        return false;
+    }
+
+    return long.TryParse(raw.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out userId)
+           && userId > 0;
+}
+
+static async Task<bool> UpsertUserPoiAccessAsync(string connectionString, long userId, long poiId, bool isPaid)
+{
+    await using var connection = await OpenConnectionAsync(connectionString);
+    await using var tx = await connection.BeginTransactionAsync();
+    await using var exists = new SqliteCommand("SELECT 1 FROM pois WHERE id = $id AND COALESCE(is_deleted, 0) = 0 LIMIT 1;", connection);
+    exists.Transaction = (SqliteTransaction)tx;
+    exists.Parameters.AddWithValue("$id", poiId);
+    if (await exists.ExecuteScalarAsync() is null)
+    {
+        await tx.RollbackAsync();
+        return false;
+    }
+
+    await using var upsert = new SqliteCommand("""
+        INSERT INTO user_poi_access (user_id, poi_id, is_paid)
+        VALUES ($user_id, $poi_id, $is_paid)
+        ON CONFLICT(user_id, poi_id) DO UPDATE SET
+            is_paid = excluded.is_paid;
+        """, connection);
+    upsert.Transaction = (SqliteTransaction)tx;
+    upsert.Parameters.AddWithValue("$user_id", userId);
+    upsert.Parameters.AddWithValue("$poi_id", poiId);
+    upsert.Parameters.AddWithValue("$is_paid", isPaid ? 1 : 0);
+    await upsert.ExecuteNonQueryAsync();
+    await tx.CommitAsync();
+    return true;
 }
 
 static async Task<DeletePoiResult> DeletePoiAsync(string connectionString, string uploadDirectory, long id, AdminActor actor)
@@ -2744,6 +2930,8 @@ sealed class PoiMobileDto
     public double Longitude { get; set; }
     public double RadiusMeters { get; set; }
     public int Priority { get; set; }
+    public double Price { get; set; }
+    public bool IsPaid { get; set; }
     public string MapLink { get; set; } = string.Empty;
     public string ImageUrl { get; set; } = string.Empty;
     public string AudioUrl { get; set; } = string.Empty;
@@ -2756,6 +2944,7 @@ sealed class PoiAdminListItemDto
     public double Longitude { get; set; }
     public double RadiusMeters { get; set; }
     public int Priority { get; set; }
+    public double Price { get; set; }
     public string MapLink { get; set; } = string.Empty;
     public string ImageUrl { get; set; } = string.Empty;
     public string AudioUrl { get; set; } = string.Empty;
@@ -2801,6 +2990,7 @@ sealed class PoiAdminDto
     public double Longitude { get; set; }
     public double RadiusMeters { get; set; } = 40;
     public int Priority { get; set; }
+    public double Price { get; set; }
     public string MapLink { get; set; } = string.Empty;
     public string ImageUrl { get; set; } = string.Empty;
     public string AudioUrl { get; set; } = string.Empty;
@@ -2851,6 +3041,7 @@ sealed class PoiAdminUpsertRequest
     public double Longitude { get; set; }
     public double RadiusMeters { get; set; } = 40;
     public int Priority { get; set; }
+    public double Price { get; set; }
     public string? MapLink { get; set; }
     public string? ImageUrl { get; set; }
     public string? AudioUrl { get; set; }
@@ -2869,11 +3060,17 @@ sealed class PoiCoreUpsert
     public required double Longitude { get; init; }
     public required double RadiusMeters { get; init; }
     public required int Priority { get; init; }
+    public required double Price { get; init; }
     public required string MapLink { get; init; }
     public required string ImageUrl { get; init; }
     public required string AudioUrl { get; init; }
     public required bool IsActive { get; init; }
     public required long? OwnerAdminId { get; init; }
+}
+
+sealed class PublicPoiUnlockRequest
+{
+    public long UserId { get; set; }
 }
 
 sealed class ShopDto

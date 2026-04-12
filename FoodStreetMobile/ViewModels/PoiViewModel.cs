@@ -18,6 +18,8 @@ public sealed class PoiViewModel : INotifyPropertyChanged
     private string _imageUrl = string.Empty;
     private string _mapLink = string.Empty;
     private string _audioUrl = string.Empty;
+    private double _price;
+    private bool _isPaid;
     private string _language = string.Empty;
 
     public PoiViewModel(Poi poi)
@@ -38,6 +40,8 @@ public sealed class PoiViewModel : INotifyPropertyChanged
         ImageUrl = poi.ImageUrl;
         MapLink = poi.MapLink;
         AudioUrl = poi.AudioUrl;
+        Price = poi.Price;
+        IsPaid = poi.IsPaid;
         Language = poi.Language;
     }
 
@@ -103,6 +107,39 @@ public sealed class PoiViewModel : INotifyPropertyChanged
         private set { if (_audioUrl != value) { _audioUrl = value; OnPropertyChanged(); } }
     }
 
+    public double Price
+    {
+        get => _price;
+        private set
+        {
+            if (Math.Abs(_price - value) < 0.01)
+            {
+                return;
+            }
+
+            _price = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsPremiumLocked));
+            OnPropertyChanged(nameof(PriceText));
+        }
+    }
+
+    public bool IsPaid
+    {
+        get => _isPaid;
+        private set
+        {
+            if (_isPaid == value)
+            {
+                return;
+            }
+
+            _isPaid = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsPremiumLocked));
+        }
+    }
+
     public string Language
     {
         get => _language;
@@ -141,6 +178,10 @@ public sealed class PoiViewModel : INotifyPropertyChanged
     }
 
     public string DistanceText => _distanceMeters <= 0 ? "--" : $"{Math.Round(_distanceMeters)} m";
+
+    public bool IsPremiumLocked => Price > 0 && !IsPaid;
+
+    public string PriceText => Price <= 0 ? "Miễn phí" : $"{Math.Round(Price).ToString("N0")} đ";
 
     public string NarrationPreview
     {

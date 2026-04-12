@@ -257,6 +257,50 @@ public sealed class PoiSyncService
         return false;
     }
 
+    public async Task<bool> UnlockPoiAsync(string poiId)
+    {
+        if (string.IsNullOrWhiteSpace(poiId))
+        {
+            return false;
+        }
+
+        LastError = null;
+        var errors = new List<string>();
+        foreach (var baseUrl in GetPreferredBaseUrls())
+        {
+            try
+            {
+                using var req = new HttpRequestMessage(
+                    HttpMethod.Post,
+                    $"{baseUrl}/api/mobile/pois/{Uri.EscapeDataString(poiId.Trim())}/unlock");
+                AttachBearerIfAny(req);
+                using var response = await _httpClient.SendAsync(req);
+                if (!response.IsSuccessStatusCode)
+                {
+                    errors.Add($"{baseUrl}: {(int)response.StatusCode} {response.ReasonPhrase}");
+                    continue;
+                }
+
+                var connection = await _database.GetConnectionAsync();
+                await connection.ExecuteAsync("UPDATE pois SET is_paid = 1 WHERE id = ?;", poiId.Trim());
+                _lastSuccessfulBaseUrl = baseUrl;
+                LastError = null;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"{baseUrl}: {ex.Message}");
+            }
+        }
+
+        if (errors.Count > 0)
+        {
+            LastError = string.Join(" | ", errors);
+        }
+
+        return false;
+    }
+
     private async Task ApplyRemoteDataAsync(string baseUrl, string requestedLang, IReadOnlyList<PoiSyncDto> pois)
     {
         var connection = await _database.GetConnectionAsync();
@@ -291,6 +335,8 @@ public sealed class PoiSyncService
                         : $"https://maps.google.com/?q={poi.Latitude},{poi.Longitude}",
                     ImageUrl = NormalizeAssetUrl(baseUrl, poi.ImageUrl),
                     AudioUrl = normalizedAudioUrl,
+                    Price = poi.Price > 0 ? poi.Price : 0,
+                    IsPaid = poi.IsPaid,
                     IsActive = true
                 });
 
@@ -416,6 +462,8 @@ public sealed class PoiSyncService
                     MapLink = poi.MapLink,
                     ImageUrl = poi.ImageUrl,
                     AudioUrl = poi.AudioUrl,
+                    Price = poi.Price,
+                    IsPaid = poi.IsPaid,
                     Description = translation?.Description ?? string.Empty,
                     TtsText = !string.IsNullOrWhiteSpace(translation?.TtsText)
                         ? translation!.TtsText
@@ -526,6 +574,8 @@ public sealed class PoiSyncService
         public string? ImageUrl { get; set; }
         public string? AudioUrl { get; set; }
         public string? TtsText { get; set; }
+        public double Price { get; set; }
+        public bool IsPaid { get; set; }
     }
 
     private sealed class ShopSyncDto

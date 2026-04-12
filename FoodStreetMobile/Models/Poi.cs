@@ -13,5 +13,7 @@ public sealed class Poi
     public string ImageUrl { get; init; } = string.Empty;
     public string MapLink { get; init; } = string.Empty;
     public string AudioUrl { get; init; } = string.Empty;
+    public double Price { get; init; }
+    public bool IsPaid { get; init; }
     public string Language { get; init; } = "vi";
 }

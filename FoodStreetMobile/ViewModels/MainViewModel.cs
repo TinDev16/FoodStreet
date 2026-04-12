@@ -241,6 +241,18 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public void SetConfiguredBaseUrls(string? rawValue) => _poiSyncService.SetConfiguredBaseUrls(rawValue);
 
+    public async Task<bool> UnlockPoiAsync(string poiId)
+    {
+        var unlocked = await _poiSyncService.UnlockPoiAsync(poiId);
+        if (!unlocked)
+        {
+            return false;
+        }
+
+        await ReloadPoisAsync(_currentLanguage);
+        return true;
+    }
+
     private static string BuildDeterministicPoiId(string shopName, double latitude, double longitude)
     {
         var normalizedName = string.IsNullOrWhiteSpace(shopName)

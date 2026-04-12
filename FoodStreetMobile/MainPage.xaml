@@ -180,6 +180,34 @@
                                      Text="{loc:Translate Key=Main_SheetHintSelectPlace}"
                                      FontSize="13"
                                      TextColor="#8B5E42" />
+                            <Border x:Name="PremiumInfoBorder"
+                                    IsVisible="False"
+                                    Padding="10,8"
+                                    BackgroundColor="#FFF7ED"
+                                    Stroke="#FDBA74"
+                                    StrokeShape="RoundRectangle 10">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                    <VerticalStackLayout Spacing="2">
+                                        <Label x:Name="PremiumBadgeLabel"
+                                               Text="Premium"
+                                               FontSize="12"
+                                               FontAttributes="Bold"
+                                               TextColor="#9A3412" />
+                                        <Label x:Name="PremiumPriceLabel"
+                                               Text="0 đ"
+                                               FontSize="12"
+                                               TextColor="#7C2D12" />
+                                    </VerticalStackLayout>
+                                    <Button Grid.Column="1"
+                                            x:Name="UnlockPoiButton"
+                                            Text="Mở khóa ngay"
+                                            FontSize="12"
+                                            BackgroundColor="#EA580C"
+                                            TextColor="White"
+                                            CornerRadius="10"
+                                            Clicked="OnUnlockPoiClicked" />
+                                </Grid>
+                            </Border>
                             <Border x:Name="AudioPlayerContainer"
                                     IsVisible="False"
                                     Padding="10"

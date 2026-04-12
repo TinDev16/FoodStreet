@@ -67,7 +67,6 @@ public partial class MainPage : ContentPage
     private readonly AuthService _authService;
     private readonly ObservableCollection<SearchPlaceResult> _searchResults = new();
 
-    private bool _hasCenteredOnUser;
     private bool _isLocationSetupDone;
     private MauiLocation? _lastUserLocation;
     private SearchPlaceResult? _selectedSearchResult;
@@ -218,7 +217,6 @@ public partial class MainPage : ContentPage
             {
                 MoveMapTo(DefaultLatitude, DefaultLongitude);
             }
-            _hasCenteredOnUser = false;
         });
     }
 
@@ -260,13 +258,6 @@ public partial class MainPage : ContentPage
         MainThread.BeginInvokeOnMainThread(() =>
         {
             PoiMap.IsShowingUser = true;
-            if (_hasCenteredOnUser)
-            {
-                return;
-            }
-
-            _hasCenteredOnUser = true;
-            MoveMapTo(location.Latitude, location.Longitude);
         });
     }
 
@@ -1428,6 +1419,7 @@ public partial class MainPage : ContentPage
     private void UpdateBottomSheetContent(SearchPlaceResult result)
     {
         PlayAudioButton.IsEnabled = false;
+        PremiumInfoBorder.IsVisible = false;
         ResetBottomSheetPlayerUiForSelection();
         SheetTitleLabel.Text = result.Name;
         SheetAddressLabel.Text = string.IsNullOrWhiteSpace(_lastRouteSummary)
@@ -1441,7 +1433,12 @@ public partial class MainPage : ContentPage
     private void UpdateBottomSheetContent(PoiViewModel poi, bool resetPlayerState = true)
     {
         var hasNarration = !string.IsNullOrWhiteSpace(ResolveNarrationForPlayback(poi));
-        PlayAudioButton.IsEnabled = !string.IsNullOrWhiteSpace(poi.AudioUrl) || hasNarration;
+        var hasAudioContent = !string.IsNullOrWhiteSpace(poi.AudioUrl) || hasNarration;
+        PlayAudioButton.IsEnabled = hasAudioContent && !poi.IsPremiumLocked;
+        PremiumInfoBorder.IsVisible = poi.Price > 0;
+        PremiumBadgeLabel.Text = poi.IsPremiumLocked ? "Premium (chưa mở khóa)" : "Premium (đã mở khóa)";
+        PremiumPriceLabel.Text = poi.Price <= 0 ? "Miễn phí" : $"{Math.Round(poi.Price).ToString("N0", CultureInfo.GetCultureInfo("vi-VN"))} đ";
+        UnlockPoiButton.IsVisible = poi.IsPremiumLocked;
         if (resetPlayerState)
         {
             if (IsSamePoi(poi, _currentPlaybackPoi))
@@ -1630,11 +1627,48 @@ public partial class MainPage : ContentPage
 
         if (!HasPlayableAudio(_selectedPoi))
         {
-            await DisplayAlertAsync("Thong bao", "POI nay chua co audio hoac noi dung thuyet minh.", "OK");
+            if (_selectedPoi.IsPremiumLocked)
+            {
+                await DisplayAlertAsync("Premium", "POI này cần mở khóa trước khi nghe audio.", "OK");
+            }
+            else
+            {
+                await DisplayAlertAsync("Thong bao", "POI nay chua co audio hoac noi dung thuyet minh.", "OK");
+            }
+            return;
+        }
+        await StartPoiPlaybackAsync(_selectedPoi, allowInterrupt: true);
+    }
+
+    private async void OnUnlockPoiClicked(object? sender, EventArgs e)
+    {
+        if (_selectedPoi is null)
+        {
             return;
         }
 
-        await StartPoiPlaybackAsync(_selectedPoi, allowInterrupt: true);
+        if (!_selectedPoi.IsPremiumLocked)
+        {
+            await DisplayAlertAsync("Thông báo", "POI đã được mở khóa.", "OK");
+            return;
+        }
+
+        var ok = await _viewModel.UnlockPoiAsync(_selectedPoi.Id);
+        if (!ok)
+        {
+            await DisplayAlertAsync("Lỗi", "Không thể mở khóa POI lúc này. Vui lòng kiểm tra đăng nhập và kết nối mạng.", "OK");
+            return;
+        }
+
+        var refreshedPoi = _viewModel.Pois.FirstOrDefault(x => string.Equals(x.Id, _selectedPoi.Id, StringComparison.Ordinal));
+        if (refreshedPoi is not null)
+        {
+            _selectedPoi = refreshedPoi;
+            PlayAudioButton.IsEnabled = HasPlayableAudio(refreshedPoi);
+            UpdateBottomSheetContent(refreshedPoi, resetPlayerState: false);
+        }
+
+        await DisplayAlertAsync("Thành công", "Mở khóa POI thành công (thanh toán ảo).", "OK");
     }
 
     private async Task TryRecordAudioPlayAsync(PoiViewModel poi)
@@ -1926,6 +1960,11 @@ public partial class MainPage : ContentPage
     private static bool HasPlayableAudio(PoiViewModel poi)
     {
         var narration = ResolveNarrationForPlayback(poi);
+        if (poi.IsPremiumLocked)
+        {
+            return false;
+        }
+
         return !string.IsNullOrWhiteSpace(poi.AudioUrl) || !string.IsNullOrWhiteSpace(narration);
     }
 

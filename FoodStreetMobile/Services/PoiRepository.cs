@@ -57,6 +57,8 @@ public sealed class PoiRepository
                 ImageUrl = entity.ImageUrl,
                 MapLink = entity.MapLink,
                 AudioUrl = entity.AudioUrl,
+                Price = entity.Price,
+                IsPaid = entity.IsPaid,
                 Language = languageCode
             });
         }

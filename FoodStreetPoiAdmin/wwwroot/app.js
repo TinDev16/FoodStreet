@@ -247,6 +247,7 @@
         <td class="mono">${escapeHtml(String(item.latitude))}, <br/>${escapeHtml(String(item.longitude))}</td>
         <td class="mono">${escapeHtml(String(item.radiusMeters))}m</td>
         <td class="mono">${escapeHtml(String(item.priority))}</td>
+        <td class="mono">${escapeHtml(formatCurrency(item.price))}</td>
         <td>${item.isActive ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-error">Inactive</span>'}</td>
         <td class="actions-cell">
           <button type="button" class="secondary icon-only" title="Tạo QR" data-action="qr" data-id="${escapeAttr(item.id)}"><i class="fa-solid fa-qrcode pointer-events-none"></i></button>
@@ -279,6 +280,12 @@
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return value;
     return parsed.toLocaleString("vi-VN");
+  };
+
+  const formatCurrency = (value) => {
+    const amount = Number(value);
+    if (!Number.isFinite(amount) || amount <= 0) return "Miễn phí";
+    return `${Math.round(amount).toLocaleString("vi-VN")} đ`;
   };
 
   const renderAudioStats = (items) => {
@@ -390,6 +397,7 @@
 
     formEl.elements.namedItem("radiusMeters").value = String(data.radiusMeters ?? 15);
     formEl.elements.namedItem("priority").value = String(data.priority ?? 0);
+    formEl.elements.namedItem("price").value = String(data.price ?? 0);
     const isActiveInput = formEl.elements.namedItem("isActive");
     if (isActiveInput) {
       isActiveInput.checked = !!data.isActive;
@@ -443,6 +451,7 @@
     const longitude = Number.parseFloat(formEl.elements.namedItem("longitude").value);
     const radiusMeters = Number.parseFloat(formEl.elements.namedItem("radiusMeters").value);
     const priority = Number.parseInt(formEl.elements.namedItem("priority").value, 10);
+    const price = Number.parseFloat(formEl.elements.namedItem("price").value);
     const mapLink = (formEl.elements.namedItem("mapLink").value || "").trim();
     const isActive = formEl.elements.namedItem("isActive")?.checked ?? false;
 
@@ -478,6 +487,7 @@
       longitude,
       radiusMeters: Number.isFinite(radiusMeters) ? radiusMeters : 15,
       priority: Number.isFinite(priority) ? priority : 0,
+      price: Number.isFinite(price) && price > 0 ? price : 0,
       mapLink: mapLink || null,
       imageUrl,
       audioUrl,
@@ -597,7 +607,7 @@
     });
 
     logoutBtn?.addEventListener("click", async () => {
-      try { await apiPost("/api/admin/auth/logout"); } catch {}
+      try { await apiPost("/api/admin/auth/logout"); } catch { }
       state.auth.token = "";
       state.auth.user = null;
       localStorage.removeItem("adminToken");
@@ -694,7 +704,7 @@
       try {
         if (state.qr.previewBlobUrl) URL.revokeObjectURL(state.qr.previewBlobUrl);
         if (state.qr.downloadBlobUrl) URL.revokeObjectURL(state.qr.downloadBlobUrl);
-      } catch {}
+      } catch { }
       state.qr.previewBlobUrl = "";
       state.qr.downloadBlobUrl = "";
     });

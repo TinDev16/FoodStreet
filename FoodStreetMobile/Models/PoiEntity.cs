@@ -30,6 +30,12 @@ public sealed class PoiEntity
     [Column("audio_url")]
     public string AudioUrl { get; set; } = string.Empty;
 
+    [Column("price")]
+    public double Price { get; set; }
+
+    [Column("is_paid")]
+    public bool IsPaid { get; set; }
+
     [Column("is_active")]
     public bool IsActive { get; set; } = true;
 }

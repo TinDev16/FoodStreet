@@ -12,6 +12,10 @@
   const routeBtnEl = $("#routeBtn");
   const audioPlayerEl = $("#audioPlayer");
   const statusEl = $("#poiStatus");
+  const paymentPanelEl = $("#poiPaymentPanel");
+  const priceLabelEl = $("#poiPriceLabel");
+  const paymentHintEl = $("#poiPaymentHint");
+  const unlockBtnEl = $("#unlockBtn");
   const appInstallPromptEl = $("#appInstallPrompt");
   const openAppBtnEl = $("#openAppBtn");
   const dismissInstallPromptBtnEl = $("#dismissInstallPromptBtn");
@@ -21,10 +25,13 @@
     lang: "vi",
     languages: [],
     poi: null,
+    isPaid: false,
+    guestUserId: 0,
     appHandOffDone: false,
   };
 
   const INSTALL_PROMPT_DISABLED_KEY = "poiDisableAppInstallPrompt";
+  const PUBLIC_GUEST_USER_ID_KEY = "poiPublicGuestUserId";
 
   const setStatus = (text) => {
     statusEl.textContent = text || "";
@@ -41,6 +48,16 @@
 
   const apiGet = async (url) => {
     const res = await fetch(url, { headers: { Accept: "application/json" } });
+    if (!res.ok) throw new Error(await safeError(res));
+    return res.json();
+  };
+
+  const apiPostJson = async (url, body) => {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
     if (!res.ok) throw new Error(await safeError(res));
     return res.json();
   };
@@ -143,6 +160,34 @@
     }
   };
 
+  const formatCurrency = (value) => {
+    const amount = Number(value);
+    if (!Number.isFinite(amount) || amount <= 0) return "Miễn phí";
+    return `${Math.round(amount).toLocaleString("vi-VN")} đ`;
+  };
+
+  const ensureGuestUserId = () => {
+    const fromStorage = Number.parseInt(localStorage.getItem(PUBLIC_GUEST_USER_ID_KEY) || "", 10);
+    if (Number.isFinite(fromStorage) && fromStorage > 0) {
+      state.guestUserId = fromStorage;
+      return fromStorage;
+    }
+
+    const created = Math.floor(Date.now() / 1000);
+    localStorage.setItem(PUBLIC_GUEST_USER_ID_KEY, String(created));
+    state.guestUserId = created;
+    return created;
+  };
+
+  const canPlayAudio = (poi) => {
+    if (!poi) return false;
+    const hasAudioContent = Boolean((poi.audioUrl || "").trim() || (poi.ttsText || "").trim() || (poi.description || "").trim());
+    if (!hasAudioContent) return false;
+    const price = Number(poi.price || 0);
+    if (!Number.isFinite(price) || price <= 0) return true;
+    return !!state.isPaid;
+  };
+
   const speakText = (text, langCode) => {
     if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
       setStatus("Trinh duyet khong ho tro TTS.");
@@ -167,6 +212,7 @@
 
   const renderPoi = (poi) => {
     state.poi = poi;
+    const price = Number(poi.price || 0);
     nameEl.textContent = poi.name || `POI #${poi.id || ""}`;
     descEl.textContent = poi.description || "Khong co mo ta.";
 
@@ -178,12 +224,23 @@
       imageEl.removeAttribute("src");
     }
 
-    if (poi.audioUrl) {
+    const unlocked = canPlayAudio(poi);
+    if (poi.audioUrl && unlocked) {
       audioPlayerEl.src = poi.audioUrl;
       audioPlayerEl.hidden = false;
     } else {
       audioPlayerEl.hidden = true;
       audioPlayerEl.removeAttribute("src");
+    }
+
+    if (price > 0 && !state.isPaid) {
+      paymentPanelEl.hidden = false;
+      priceLabelEl.textContent = `Premium • ${formatCurrency(price)}`;
+      paymentHintEl.textContent = "Bạn cần mở khóa (thanh toán ảo) để nghe audio.";
+      speakBtnEl.disabled = true;
+    } else {
+      paymentPanelEl.hidden = true;
+      speakBtnEl.disabled = !canPlayAudio(poi);
     }
 
     mapFrameEl.src = buildMapEmbedUrl(poi.latitude, poi.longitude);
@@ -196,7 +253,9 @@
     }
 
     setStatus("Dang tai POI...");
-    const data = await apiGet(`/api/public/pois/${encodeURIComponent(state.poiId)}?lang=${encodeURIComponent(state.lang)}`);
+    ensureGuestUserId();
+    const data = await apiGet(`/api/public/pois/${encodeURIComponent(state.poiId)}?lang=${encodeURIComponent(state.lang)}&userId=${encodeURIComponent(String(state.guestUserId))}`);
+    state.isPaid = !!data.isPaid;
     renderPoi(data);
     setStatus("");
   };
@@ -234,6 +293,10 @@
     speakBtnEl.addEventListener("click", () => {
       const poi = state.poi;
       if (!poi) return;
+      if (!canPlayAudio(poi)) {
+        setStatus("POI Premium. Hãy mở khóa để nghe audio.");
+        return;
+      }
       const content = poi.ttsText || poi.description || poi.name;
       speakText(content, state.lang);
     });
@@ -273,6 +336,20 @@
     dismissInstallPromptBtnEl?.addEventListener("click", () => {
       localStorage.setItem(INSTALL_PROMPT_DISABLED_KEY, "1");
       hideInstallPrompt();
+    });
+
+    unlockBtnEl?.addEventListener("click", async () => {
+      if (!state.poiId) return;
+      try {
+        setStatus("Đang mở khóa...");
+        ensureGuestUserId();
+        const result = await apiPostJson(`/api/public/pois/${encodeURIComponent(state.poiId)}/unlock`, { userId: state.guestUserId });
+        state.isPaid = !!result.isPaid;
+        await fetchAndRenderPoi();
+        setStatus("Mở khóa thành công. Bạn có thể nghe audio.");
+      } catch (err) {
+        setStatus(err?.message || String(err));
+      }
     });
   };
 

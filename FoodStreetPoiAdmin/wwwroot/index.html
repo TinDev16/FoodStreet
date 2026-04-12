@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="vi">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -10,17 +11,18 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
+
 <body>
   <div class="dashboard">
     <!-- Sidebar -->
     <aside class="sidebar">
       <div class="sidebar-brand">
-        <i class="fa-solid fa-map-location-dot brand-icon"></i> 
+        <i class="fa-solid fa-map-location-dot brand-icon"></i>
         <span>FS Admin</span>
       </div>
       <nav class="sidebar-nav">
         <a href="/" class="nav-item active" id="navPoiManage">
-          <i class="fa-solid fa-list-check"></i> 
+          <i class="fa-solid fa-list-check"></i>
           <span>Quản lý POI</span>
         </a>
         <a href="/stats.html" class="nav-item" id="navAudioStats">
@@ -34,7 +36,8 @@
       </nav>
       <div class="sidebar-footer">
         <div class="user-profile">
-          <img id="sidebarUserAvatar" src="https://ui-avatars.com/api/?name=Admin&background=4f46e5&color=fff&rounded=true" alt="Admin" />
+          <img id="sidebarUserAvatar"
+            src="https://ui-avatars.com/api/?name=Admin&background=4f46e5&color=fff&rounded=true" alt="Admin" />
           <div class="user-info">
             <span class="user-name" id="sidebarUserName">Super Admin</span>
             <span class="user-role" id="sidebarUserRole">Hệ thống</span>
@@ -50,10 +53,11 @@
         <div class="topbar-actions">
           <button class="topbar-btn"><i class="fa-regular fa-bell"></i></button>
           <button class="topbar-btn"><i class="fa-solid fa-gear"></i></button>
-          <button class="topbar-btn" id="logoutBtn" title="Đăng xuất"><i class="fa-solid fa-right-from-bracket"></i></button>
+          <button class="topbar-btn" id="logoutBtn" title="Đăng xuất"><i
+              class="fa-solid fa-right-from-bracket"></i></button>
         </div>
       </header>
-      
+
       <div class="scroll-container">
         <main class="layout">
           <!-- Form Card -->
@@ -64,7 +68,8 @@
                 <h2>Cập nhật POI</h2>
               </div>
               <div class="header-actions">
-                <button type="button" id="createBtn" class="secondary"><i class="fa-solid fa-plus"></i> Thêm mới</button>
+                <button type="button" id="createBtn" class="secondary"><i class="fa-solid fa-plus"></i> Thêm
+                  mới</button>
               </div>
             </header>
 
@@ -120,8 +125,16 @@
                   </label>
                 </div>
               </div>
+              <div class="form-group">
+                <label>Giá mở khóa (VND)
+                  <div class="input-icon">
+                    <i class="fa-solid fa-tag"></i>
+                    <input name="price" type="number" min="0" step="1000" value="0" required />
+                  </div>
+                </label>
+              </div>
 
-              <hr class="divider"/>
+              <hr class="divider" />
 
               <div class="form-group">
                 <label>Ngôn ngữ nhập liệu
@@ -150,7 +163,7 @@
                 </label>
               </div>
 
-              <hr class="divider"/>
+              <hr class="divider" />
               <div class="grid-2">
                 <div class="file-block">
                   <div class="file-block-header">
@@ -159,7 +172,8 @@
                   </div>
                   <input name="imageFile" type="file" accept="image/*" />
                   <div class="file-meta">
-                    <span>C. tại: <a id="currentImageLink" href="#" target="_blank" rel="noopener" hidden>Mở ảnh</a><span id="currentImageEmpty">Chưa có</span></span>
+                    <span>C. tại: <a id="currentImageLink" href="#" target="_blank" rel="noopener" hidden>Mở
+                        ảnh</a><span id="currentImageEmpty">Chưa có</span></span>
                     <label class="checkbox danger-check">
                       <input name="removeImage" type="checkbox" />
                       <span>Xóa ảnh</span>
@@ -174,7 +188,8 @@
                   </div>
                   <input name="audioFile" type="file" accept="audio/*" />
                   <div class="file-meta">
-                    <span>C. tại: <a id="currentAudioLink" href="#" target="_blank" rel="noopener" hidden>Nghe audio</a><span id="currentAudioEmpty">Chưa có</span></span>
+                    <span>C. tại: <a id="currentAudioLink" href="#" target="_blank" rel="noopener" hidden>Nghe
+                        audio</a><span id="currentAudioEmpty">Chưa có</span></span>
                     <label class="checkbox danger-check">
                       <input name="removeAudio" type="checkbox" />
                       <span>Xóa audio</span>
@@ -190,8 +205,10 @@
 
               <div class="actions">
                 <button type="submit"><i class="fa-solid fa-floppy-disk"></i> Lưu POI</button>
-                <button type="button" id="generateQrBtn" class="secondary"><i class="fa-solid fa-qrcode"></i> Tạo QR của POI</button>
-                <button type="button" id="resetBtn" class="secondary"><i class="fa-solid fa-rotate-right"></i> Làm mới</button>
+                <button type="button" id="generateQrBtn" class="secondary"><i class="fa-solid fa-qrcode"></i> Tạo QR của
+                  POI</button>
+                <button type="button" id="resetBtn" class="secondary"><i class="fa-solid fa-rotate-right"></i> Làm
+                  mới</button>
               </div>
               <p id="status"></p>
             </form>
@@ -219,6 +236,7 @@
                     <th>Toạ độ GPS</th>
                     <th width="80">B.Kính</th>
                     <th width="80">Ưu tiên</th>
+                    <th width="110">Giá mở khóa</th>
                     <th width="100">Status</th>
                     <th width="130" class="text-right">Hành động</th>
                   </tr>
@@ -323,7 +341,7 @@
         <button type="submit" class="secondary icon-only round-btn"><i class="fa-solid fa-xmark"></i></button>
       </header>
       <p class="small muted mb-15">Quét mã để khách hàng mở nhanh trang bản đồ.</p>
-      
+
       <div class="grid-2 mb-15">
         <div class="form-group">
           <label>Ngôn ngữ mặc định
@@ -342,7 +360,7 @@
           </label>
         </div>
       </div>
-      
+
       <div class="form-group">
         <label>Public URL
           <div class="input-icon">
@@ -365,4 +383,5 @@
 
   <script src="/app.js?v=20260407-owner-menu-fix2"></script>
 </body>
+
 </html>

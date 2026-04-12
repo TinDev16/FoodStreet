@@ -38,6 +38,12 @@ public sealed class AppDatabase
             try {
                 await connection.ExecuteAsync("ALTER TABLE poi_view_history ADD COLUMN server_user_id INTEGER DEFAULT 0;");
             } catch { /* Column likely already exists */ }
+            try {
+                await connection.ExecuteAsync("ALTER TABLE pois ADD COLUMN price REAL NOT NULL DEFAULT 0;");
+            } catch { /* Column likely already exists */ }
+            try {
+                await connection.ExecuteAsync("ALTER TABLE pois ADD COLUMN is_paid INTEGER NOT NULL DEFAULT 0;");
+            } catch { /* Column likely already exists */ }
 
             await connection.ExecuteAsync("CREATE INDEX IF NOT EXISTS idx_history_user ON poi_view_history(server_user_id);");
             await connection.ExecuteAsync("CREATE UNIQUE INDEX IF NOT EXISTS ux_poi_lang ON poi_translations(poi_id, lang_code);");
