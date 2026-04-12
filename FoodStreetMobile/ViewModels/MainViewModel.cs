@@ -241,16 +241,29 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public void SetConfiguredBaseUrls(string? rawValue) => _poiSyncService.SetConfiguredBaseUrls(rawValue);
 
-    public async Task<bool> UnlockPoiAsync(string poiId)
+    public async Task<(bool Ok, string Message)> UnlockPoiAsync(string poiId)
     {
-        var unlocked = await _poiSyncService.UnlockPoiAsync(poiId);
-        if (!unlocked)
+        try
         {
-            return false;
-        }
+            var unlocked = await _poiSyncService.UnlockPoiAsync(poiId);
+            if (!unlocked)
+            {
+                var error = string.IsNullOrWhiteSpace(_poiSyncService.LastError)
+                    ? "Không thể mở khóa POI lúc này."
+                    : _poiSyncService.LastError!;
+                return (false, error);
+            }
 
-        await ReloadPoisAsync(_currentLanguage);
-        return true;
+            await ReloadPoisAsync(_currentLanguage);
+            return (true, "Mở khóa thành công.");
+        }
+        catch (Exception ex)
+        {
+            var fallback = string.IsNullOrWhiteSpace(ex.Message)
+                ? "Đã xảy ra lỗi không mong muốn khi mở khóa."
+                : ex.Message;
+            return (false, fallback);
+        }
     }
 
     private static string BuildDeterministicPoiId(string shopName, double latitude, double longitude)
@@ -267,9 +280,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private async Task ReloadPoisAsync(string languageCode)
     {
         var sourcePois = await _poiRepository.GetPoisAsync(languageCode);
-        
-        // Use a more robust check or just proceed to smart update
-        MainThread.BeginInvokeOnMainThread(() =>
+
+        await MainThread.InvokeOnMainThreadAsync(() =>
         {
             var currentPoisDict = Pois.ToDictionary(x => x.Id);
             var sourcePoisDict = sourcePois.ToDictionary(x => x.Id);

@@ -261,6 +261,21 @@ public sealed class PoiSyncService
     {
         if (string.IsNullOrWhiteSpace(poiId))
         {
+            LastError = "POI không hợp lệ.";
+            return false;
+        }
+
+        var normalizedPoiId = poiId.Trim();
+        if (!long.TryParse(normalizedPoiId, out _))
+        {
+            LastError = "POI này chưa hỗ trợ mở khóa (id không hợp lệ).";
+            return false;
+        }
+
+        var token = Preferences.Get(MobileJwtPreferenceKey, string.Empty);
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            LastError = "Bạn cần đăng nhập tài khoản mobile để mở khóa.";
             return false;
         }
 
@@ -272,17 +287,18 @@ public sealed class PoiSyncService
             {
                 using var req = new HttpRequestMessage(
                     HttpMethod.Post,
-                    $"{baseUrl}/api/mobile/pois/{Uri.EscapeDataString(poiId.Trim())}/unlock");
-                AttachBearerIfAny(req);
+                    $"{baseUrl}/api/mobile/pois/{Uri.EscapeDataString(normalizedPoiId)}/unlock");
+                req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 using var response = await _httpClient.SendAsync(req);
                 if (!response.IsSuccessStatusCode)
                 {
-                    errors.Add($"{baseUrl}: {(int)response.StatusCode} {response.ReasonPhrase}");
+                    var detail = await ReadApiErrorAsync(response);
+                    errors.Add($"{baseUrl}: {(int)response.StatusCode} {detail}");
                     continue;
                 }
 
                 var connection = await _database.GetConnectionAsync();
-                await connection.ExecuteAsync("UPDATE pois SET is_paid = 1 WHERE id = ?;", poiId.Trim());
+                await connection.ExecuteAsync("UPDATE pois SET is_paid = 1 WHERE id = ?;", normalizedPoiId);
                 _lastSuccessfulBaseUrl = baseUrl;
                 LastError = null;
                 return true;
@@ -299,6 +315,34 @@ public sealed class PoiSyncService
         }
 
         return false;
+    }
+
+    private static async Task<string> ReadApiErrorAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            if (string.IsNullOrWhiteSpace(body))
+            {
+                return response.ReasonPhrase ?? "Unknown error";
+            }
+
+            using var doc = System.Text.Json.JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("error", out var errorNode))
+            {
+                var apiError = errorNode.GetString();
+                if (!string.IsNullOrWhiteSpace(apiError))
+                {
+                    return apiError;
+                }
+            }
+        }
+        catch
+        {
+            // Ignore parser errors and fallback to reason phrase.
+        }
+
+        return response.ReasonPhrase ?? "Unknown error";
     }
 
     private async Task ApplyRemoteDataAsync(string baseUrl, string requestedLang, IReadOnlyList<PoiSyncDto> pois)
