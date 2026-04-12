@@ -13,7 +13,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
 COPY --from=publish /app/publish .
-RUN mkdir -p /app/App_Data
+RUN mkdir -p /FoodStreetPoiAdmin/App_Data
 
 ENV ASPNETCORE_URLS=http://0.0.0.0:5187
 ENV DOTNET_EnableDiagnostics=0
