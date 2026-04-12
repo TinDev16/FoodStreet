@@ -135,7 +135,7 @@ public partial class HomePage : ContentPage
                     .Select(x => new FeaturedPlaceCard(
                         x.Id,
                         x.Name.Trim(),
-                        x.PlayCount > 0 ? $"{x.PlayCount} lượt phát" : "Phổ biến",
+                        x.PlayCount > 0 ? $"{x.PlayCount} lượt quan tâm" : "Phổ biến",
                         NormalizeAssetUrl(baseUrl, x.ImageUrl)))
                     .ToList();
 
@@ -184,7 +184,7 @@ public partial class HomePage : ContentPage
                 .Select(x => new FeaturedPlaceCard(
                     x.Id,
                     x.Name.Trim(),
-                    x.PlayCount > 0 ? $"{x.PlayCount} lượt phát" : "Phổ biến",
+                    x.PlayCount > 0 ? $"{x.PlayCount} lượt quan tâm" : "Phổ biến",
                     NormalizeAssetUrl(payload.BaseUrl, x.ImageUrl),
                     isFromCache: true))
                 .ToList();

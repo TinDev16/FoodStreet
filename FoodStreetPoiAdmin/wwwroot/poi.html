@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>FoodStreet - Khám phá điểm đến</title>
+  <title id="pageTitle">FoodStreet - Khám phá điểm đến</title>
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/poi.css">
 </head>
@@ -13,8 +13,8 @@
     <div class="app-install-card">
       <div class="app-install-icon">📱</div>
       <div class="app-install-content">
-        <strong>Trải nghiệm tốt hơn với App FoodStreet</strong>
-        <p>Xem POI trên bản đồ, nhận thông báo và nhiều tính năng hấp dẫn</p>
+        <strong id="installPromptTitle">Trải nghiệm tốt hơn với App FoodStreet</strong>
+        <p id="installPromptDesc">Xem POI trên bản đồ, nhận thông báo và nhiều tính năng hấp dẫn</p>
         <div class="app-install-actions">
           <button id="openAppBtn" class="btn-primary btn-sm">Mở App</button>
           <button id="dismissInstallPromptBtn" class="btn-outline btn-sm">Để sau</button>
@@ -29,37 +29,43 @@
       <div class="card-header">
         <h1 id="poiName">Đang tải...</h1>
         <div class="lang-selector">
-          <label for="langSelect">🌐 Ngôn ngữ</label>
+          <label for="langSelect" id="langSelectorLabel">🌐 Ngôn ngữ</label>
           <select id="langSelect" class="lang-dropdown"></select>
         </div>
       </div>
 
       <div class="poi-media">
         <img id="poiImage" class="poi-image" alt="Hình ảnh địa điểm" hidden>
-        <div class="poi-status-badge" id="poiStatusBadge"></div>
+        <div class="poi-status-badge" id="poiStatusBadge" hidden></div>
       </div>
 
       <div class="poi-description">
         <p id="poiDesc" class="desc-text"></p>
       </div>
       <div class="poi-payment" id="poiPaymentPanel" hidden>
-        <strong id="poiPriceLabel">Premium</strong>
-        <p id="poiPaymentHint">Bạn cần mở khóa để nghe audio.</p>
-        <button id="unlockBtn" class="btn-secondary">Mở khóa ngay</button>
+        <div class="poi-payment-head">
+          <span class="poi-payment-chip" id="poiPaymentChip">Premium Access</span>
+          <strong id="poiPriceLabel">249.000 đ</strong>
+        </div>
+        <p id="poiPaymentHint">Mở khóa một lần để nghe toàn bộ audio thuyết minh cho địa điểm này.</p>
+        <div class="poi-payment-foot">
+          <span class="poi-payment-note" id="poiPaymentNote">Thanh toán mô phỏng, mở ngay lập tức.</span>
+          <button id="unlockBtn" class="btn-primary">Mở khóa ngay</button>
+        </div>
       </div>
 
       <div class="action-group">
         <button id="speakBtn" class="btn-primary">
-          <span>🔊</span> Nghe giới thiệu
+          <span>🔊</span> <span id="speakBtnLabel">Nghe giới thiệu</span>
         </button>
         <button id="stopBtn" class="btn-outline">
-          <span>⏹️</span> Dừng
+          <span>⏹️</span> <span id="stopBtnLabel">Dừng</span>
         </button>
         <a id="mapBtn" class="btn-outline" target="_blank" rel="noopener noreferrer">
-          <span>🗺️</span> Xem bản đồ
+          <span>🗺️</span> <span id="mapBtnLabel">Xem bản đồ</span>
         </a>
         <button id="routeBtn" class="btn-secondary">
-          <span>🚶</span> Chỉ đường
+          <span>🚶</span> <span id="routeBtnLabel">Chỉ đường</span>
         </button>
       </div>
 
@@ -69,7 +75,7 @@
 
     <!-- Bản đồ -->
     <div class="poi-card map-card">
-      <h2>📍 Vị trí trên bản đồ</h2>
+      <h2 id="mapSectionTitle">📍 Vị trí trên bản đồ</h2>
       <div class="map-wrapper">
         <iframe id="mapFrame" title="Bản đồ POI" loading="lazy"></iframe>
       </div>
