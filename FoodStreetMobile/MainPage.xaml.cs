@@ -82,7 +82,6 @@ public partial class MainPage : ContentPage
     private Polyline? _routePolyline;
     private string? _lastRouteSummary;
     private Circle? _foodZoneCircle;
-    private CancellationTokenSource? _statusBannerCts;
     private readonly List<Circle> _poiRadiusCircles = new();
     private readonly List<string> _ttsWords = new();
     private readonly List<TtsSegment> _ttsSegments = new();
@@ -129,7 +128,6 @@ public partial class MainPage : ContentPage
         _viewModel.PoisLoaded += OnPoisLoaded;
         _viewModel.ActivePoiChanged += OnActivePoiChanged;
         _viewModel.UserLocationChanged += OnUserLocationChanged;
-        _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         _deepLinkService.PendingPoiLinkQueued += OnPendingPoiLinkQueued;
         _deepLinkService.PendingPlaceSelectionQueued += OnPendingPlaceSelectionQueued;
         SizeChanged += OnPageSizeChanged;
@@ -147,13 +145,12 @@ public partial class MainPage : ContentPage
             await _viewModel.InitializeAsync();
             await TryOpenPendingDeepLinkAsync();
             await TryOpenPendingPlaceSelectionAsync();
-            _ = ShowStatusBannerForOneSecondAsync();
 
             if (_viewModel.Pois.Count == 0)
             {
                 await DisplayAlertAsync(
                     "Chua co POI",
-                    $"{_viewModel.StatusText}\nNeu ban dung Android emulator, thu HOST = http://10.0.2.2:5187",
+                    "Khong co du lieu POI. Neu ban dung Android emulator, thu HOST = http://10.0.2.2:5187",
                     "OK");
             }
         }
@@ -519,7 +516,7 @@ public partial class MainPage : ContentPage
 
         if (_viewModel.Pois.Count == 0)
         {
-            await DisplayAlertAsync("Chua co POI", _viewModel.StatusText, "OK");
+            await DisplayAlertAsync("Chua co POI", "Khong co du lieu POI tu may chu.", "OK");
         }
     }
 
@@ -535,7 +532,7 @@ public partial class MainPage : ContentPage
             await _viewModel.RefreshFromServerAsync();
             if (_viewModel.Pois.Count == 0)
             {
-                await DisplayAlertAsync("Chua co POI", _viewModel.StatusText, "OK");
+                await DisplayAlertAsync("Chua co POI", "Khong co du lieu POI tu may chu.", "OK");
             }
 
             await EnsureUserLocationEnabledAsync();
@@ -785,48 +782,6 @@ public partial class MainPage : ContentPage
         return list;
     }
 
-    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(MainViewModel.StatusText))
-        {
-            _ = ShowStatusBannerForOneSecondAsync();
-        }
-    }
-
-    private async Task ShowStatusBannerForOneSecondAsync()
-    {
-        _statusBannerCts?.Cancel();
-        _statusBannerCts?.Dispose();
-
-        var cts = new CancellationTokenSource();
-        _statusBannerCts = cts;
-
-        await MainThread.InvokeOnMainThreadAsync(() =>
-        {
-            StatusBanner.IsVisible = !string.IsNullOrWhiteSpace(_viewModel.StatusText);
-            StatusBanner.Opacity = 1;
-        });
-
-        try
-        {
-            await Task.Delay(1000, cts.Token);
-            if (cts.IsCancellationRequested)
-            {
-                return;
-            }
-
-            await MainThread.InvokeOnMainThreadAsync(async () =>
-            {
-                await StatusBanner.FadeToAsync(0, 150, Easing.CubicOut);
-                StatusBanner.IsVisible = false;
-                StatusBanner.Opacity = 1;
-            });
-        }
-        catch (TaskCanceledException)
-        {
-            // Ignore cancellation when status updates rapidly.
-        }
-    }
 
     private void DrawVinhKhanhFoodZone()
     {
@@ -870,10 +825,10 @@ public partial class MainPage : ContentPage
 
     private void SetSearchUiState(bool isLoading, string? errorText)
     {
-        SearchStatusLayout.IsVisible = isLoading || !string.IsNullOrWhiteSpace(errorText);
-        SearchLoadingIndicator.IsRunning = isLoading;
-        SearchErrorLabel.Text = errorText ?? string.Empty;
-        SearchErrorLabel.IsVisible = !string.IsNullOrWhiteSpace(errorText);
+        SearchStatusLayout.IsVisible = false;
+        SearchLoadingIndicator.IsRunning = false;
+        SearchErrorLabel.Text = string.Empty;
+        SearchErrorLabel.IsVisible = false;
     }
 
     private static string? NormalizeRemoteImageUrl(string? raw)

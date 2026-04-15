@@ -214,4 +214,10 @@
   <data name="General_Confirm" xml:space="preserve">
     <value>Confirm</value>
   </data>
+  <data name="Home_InterestCountFormat" xml:space="preserve">
+    <value>{0} interested</value>
+  </data>
+  <data name="Home_Popular" xml:space="preserve">
+    <value>Popular</value>
+  </data>
 </root>

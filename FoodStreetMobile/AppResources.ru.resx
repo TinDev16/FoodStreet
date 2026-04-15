@@ -200,4 +200,10 @@
   <data name="Profile_GoLogin" xml:space="preserve">
     <value>Войти</value>
   </data>
+  <data name="Home_InterestCountFormat" xml:space="preserve">
+    <value>{0} заинтересованы</value>
+  </data>
+  <data name="Home_Popular" xml:space="preserve">
+    <value>Популярно</value>
+  </data>
 </root>

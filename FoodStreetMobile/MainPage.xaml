@@ -132,20 +132,6 @@
                     </CollectionView>
                 </Grid>
             </Border>
-            <Border x:Name="StatusBanner"
-                    Margin="16,88,16,0"
-                    Padding="10,7"
-                    BackgroundColor="#FFF7ED"
-                    Stroke="#FED7AA"
-                    StrokeShape="RoundRectangle 14"
-                    IsVisible="False"
-                    VerticalOptions="Start"
-                    HorizontalOptions="Fill">
-                <Label Text="{Binding StatusText}"
-                       FontSize="12"
-                       TextColor="#7C2D12"
-                       LineBreakMode="WordWrap" />
-            </Border>
             <Border x:Name="SearchBottomSheet"
                     VerticalOptions="End"
                     Stroke="#F2E8E0"
@@ -284,32 +270,30 @@
                                     </Grid>
                                 </VerticalStackLayout>
                             </Border>
-                            <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="8">
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
                                 <Button Text="{loc:Translate Key=Main_Directions}"
-                                        BackgroundColor="#E07A5F"
-                                        TextColor="White"
+                                        HeightRequest="46"
+                                        Padding="14,10"
+                                        FontSize="14"
+                                        FontAttributes="Bold"
+                                        BackgroundColor="#F4E7DC"
+                                        TextColor="#5A2A0C"
                                         CornerRadius="14"
+                                        LineBreakMode="TailTruncation"
                                         Clicked="OnDirectionsClicked" />
                                 <Button Grid.Column="1"
                                         x:Name="PlayAudioButton"
                                         Text="{loc:Translate Key=Main_PlayAudio}"
-                                        BackgroundColor="#F4E7DC"
-                                        TextColor="#5A2A0C"
+                                        HeightRequest="46"
+                                        Padding="14,10"
+                                        FontSize="14"
+                                        FontAttributes="Bold"
+                                        BackgroundColor="#E07A5F"
+                                        TextColor="White"
                                         CornerRadius="14"
+                                        LineBreakMode="TailTruncation"
                                         IsEnabled="False"
                                         Clicked="OnPlayAudioClicked" />
-                                <Button Grid.Column="2"
-                                        Text="{loc:Translate Key=Main_Save}"
-                                        BackgroundColor="#F4E7DC"
-                                        TextColor="#5A2A0C"
-                                        CornerRadius="14"
-                                        Clicked="OnSaveClicked" />
-                                <Button Grid.Column="3"
-                                        Text="{loc:Translate Key=Main_Share}"
-                                        BackgroundColor="#F4E7DC"
-                                        TextColor="#5A2A0C"
-                                        CornerRadius="14"
-                                        Clicked="OnShareClicked" />
                             </Grid>
                             <Border x:Name="PlaybackQueuePanel"
                                     Padding="12,10"

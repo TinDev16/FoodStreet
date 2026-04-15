@@ -161,25 +161,25 @@
                 <!-- ─────────────────────────────
                      SECTION: Quán Ăn Nổi Bật
                 ──────────────────────────────── -->
-                <VerticalStackLayout x:Name="FeaturedPlacesContainer" IsVisible="False" Padding="24,28,0,28" Spacing="16">
+                <VerticalStackLayout x:Name="FeaturedPlacesContainer" IsVisible="False" Padding="14,28,14,28" Spacing="16">
 
                     <Label Text="{loc:Translate Key=Home_FeaturedTitle}"
-                           Margin="0,0,24,0"
+                           Margin="0,0,8,0"
                            FontSize="22"
                            FontAttributes="Bold"
                            TextColor="#1A0E0B" />
 
                     <CollectionView x:Name="FeaturedPlacesCollection"
                                     ItemsLayout="HorizontalList"
-                                    HeightRequest="200"
+                                    HeightRequest="{OnIdiom Phone=390, Tablet=460, Desktop=500}"
                                     SelectionMode="None">
                         <CollectionView.ItemTemplate>
                             <DataTemplate>
                                 <Border BackgroundColor="White"
                                         StrokeThickness="0"
                                         StrokeShape="RoundRectangle 24"
-                                        WidthRequest="170"
-                                        Margin="0,4,14,8">
+                                        WidthRequest="{OnIdiom Phone=340, Tablet=500, Desktop=620}"
+                                        Margin="0,4,12,8">
                                     <Border.GestureRecognizers>
                                         <TapGestureRecognizer Tapped="OnFeaturedPlaceTapped" CommandParameter="{Binding .}" />
                                     </Border.GestureRecognizers>
@@ -191,7 +191,7 @@
                                         <!-- Real Thumbnail -->
                                         <Border Grid.Row="0"
                                                 StrokeThickness="0"
-                                                HeightRequest="110"
+                                                HeightRequest="{OnIdiom Phone=210, Tablet=280, Desktop=320}"
                                                 IsVisible="{Binding HasImage}"
                                                 StrokeShape="RoundRectangle 24,24,0,0">
                                             <Image Source="{Binding ImageUrl}" Aspect="AspectFill" />
@@ -200,7 +200,7 @@
                                         <!-- Thumbnail placeholder -->
                                         <Border Grid.Row="0"
                                                 StrokeThickness="0"
-                                                HeightRequest="110"
+                                                HeightRequest="{OnIdiom Phone=210, Tablet=280, Desktop=320}"
                                                 IsVisible="{Binding ShowPlaceholder}"
                                                 StrokeShape="RoundRectangle 24,24,0,0">
                                             <Border.Background>
@@ -216,24 +216,33 @@
 
                                         <!-- Info -->
                                         <VerticalStackLayout Grid.Row="1"
-                                                             Padding="12,10,12,12"
-                                                             Spacing="2">
+                                                             Padding="12,10,12,14"
+                                                             Spacing="6">
                                             <Label Text="{Binding Name}"
-                                                   FontSize="13"
+                                                   FontSize="18"
                                                    FontAttributes="Bold"
                                                    TextColor="#2C1C19"
-                                                   MaxLines="1"
+                                                   MaxLines="2"
                                                    LineBreakMode="TailTruncation" />
-                                            <HorizontalStackLayout Spacing="4">
-                                                <Label Text="" FontSize="11" VerticalOptions="Center" />
-                                                <Label Text="{Binding MetaText}"
-                                                       FontSize="11"
-                                                       TextColor="#9A7D69"
-                                                       VerticalOptions="Center" />
+                                            <Label Text="{Binding SummaryText}"
+                                                   FontSize="14"
+                                                   TextColor="#7B5B49"
+                                                   MaxLines="3"
+                                                   LineBreakMode="TailTruncation"
+                                                   IsVisible="{Binding HasSummary}" />
+                                            <HorizontalStackLayout Spacing="6">
+                                                <Border StrokeThickness="0"
+                                                        BackgroundColor="#FFF1E8"
+                                                        StrokeShape="RoundRectangle 10"
+                                                        Padding="8,3">
+                                                    <Label Text="{Binding MetaText}"
+                                                           FontSize="13"
+                                                           TextColor="#9A3412" />
+                                                </Border>
                                             </HorizontalStackLayout>
                                             <!-- Offline cache badge -->
                                             <Label Text="📦 Đã lưu • offline"
-                                                   FontSize="9"
+                                                   FontSize="11"
                                                    FontAttributes="Italic"
                                                    TextColor="#B0A8A0"
                                                    IsVisible="{Binding IsFromCache}" />

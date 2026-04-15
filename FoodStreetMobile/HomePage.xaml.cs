@@ -4,6 +4,7 @@ using FoodStreetMobile.Services;
 using FoodStreetMobile.ViewModels;
 using Microsoft.Maui.Devices.Sensors;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -92,6 +93,7 @@ public partial class HomePage : ContentPage
 
     private async Task RefreshFeaturedPlacesAsync()
     {
+        await TryEnsureUserLocationAsync();
         var featured = await TryLoadFeaturedPlacesFromStatsAsync();
         _featuredPlaces.Clear();
         foreach (var item in featured)
@@ -132,11 +134,7 @@ public partial class HomePage : ContentPage
                 var items = await response.Content.ReadFromJsonAsync<List<FeaturedPoiDto>>() ?? [];
                 var cards = items
                     .Where(x => !string.IsNullOrWhiteSpace(x.Name))
-                    .Select(x => new FeaturedPlaceCard(
-                        x.Id,
-                        x.Name.Trim(),
-                        x.PlayCount > 0 ? $"{x.PlayCount} lượt quan tâm" : "Phổ biến",
-                        NormalizeAssetUrl(baseUrl, x.ImageUrl)))
+                    .Select(x => BuildFeaturedCard(x, baseUrl, isFromCache: false))
                     .ToList();
 
                 // Save to cache for offline use
@@ -167,7 +165,7 @@ public partial class HomePage : ContentPage
         }
     }
 
-    private static async Task<List<FeaturedPlaceCard>> LoadFeaturedCacheAsync()
+    private async Task<List<FeaturedPlaceCard>> LoadFeaturedCacheAsync()
     {
         try
         {
@@ -181,12 +179,7 @@ public partial class HomePage : ContentPage
 
             return payload.Items
                 .Where(x => !string.IsNullOrWhiteSpace(x.Name))
-                .Select(x => new FeaturedPlaceCard(
-                    x.Id,
-                    x.Name.Trim(),
-                    x.PlayCount > 0 ? $"{x.PlayCount} lượt quan tâm" : "Phổ biến",
-                    NormalizeAssetUrl(payload.BaseUrl, x.ImageUrl),
-                    isFromCache: true))
+                .Select(x => BuildFeaturedCard(x, payload.BaseUrl, isFromCache: true))
                 .ToList();
         }
         catch
@@ -417,6 +410,67 @@ public partial class HomePage : ContentPage
         return value;
     }
 
+    private static string BuildFeaturedMetaText(long playCount)
+    {
+        var culture = CultureInfo.CurrentUICulture;
+        if (playCount > 0)
+        {
+            var format = AppResources.ResourceManager.GetString("Home_InterestCountFormat", culture) ?? "{0} interested";
+            return string.Format(culture, format, playCount);
+        }
+
+        return AppResources.ResourceManager.GetString("Home_Popular", culture) ?? "Popular";
+    }
+
+    private FeaturedPlaceCard BuildFeaturedCard(FeaturedPoiDto item, string baseUrl, bool isFromCache)
+    {
+        var poi = _viewModel.Pois.FirstOrDefault(p => string.Equals(p.Id, item.Id, StringComparison.Ordinal));
+        return new FeaturedPlaceCard(
+            item.Id,
+            item.Name.Trim(),
+            BuildFeaturedMetaText(item.PlayCount),
+            BuildFeaturedSummaryText(poi?.Description),
+            BuildFeaturedDistanceText(poi),
+            poi?.PriceText ?? string.Empty,
+            NormalizeAssetUrl(baseUrl, item.ImageUrl),
+            isFromCache);
+    }
+
+    private static string BuildFeaturedSummaryText(string? description)
+    {
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            return string.Empty;
+        }
+
+        var value = description.Trim();
+        return value.Length > 90 ? value[..90] + "..." : value;
+    }
+
+    private string BuildFeaturedDistanceText(PoiViewModel? poi)
+    {
+        if (poi is null || _lastUserLocation is null)
+        {
+            return string.Empty;
+        }
+
+        var poiLocation = new MauiLocation(poi.Latitude, poi.Longitude);
+        var kilometers = MauiLocation.CalculateDistance(_lastUserLocation, poiLocation, DistanceUnits.Kilometers);
+        var meters = kilometers * 1000d;
+        if (meters <= 0)
+        {
+            return string.Empty;
+        }
+
+        var culture = CultureInfo.CurrentUICulture;
+        if (meters < 1000)
+        {
+            return $"{Math.Round(meters)} m";
+        }
+
+        return $"{Math.Round(kilometers, 1).ToString("0.0", culture)} km";
+    }
+
     public void OnFeaturedPlaceTapped(object? sender, TappedEventArgs e)
     {
         if (e.Parameter is FeaturedPlaceCard card && !string.IsNullOrWhiteSpace(card.Id))
@@ -424,7 +478,7 @@ public partial class HomePage : ContentPage
             _deepLinkService.QueuePendingPlaceSelection(new PendingPlaceSelection
             {
                 Name = card.Name,
-                Address = card.MetaText,
+                Address = string.IsNullOrWhiteSpace(card.SummaryText) ? card.MetaText : card.SummaryText,
                 PoiId = card.Id,
                 ImageUrl = card.ImageUrl
             });
@@ -438,11 +492,22 @@ public partial class HomePage : ContentPage
 
     private sealed class FeaturedPlaceCard
     {
-        public FeaturedPlaceCard(string id, string name, string metaText, string? imageUrl = null, bool isFromCache = false)
+        public FeaturedPlaceCard(
+            string id,
+            string name,
+            string metaText,
+            string summaryText,
+            string distanceText,
+            string priceTag,
+            string? imageUrl = null,
+            bool isFromCache = false)
         {
             Id = id;
             Name = name;
             MetaText = metaText;
+            SummaryText = summaryText;
+            DistanceText = distanceText;
+            PriceTag = priceTag;
             ImageUrl = imageUrl ?? string.Empty;
             IsFromCache = isFromCache;
         }
@@ -450,10 +515,16 @@ public partial class HomePage : ContentPage
         public string Id { get; }
         public string Name { get; }
         public string MetaText { get; }
+        public string SummaryText { get; }
+        public string DistanceText { get; }
+        public string PriceTag { get; }
         public string ImageUrl { get; }
         public bool IsFromCache { get; }
         public bool HasImage => !string.IsNullOrWhiteSpace(ImageUrl);
         public bool ShowPlaceholder => string.IsNullOrWhiteSpace(ImageUrl);
+        public bool HasSummary => !string.IsNullOrWhiteSpace(SummaryText);
+        public bool HasDistance => !string.IsNullOrWhiteSpace(DistanceText);
+        public bool HasPriceTag => !string.IsNullOrWhiteSpace(PriceTag);
     }
 
     private sealed class FeaturedPoiDto
@@ -492,11 +563,11 @@ public partial class HomePage : ContentPage
 
     private void SetSearchStatus(bool isLoading, string? errorText)
     {
-        HomeSearchStatusLayout.IsVisible = isLoading || !string.IsNullOrWhiteSpace(errorText);
-        HomeSearchLoadingIndicator.IsRunning = isLoading;
+        HomeSearchStatusLayout.IsVisible = false;
+        HomeSearchLoadingIndicator.IsRunning = false;
 
-        HomeSearchErrorLabel.Text = errorText ?? string.Empty;
-        HomeSearchErrorLabel.IsVisible = !string.IsNullOrWhiteSpace(errorText);
+        HomeSearchErrorLabel.Text = string.Empty;
+        HomeSearchErrorLabel.IsVisible = false;
     }
 
     private void ClearHomeSearchUi()
