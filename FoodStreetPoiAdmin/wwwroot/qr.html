@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>FoodStreet Audio Stats</title>
+  <title>FoodStreet QR Management</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -24,7 +24,7 @@
           <i class="fa-solid fa-list-check"></i>
           <span>Quản lý POI</span>
         </a>
-        <a href="/stats.html" class="nav-item active" id="navAudioStats">
+        <a href="/stats.html" class="nav-item" id="navAudioStats">
           <i class="fa-solid fa-chart-column"></i>
           <span>Thống kê lượt phát Audio</span>
         </a>
@@ -36,7 +36,7 @@
           <i class="fa-solid fa-users"></i>
           <span>Quản lý User</span>
         </a>
-        <a href="/qr.html" class="nav-item" id="qrManageNav" hidden>
+        <a href="/qr.html" class="nav-item active" id="qrManageNav">
           <i class="fa-solid fa-qrcode"></i>
           <span>Quản lý QR</span>
         </a>
@@ -55,9 +55,9 @@
 
     <div class="main-board">
       <header class="topbar">
-        <div class="topbar-title">Bảng điều khiển (Dashboard)</div>
+        <div class="topbar-title">Quản lý QR</div>
         <div class="topbar-actions">
-          <button class="topbar-btn" id="logoutBtn" title="Dang xuat"><i
+          <button class="topbar-btn" id="logoutBtn" title="Đăng xuất"><i
               class="fa-solid fa-right-from-bracket"></i></button>
         </div>
       </header>
@@ -67,45 +67,60 @@
           <section class="card">
             <header class="card-header">
               <div class="card-title">
-                <i class="fa-solid fa-chart-column"></i>
-                <h2>Thống kê lượt phát Audio</h2>
-              </div>
-              <div class="header-actions filters-toolbar">
-                <label>
-                  Từ ngày
-                  <input type="date" id="audioStatsFrom" />
-                </label>
-                <label>
-                  Đến ngày
-                  <input type="date" id="audioStatsTo" />
-                </label>
-                <label>
-                  Sắp xếp
-                  <select id="audioStatsSort">
-                    <option value="desc">Nhiều đến ít</option>
-                    <option value="asc">Ít đến nhiều</option>
-                  </select>
-                </label>
-                <button type="button" id="audioStatsReloadBtn" class="secondary">
-                  <i class="fa-solid fa-rotate-right"></i> Tải lại
-                </button>
+                <i class="fa-solid fa-qrcode"></i>
+                <h2>Tạo / sửa QR theo POI</h2>
               </div>
             </header>
-            <div class="stats-summary" id="audioStatsSummary">Chưa có dữ liệu.</div>
+            <form id="qrForm">
+              <div class="grid-2">
+                <div class="form-group">
+                  <label>POI
+                    <select id="qrPoiId" required></select>
+                  </label>
+                </div>
+                <div class="form-group">
+                  <label>Giá mở khóa (VND)
+                    <input id="qrPrice" type="number" min="0" step="1000" value="0" required />
+                  </label>
+                </div>
+              </div>
+              <div class="grid-2">
+                <div class="form-group">
+                  <label>Ngôn ngữ mặc định
+                    <select id="qrLang"></select>
+                  </label>
+                </div>
+              </div>
+              <div class="actions">
+                <button type="submit"><i class="fa-solid fa-floppy-disk"></i> Tạo / Cập nhật QR</button>
+                <button type="button" id="qrViewBtn" class="secondary"><i class="fa-regular fa-eye"></i> Xem QR</button>
+                <button type="button" id="qrResetBtn" class="secondary"><i class="fa-solid fa-rotate-right"></i> Làm mới</button>
+              </div>
+              <p id="qrStatus"></p>
+            </form>
+          </section>
+
+          <section class="card">
+            <header class="card-header">
+              <div class="card-title">
+                <i class="fa-solid fa-table-list"></i>
+                <h2>Danh sách QR theo POI</h2>
+              </div>
+            </header>
             <div class="table-responsive">
               <table>
                 <thead>
                   <tr>
-                    <th width="90">POI ID</th>
+                    <th width="80">POI ID</th>
                     <th>Tên POI</th>
-                    <th width="140">Lượt phát</th>
-                    <th width="220">Lần phát gần nhất</th>
+                    <th width="160">Giá mở khóa</th>
+                    <th width="220">Cập nhật lần cuối</th>
+                    <th width="180">Hành động</th>
                   </tr>
                 </thead>
-                <tbody id="audioStatsRows"></tbody>
+                <tbody id="qrRows"></tbody>
               </table>
             </div>
-            <p id="audioStatsStatus" class="small muted mt-10"></p>
           </section>
         </main>
       </div>
@@ -131,13 +146,37 @@
         </label>
       </div>
       <div class="actions">
-        <button type="submit"><i class="fa-solid fa-right-to-bracket"></i> Đăng nhập </button>
+        <button type="submit"><i class="fa-solid fa-right-to-bracket"></i> Đăng nhập</button>
       </div>
       <p id="authStatus" class="small muted mt-10"></p>
     </form>
   </dialog>
 
-  <script src="/stats.js?v=20260415-owner-qr-access"></script>
+  <dialog id="qrDialog" class="qr-dialog">
+    <form method="dialog" class="qr-panel">
+      <header class="qr-header">
+        <div class="qr-title">
+          <i class="fa-solid fa-qrcode"></i>
+          <h3>Xem QR</h3>
+        </div>
+        <button type="submit" class="secondary icon-only round-btn"><i class="fa-solid fa-xmark"></i></button>
+      </header>
+      <div class="form-group">
+        <label>Public URL
+          <input id="qrPublicUrl" type="text" readonly />
+        </label>
+      </div>
+      <div class="qr-preview-wrap">
+        <img id="qrPreviewImage" alt="POI QR code" />
+      </div>
+      <div class="actions center mt-20">
+        <button type="button" id="qrCopyBtn" class="secondary"><i class="fa-regular fa-copy"></i> Copy Link</button>
+        <a id="qrDownloadBtn" class="button-link" href="#" download><i class="fa-solid fa-download"></i> Tải QR</a>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/qr.js?v=20260415-qr-hide-base-url"></script>
 </body>
 
 </html>

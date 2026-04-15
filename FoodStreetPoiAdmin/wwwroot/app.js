@@ -29,6 +29,7 @@
   const sidebarUserAvatarEl = $("#sidebarUserAvatar");
   const ownerManageNavEl = $("#ownerManageNav");
   const userManageNavEl = $("#userManageNav");
+  const qrManageNavEl = $("#qrManageNav");
   const navClientPoiEl = $("#navClientPoi");
   const poiFormCardEl = $("#poiFormCard");
   const audioStatsRowsEl = $("#audioStatsRows");
@@ -526,6 +527,9 @@
     ownerManageNavEl.hidden = !isSuperAdmin();
     if (userManageNavEl) {
       userManageNavEl.hidden = !isSuperAdmin();
+    }
+    if (qrManageNavEl) {
+      qrManageNavEl.hidden = !roleCode;
     }
     if (navClientPoiEl) {
       navClientPoiEl.hidden = isOwnerRole;

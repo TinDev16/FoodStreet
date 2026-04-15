@@ -9,6 +9,8 @@
   const sidebarUserRoleEl = $("#sidebarUserRole");
   const sidebarUserAvatarEl = $("#sidebarUserAvatar");
   const userManageNavEl = $("#userManageNav");
+  const ownerManageNavEl = $("#ownerManageNav");
+  const qrManageNavEl = $("#qrManageNav");
 
   const userFormEl = $("#userForm");
   const userResetBtn = $("#userResetBtn");
@@ -89,10 +91,21 @@
   const updateIdentityUi = () => {
     const username = state.me?.username || "Guest";
     const role = state.me?.role || "";
+    const roleCode = role.toLowerCase();
+    const canManageUsers = roleCode === "superadmin";
     const fullName = state.me?.fullName || username;
     sidebarUserNameEl.textContent = fullName;
     sidebarUserRoleEl.textContent = role ? role.toUpperCase() : "Chua dang nhap";
     sidebarUserAvatarEl.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=4f46e5&color=fff&rounded=true`;
+    if (ownerManageNavEl) {
+      ownerManageNavEl.hidden = roleCode === "owner";
+    }
+    if (userManageNavEl) {
+      userManageNavEl.hidden = !canManageUsers;
+    }
+    if (qrManageNavEl) {
+      qrManageNavEl.hidden = !roleCode;
+    }
   };
 
   const ensureSuperAdmin = () => {
