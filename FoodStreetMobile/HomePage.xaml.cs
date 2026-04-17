@@ -8,6 +8,7 @@ using System.Globalization;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using MauiLocation = Microsoft.Maui.Devices.Sensors.Location;
 
 namespace FoodStreetMobile;
@@ -141,8 +142,9 @@ public partial class HomePage : ContentPage
                 _ = SaveFeaturedCacheAsync(items, baseUrl);
                 return cards;
             }
-            catch
+            catch (Exception ex)
             {
+                CrashLogger.Write($"HomePage.TryLoadFeatured({baseUrl})", ex);
                 // Ignore endpoint errors, try next URL.
             }
         }
@@ -428,7 +430,7 @@ public partial class HomePage : ContentPage
         return new FeaturedPlaceCard(
             item.Id,
             item.Name.Trim(),
-            BuildFeaturedMetaText(item.PlayCount),
+            BuildFeaturedMetaText(item.PopularityScore),
             BuildFeaturedSummaryText(poi?.Description),
             BuildFeaturedDistanceText(poi),
             poi?.PriceText ?? string.Empty,
@@ -529,10 +531,17 @@ public partial class HomePage : ContentPage
 
     private sealed class FeaturedPoiDto
     {
+        [JsonPropertyName("id")]
         public string Id { get; set; } = string.Empty;
+
+        [JsonPropertyName("name")]
         public string Name { get; set; } = string.Empty;
+
+        [JsonPropertyName("imageUrl")]
         public string ImageUrl { get; set; } = string.Empty;
-        public long PlayCount { get; set; }
+
+        [JsonPropertyName("popularityScore")]
+        public long PopularityScore { get; set; }
     }
 
     private sealed class FeaturedCachePayload

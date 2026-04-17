@@ -300,6 +300,7 @@ public sealed class PoiSyncService
     private IEnumerable<string> GetPreferredBaseUrls()
     {
         var list = new List<string>();
+        list.Add("https://foodstreet-ry06.onrender.com");
 
         var configured = GetConfiguredBaseUrls();
         var configuredUrls = new List<string>();

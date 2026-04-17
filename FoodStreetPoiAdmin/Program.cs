@@ -2235,19 +2235,35 @@ static async Task<List<PoiAudioPlayStatDto>> GetPoiAudioPlayStatsAsync(
 static async Task<List<FeaturedPoiDto>> GetFeaturedPoisForPublicAsync(string connectionString, string requestedLang, int limit)
 {
     await using var connection = await OpenConnectionAsync(connectionString);
+    
+    // We use a weighted score from ALL user activities in the last 7 days.
+    // If no activities are found, it falls back to manually set priority and then ID.
     const string sql = """
         SELECT
             p.id,
             COALESCE(NULLIF(t_req.name, ''), t_vi.name, '') AS name,
             p.image_url,
-            COUNT(e.id) AS play_count
+            COALESCE(stats.score, 0) AS popularity_score
         FROM pois p
+        LEFT JOIN (
+            SELECT
+                poi_id,
+                SUM(CASE
+                    WHEN action = 'scan_qr' THEN 4
+                    WHEN action = 'play_audio' THEN 3
+                    WHEN action = 'view_poi' THEN 1
+                    ELSE 0
+                END) AS score
+            FROM user_activity_events
+            WHERE created_at >= datetime('now', '-7 days')
+              AND action IN ('scan_qr', 'play_audio', 'view_poi')
+            GROUP BY poi_id
+        ) stats ON p.id = stats.poi_id
         LEFT JOIN poi_translations t_req ON p.id = t_req.poi_id AND t_req.lang_code = $lang_code
         LEFT JOIN poi_translations t_vi ON p.id = t_vi.poi_id AND t_vi.lang_code = 'vi'
-        LEFT JOIN poi_audio_play_events e ON e.poi_id = p.id
         WHERE p.is_active = 1 AND COALESCE(p.is_deleted, 0) = 0
-        GROUP BY p.id, COALESCE(NULLIF(t_req.name, ''), t_vi.name, ''), p.image_url, p.priority
-        ORDER BY play_count DESC, p.priority DESC, p.id ASC
+        GROUP BY p.id, COALESCE(NULLIF(t_req.name, ''), t_vi.name, ''), p.image_url, p.priority, stats.score
+        ORDER BY popularity_score DESC, p.priority DESC, p.id ASC
         LIMIT $limit;
         """;
 
@@ -2263,7 +2279,7 @@ static async Task<List<FeaturedPoiDto>> GetFeaturedPoisForPublicAsync(string con
             Id = reader.GetInt64(0).ToString(CultureInfo.InvariantCulture),
             Name = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
             ImageUrl = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
-            PlayCount = reader.IsDBNull(3) ? 0 : reader.GetInt64(3)
+            PopularityScore = reader.IsDBNull(3) ? 0 : reader.GetInt64(3)
         });
     }
 
@@ -2925,7 +2941,7 @@ sealed class FeaturedPoiDto
     public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string ImageUrl { get; set; } = string.Empty;
-    public long PlayCount { get; set; }
+    public long PopularityScore { get; set; }
 }
 
 sealed class PoiTranslationDto
