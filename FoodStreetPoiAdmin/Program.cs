@@ -667,8 +667,8 @@ app.MapGet("/qr/scan", (HttpContext context) =>
         setTimeout(async () => {{
             const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
             const screenWidth = window.screen.width;
-            let sid = localStorage.getItem('poi_session_id');
-            if (!sid) {{ sid = 'web_' + Date.now() + '_' + Math.random().toString(36).substring(2); localStorage.setItem('poi_session_id', sid); }}
+            let sid = localStorage.getItem('session_id');
+            if (!sid) {{ sid = 'web_' + Date.now() + '_' + Math.random().toString(36).substring(2); localStorage.setItem('session_id', sid); }}
 
             try {{
                 const res = await fetch('/api/public/qr/confirm', {{
@@ -733,9 +733,9 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
 
     await using var conn = await OpenConnectionAsync(connectionString);
     
-    // 1. Online now (last 5 min)
+    // 1. Online now (last 120s)
     long onlineNow = 0;
-    string onlineSql = "SELECT COUNT(DISTINCT session_id) FROM active_sessions WHERE strftime('%s', 'now') - strftime('%s', last_ping_at) <= 300";
+    string onlineSql = "SELECT COUNT(DISTINCT session_id) FROM active_sessions WHERE strftime('%s', 'now') - strftime('%s', last_ping_at) <= 120";
     if (!string.IsNullOrEmpty(platform) && platform != "all") onlineSql += " AND platform = $platform";
     await using (var cmd = new SqliteCommand(onlineSql, conn))
     {
@@ -2768,7 +2768,7 @@ static async Task<bool> RecordUserActivityAsync(
         var lastPingRaw = await checkCmd.ExecuteScalarAsync();
         if (lastPingRaw != null && DateTimeOffset.TryParse(lastPingRaw.ToString(), out var lastPing))
         {
-            if (DateTimeOffset.UtcNow - lastPing < TimeSpan.FromSeconds(25))
+            if (DateTimeOffset.UtcNow - lastPing < TimeSpan.FromSeconds(4))
             {
                 return true; // Throttle: do not insert into DB
             }

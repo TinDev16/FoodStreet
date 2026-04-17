@@ -1,3 +1,4 @@
+using FoodStreetMobile.ViewModels;
 using FoodStreetMobile.Services;
 using FoodStreetMobile.Models;
 using Microsoft.Maui.ApplicationModel;
@@ -7,6 +8,8 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using Microsoft.Maui.Controls;
+using Microsoft.Maui.Dispatching;
 
 namespace FoodStreetMobile.ViewModels;
 
@@ -30,6 +33,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private DateTimeOffset _lastAutoSyncAt = DateTimeOffset.MinValue;
     private readonly SemaphoreSlim _autoSyncLock = new(1, 1);
     private static readonly TimeSpan AutoSyncInterval = TimeSpan.FromSeconds(12);
+    private IDispatcherTimer? _heartbeatTimer;
     private readonly ICommand _setVietnameseCommand;
     private readonly ICommand _setEnglishCommand;
     private readonly ICommand _syncNowCommand;
@@ -144,6 +148,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
         {
             await StartTrackingAsync();
         }
+
+        if (_heartbeatTimer == null && Application.Current?.Dispatcher != null)
+        {
+            _heartbeatTimer = Application.Current.Dispatcher.CreateTimer();
+            _heartbeatTimer.Interval = TimeSpan.FromSeconds(5);
+            _heartbeatTimer.Tick += (s, e) => _ = _poiSyncService.TrackActivityAsync("ping");
+        }
+        _heartbeatTimer?.Start();
     }
 
     public async Task SetLanguageAsync(string languageCode)
@@ -490,4 +502,3 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private void OnPropertyChanged([CallerMemberName] string? name = null)
         => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
-

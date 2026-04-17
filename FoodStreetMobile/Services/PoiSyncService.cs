@@ -478,11 +478,11 @@ public sealed class PoiSyncService
 
     public string GetSessionId()
     {
-        var sid = Preferences.Get("poi_app_session_id", string.Empty);
+        var sid = Preferences.Get("session_id", string.Empty);
         if (string.IsNullOrWhiteSpace(sid))
         {
             sid = $"app_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}";
-            Preferences.Set("poi_app_session_id", sid);
+            Preferences.Set("session_id", sid);
         }
         return sid;
     }

@@ -320,3 +320,22 @@ Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 1: 'ambiguous c
    at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
    at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
    at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-17T12:42:14.8116695+07:00
+Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: 'FOREIGN KEY constraint failed'.
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at System.Data.Common.DbCommand.ExecuteNonQueryAsync(CancellationToken cancellationToken)
+--- End of stack trace from previous location ---
+   at Program.<<Main>$>g__RecordUserActivityAsync|0_80(String connectionString, String sessionId, String platform, String action, String language, String deviceType, Nullable`1 poiId, Nullable`1 isRealScan, Nullable`1 duration) in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 2810
+   at Program.<<Main>$>g__RecordUserActivityAsync|0_80(String connectionString, String sessionId, String platform, String action, String language, String deviceType, Nullable`1 poiId, Nullable`1 isRealScan, Nullable`1 duration) in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 2811
+   at Program.<<Main>$>g__RecordUserActivityAsync|0_80(String connectionString, String sessionId, String platform, String action, String language, String deviceType, Nullable`1 poiId, Nullable`1 isRealScan, Nullable`1 duration) in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 2823
+   at Program.<<Main>$>g__RecordUserActivityAsync|0_80(String connectionString, String sessionId, String platform, String action, String language, String deviceType, Nullable`1 poiId, Nullable`1 isRealScan, Nullable`1 duration) in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 2823
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__27>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 704
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.<>c__DisplayClass102_2.<<HandleRequestBodyAndCompileRequestDelegateForJson>b__2>d.MoveNext()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98

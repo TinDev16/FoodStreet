@@ -286,8 +286,8 @@
 
   const trackActivity = async (action, overrideParams = {}) => {
     try {
-        const sid = localStorage.getItem('poi_session_id') || ('web_' + Date.now() + '_' + Math.random().toString(36).substring(2));
-        localStorage.setItem('poi_session_id', sid);
+        const sid = localStorage.getItem('session_id') || ('web_' + Date.now() + '_' + Math.random().toString(36).substring(2));
+        localStorage.setItem('session_id', sid);
         state.sessionId = sid;
 
         await fetch('/api/public/pois/track-activity', {
@@ -629,7 +629,7 @@
     await fetchAndRenderPoi();
 
     trackActivity('view_poi');
-    setInterval(() => trackActivity('ping'), 35000);
+    setInterval(() => trackActivity('ping'), 5000);
   };
 
   init().catch((err) => {
