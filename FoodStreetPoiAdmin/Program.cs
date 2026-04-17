@@ -733,9 +733,12 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
 
     await using var conn = await OpenConnectionAsync(connectionString);
     
-    // 1. Online now (last 10s)
+    const string VN_OFFSET = "+7 hours";
+    const string VN_TO_UTC = "-7 hours";
+
+    // 1. Online now (last 20s for robustness)
     long onlineNow = 0;
-    string onlineSql = "SELECT COUNT(DISTINCT session_id) FROM active_sessions WHERE strftime('%s', 'now') - strftime('%s', last_ping_at) <= 10";
+    string onlineSql = "SELECT COUNT(DISTINCT session_id) FROM active_sessions WHERE strftime('%s', 'now') - strftime('%s', last_ping_at) <= 20";
     if (!string.IsNullOrEmpty(platform) && platform != "all") onlineSql += " AND platform = $platform";
     await using (var cmd = new SqliteCommand(onlineSql, conn))
     {
@@ -748,15 +751,29 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         return Results.Ok(new { onlineNow });
     }
     
-    // 2. Filter logic for historical data
+    // 2. Filter logic for historical data (Index-friendly UTC boundaries)
     string dateFilter = "1=1";
-    if (period == "today") dateFilter = "date(created_at) = date('now')";
-    else if (period == "week") dateFilter = "created_at >= date('now', '-7 days')";
-    else if (period == "month") dateFilter = "created_at >= date('now', '-30 days')";
-    else if (period == "year") dateFilter = "created_at >= date('now', '-1 year')";
+    if (period == "today") 
+    {
+        dateFilter = $"created_at >= datetime('now', '{VN_OFFSET}', 'start of day', '{VN_TO_UTC}') AND created_at < datetime('now', '{VN_OFFSET}', 'start of day', '+1 day', '{VN_TO_UTC}')";
+    }
+    else if (period == "week") 
+    {
+        dateFilter = $"created_at >= datetime('now', '{VN_OFFSET}', 'start of day', '-7 days', '{VN_TO_UTC}')";
+    }
+    else if (period == "month") 
+    {
+        dateFilter = $"created_at >= datetime('now', '{VN_OFFSET}', 'start of day', '-30 days', '{VN_TO_UTC}')";
+    }
+    else if (period == "year") 
+    {
+        dateFilter = $"created_at >= datetime('now', '{VN_OFFSET}', 'start of day', '-1 year', '{VN_TO_UTC}')";
+    }
     else if (period == "custom" && !string.IsNullOrEmpty(from) && !string.IsNullOrEmpty(to))
     {
-        dateFilter = "date(created_at) >= date($from) AND date(created_at) <= date($to)";
+        // For custom range, we assume 'from' and 'to' are YYYY-MM-DD in VN timezone.
+        // Boundary: from 00:00:00 VN to 23:59:59 VN.
+        dateFilter = $"created_at >= datetime($from, '00:00:00', '{VN_TO_UTC}') AND created_at <= datetime($to, '23:59:59', '{VN_TO_UTC}')";
     }
     
     string platformFilter = (!string.IsNullOrEmpty(platform) && platform != "all") ? " AND platform = $platform" : "";
@@ -789,10 +806,10 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         }
     }
 
-    // 4. Chart Data (Grouped by Date)
+    // 4. Chart Data (Grouped by Date in VN Time)
     var chartData = new List<object>();
     string chartSql = $@"
-        SELECT date(created_at) as dt, action, COUNT(1) as c, platform
+        SELECT date(created_at, '{VN_OFFSET}') as dt, action, COUNT(1) as c, platform
         FROM user_activity_events
         WHERE {dateFilter} {platformFilter} {langFilter}
         GROUP BY dt, action, platform
@@ -815,10 +832,10 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         }
     }
 
-    // 5. Hourly Activity (0-23)
+    // 5. Hourly Activity (0-23 in VN Time)
     var hourlyData = new List<object>();
     string hourlySql = $@"
-        SELECT strftime('%H', created_at) as hr, COUNT(1) 
+        SELECT CAST(strftime('%H', created_at, '{VN_OFFSET}') AS INTEGER) as hr, COUNT(1) 
         FROM user_activity_events 
         WHERE {dateFilter} {platformFilter} {langFilter}
         GROUP BY hr ORDER BY hr ASC;";
@@ -831,22 +848,28 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync())
         {
-            hourlyData.Add(new { hour = reader.GetString(0), count = reader.GetInt64(1) });
+            hourlyData.Add(new { hour = reader.GetInt32(0).ToString("D2"), count = reader.GetInt64(1) });
         }
     }
 
-    // 6. Top POI Activity Ranking
+    // 6. Top POI Activity Ranking (Weighted Score: Scan=3, Audio=2, View=1, Exclude Ping)
     var topPois = new List<object>();
     string sortDir = (poiSort == "asc") ? "ASC" : "DESC"; // default DESC
     string poiRankLang = (!string.IsNullOrEmpty(lang) && lang != "all") ? lang : "vi";
     
+    // We use a weighted score for "Interest" instead of just raw count.
     string poiSql = $@"
-        SELECT e.poi_id, t.name, COUNT(1) as activity_count
+        SELECT e.poi_id, t.name, 
+               SUM(CASE e.action 
+                   WHEN 'scan_qr' THEN 3 
+                   WHEN 'play_audio' THEN 2 
+                   WHEN 'view_poi' THEN 1 
+                   ELSE 0 END) as score
         FROM user_activity_events e
         LEFT JOIN poi_translations t ON e.poi_id = t.poi_id AND t.lang_code = $rankLang
-        WHERE e.poi_id IS NOT NULL AND {dateFilter} {platformFilter} {langFilter}
+        WHERE e.poi_id IS NOT NULL AND action != 'ping' AND {dateFilter} {platformFilter} {langFilter}
         GROUP BY e.poi_id
-        ORDER BY activity_count {sortDir}
+        ORDER BY score {sortDir}
         LIMIT 15;";
     await using (var cmd = new SqliteCommand(poiSql, conn))
     {
