@@ -733,9 +733,9 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
 
     await using var conn = await OpenConnectionAsync(connectionString);
     
-    // 1. Online now (last 120s)
+    // 1. Online now (last 10s)
     long onlineNow = 0;
-    string onlineSql = "SELECT COUNT(DISTINCT session_id) FROM active_sessions WHERE strftime('%s', 'now') - strftime('%s', last_ping_at) <= 120";
+    string onlineSql = "SELECT COUNT(DISTINCT session_id) FROM active_sessions WHERE strftime('%s', 'now') - strftime('%s', last_ping_at) <= 10";
     if (!string.IsNullOrEmpty(platform) && platform != "all") onlineSql += " AND platform = $platform";
     await using (var cmd = new SqliteCommand(onlineSql, conn))
     {
