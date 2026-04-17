@@ -64,7 +64,6 @@ public partial class MainPage : ContentPage
     private readonly PlaceSearchService _placeSearchService;
     private readonly DeepLinkService _deepLinkService;
     private readonly PoiViewHistoryService _poiViewHistoryService;
-    private readonly AuthService _authService;
     private readonly ObservableCollection<SearchPlaceResult> _searchResults = new();
 
     private bool _isLocationSetupDone;
@@ -113,14 +112,16 @@ public partial class MainPage : ContentPage
     private const double MapMarginUpdateThresholdPx = 3;
     private const int MapMarginUpdateMinIntervalMs = 16;
 
-    public MainPage(MainViewModel viewModel, PlaceSearchService placeSearchService, DeepLinkService deepLinkService, PoiViewHistoryService poiViewHistoryService, AuthService authService)
+    private readonly PoiSyncService _poiSyncService;
+
+    public MainPage(MainViewModel viewModel, PlaceSearchService placeSearchService, DeepLinkService deepLinkService, PoiViewHistoryService poiViewHistoryService, PoiSyncService poiSyncService)
     {
         InitializeComponent();
         _viewModel = viewModel;
         _placeSearchService = placeSearchService;
         _deepLinkService = deepLinkService;
         _poiViewHistoryService = poiViewHistoryService;
-        _authService = authService;
+        _poiSyncService = poiSyncService;
         BindingContext = _viewModel;
         SearchResultsView.ItemsSource = _searchResults;
         PlaceSearchEntry.TextChanged += OnPlaceSearchTextChanged;
@@ -284,8 +285,10 @@ public partial class MainPage : ContentPage
     {
         try
         {
-            var userId = _authService.CurrentUserId;
-            await _poiViewHistoryService.RecordViewedAsync(userId, poi.Id, poi.Name, poi.ImageUrl);
+            await _poiViewHistoryService.RecordViewedAsync(PoiViewHistoryService.GuestUserId, poi.Id, poi.Name, poi.ImageUrl);
+            #pragma warning disable CS4014
+            _poiSyncService.TrackActivityAsync("view_poi", poi.Id, poi.Language);
+            #pragma warning restore CS4014
         }
         catch
         {
@@ -1786,6 +1789,10 @@ public partial class MainPage : ContentPage
         _currentPlaybackDurationSeconds = 1;
         RefreshPlaybackQueuePanel();
         SyncBottomSheetToCurrentPlayback(previousPlaybackPoi, poi);
+
+        #pragma warning disable CS4014
+        _poiSyncService.TrackActivityAsync("play_audio", poi.Id, poi.Language);
+        #pragma warning restore CS4014
 
         if (!string.IsNullOrWhiteSpace(poi.AudioUrl))
         {

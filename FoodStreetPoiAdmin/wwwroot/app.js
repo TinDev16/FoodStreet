@@ -30,6 +30,7 @@
   const ownerManageNavEl = $("#ownerManageNav");
   const userManageNavEl = $("#userManageNav");
   const qrManageNavEl = $("#qrManageNav");
+  const monitoringNavEl = $("#monitoringNav");
   const navClientPoiEl = $("#navClientPoi");
   const poiFormCardEl = $("#poiFormCard");
   const audioStatsRowsEl = $("#audioStatsRows");
@@ -530,6 +531,9 @@
     }
     if (qrManageNavEl) {
       qrManageNavEl.hidden = !roleCode;
+    }
+    if (monitoringNavEl) {
+      monitoringNavEl.hidden = !(roleCode === "superadmin" || roleCode === "owner");
     }
     if (navClientPoiEl) {
       navClientPoiEl.hidden = isOwnerRole;

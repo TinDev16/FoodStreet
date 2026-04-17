@@ -179,7 +179,7 @@ public sealed class PoiViewModel : INotifyPropertyChanged
 
     public string DistanceText => _distanceMeters <= 0 ? "--" : $"{Math.Round(_distanceMeters)} m";
 
-    public bool IsPremiumLocked => Price > 0 && !IsPaid;
+    public bool IsPremiumLocked => false;
 
     public string PriceText => Price <= 0 ? "Miễn phí" : $"{Math.Round(Price).ToString("N0")} đ";
 

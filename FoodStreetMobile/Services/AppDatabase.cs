@@ -32,7 +32,6 @@ public sealed class AppDatabase
             await connection.CreateTableAsync<PlaybackStateEntity>();
             await connection.CreateTableAsync<AppSettingEntity>();
             await connection.CreateTableAsync<PoiViewHistoryEntity>();
-            await connection.CreateTableAsync<UserProfileEntity>();
 
             // Migration: Add server_user_id if it doesn't exist
             try {

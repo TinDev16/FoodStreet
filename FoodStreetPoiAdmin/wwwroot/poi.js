@@ -40,6 +40,7 @@
     isPaid: false,
     guestUserId: 0,
     appHandOffDone: false,
+    sessionId: "",
   };
 
   const INSTALL_PROMPT_DISABLED_KEY = "poiDisableAppInstallPrompt";
@@ -281,6 +282,28 @@
     });
     if (!res.ok) throw new Error(await safeError(res));
     return res.json();
+  };
+
+  const trackActivity = async (action, overrideParams = {}) => {
+    try {
+        const sid = localStorage.getItem('poi_session_id') || ('web_' + Date.now() + '_' + Math.random().toString(36).substring(2));
+        localStorage.setItem('poi_session_id', sid);
+        state.sessionId = sid;
+
+        await fetch('/api/public/pois/track-activity', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action,
+                platform: 'web',
+                sessionId: sid,
+                language: state.lang,
+                poiId: state.poiId,
+                deviceType: 'web',
+                ...overrideParams
+            })
+        });
+    } catch(e) {}
   };
 
   const toLangCode = (raw) => {
@@ -535,6 +558,11 @@
       }
       const content = poi.ttsText || poi.description || poi.name;
       speakText(content, state.lang);
+      trackActivity('play_audio');
+    });
+
+    audioPlayerEl?.addEventListener("play", () => {
+      trackActivity('play_audio');
     });
 
     stopBtnEl.addEventListener("click", () => {
@@ -599,6 +627,9 @@
     await initLanguages();
     initEvents();
     await fetchAndRenderPoi();
+
+    trackActivity('view_poi');
+    setInterval(() => trackActivity('ping'), 35000);
   };
 
   init().catch((err) => {

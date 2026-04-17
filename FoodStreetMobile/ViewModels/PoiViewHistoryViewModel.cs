@@ -13,14 +13,12 @@ public sealed class PoiViewHistoryViewModel : INotifyPropertyChanged
 {
     private readonly PoiViewHistoryService _historyService;
     private readonly DeepLinkService _deepLinkService;
-    private readonly AuthService _authService;
     private bool _isEmpty;
 
-    public PoiViewHistoryViewModel(PoiViewHistoryService historyService, DeepLinkService deepLinkService, AuthService authService)
+    public PoiViewHistoryViewModel(PoiViewHistoryService historyService, DeepLinkService deepLinkService)
     {
         _historyService = historyService;
         _deepLinkService = deepLinkService;
-        _authService = authService;
 
         Items = new ObservableCollection<PoiViewHistoryListItem>();
         RefreshCommand = new Command(async () => await RefreshAsync());
@@ -59,8 +57,7 @@ public sealed class PoiViewHistoryViewModel : INotifyPropertyChanged
         IReadOnlyList<Models.PoiViewHistoryEntity> history;
         try
         {
-            var userId = _authService.CurrentUserId;
-            history = await _historyService.GetRecentAsync(userId, limit: 250);
+            history = await _historyService.GetRecentAsync(PoiViewHistoryService.GuestUserId, limit: 250);
         }
         catch
         {
@@ -167,8 +164,7 @@ public sealed class PoiViewHistoryViewModel : INotifyPropertyChanged
 
         try
         {
-            var userId = _authService.CurrentUserId;
-            await _historyService.ClearAsync(userId);
+            await _historyService.ClearAsync(PoiViewHistoryService.GuestUserId);
             await RefreshAsync();
         }
         catch

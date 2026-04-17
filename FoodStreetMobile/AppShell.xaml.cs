@@ -1,37 +1,16 @@
 using System.Linq;
-using FoodStreetMobile.Services;
 
 namespace FoodStreetMobile;
 
 public partial class AppShell : Shell
 {
-    private readonly AuthService _authService;
-
     public AppShell(
         MainPage mainPage,
         HomePage homePage,
-        ProfilePage profilePage,
-        AuthPage authPage,
-        RegisterPage registerPage,
-        AuthService authService)
+        ProfilePage profilePage)
     {
         InitializeComponent();
-        _authService = authService;
         FlyoutBehavior = FlyoutBehavior.Disabled;
-
-        Items.Add(new ShellContent
-        {
-            Route = "AuthPage",
-            Content = authPage,
-            Title = "Auth"
-        });
-
-        Items.Add(new ShellContent
-        {
-            Route = "RegisterPage",
-            Content = registerPage,
-            Title = "Register"
-        });
 
         var tabBar = new TabBar
         {
@@ -92,12 +71,6 @@ public partial class AppShell : Shell
     {
         try
         {
-            if (!_authService.IsLoggedIn)
-            {
-                await GoToAsync("//AuthPage");
-                return;
-            }
-
             NavigateToMainTabsTab(0);
         }
         catch

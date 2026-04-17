@@ -9,7 +9,6 @@
 
     <ScrollView>
         <VerticalStackLayout Padding="24,40,24,24" Spacing="20">
-            <!-- Header -->
             <VerticalStackLayout Spacing="8" Margin="0,0,0,8">
                 <Label Text="👤" FontSize="48" HorizontalOptions="Center" />
                 <Label Text="{loc:Translate Key=Profile_AccountHeader}"
@@ -19,126 +18,6 @@
                        HorizontalTextAlignment="Center" />
             </VerticalStackLayout>
 
-            <Label Text="{Binding StatusMessage}"
-                   TextColor="#DC2626"
-                   FontAttributes="Bold"
-                   FontSize="14"
-                   HorizontalTextAlignment="Center" />
-
-            <!-- Chưa đăng nhập -->
-            <Border Padding="20"
-                    BackgroundColor="White"
-                    Stroke="#FFEDD5"
-                    StrokeThickness="2"
-                    StrokeShape="RoundRectangle 20"
-                    IsVisible="{Binding IsNotLoggedIn}">
-                <Border.Shadow>
-                    <Shadow Brush="Black" Offset="0,4" Radius="12" Opacity="0.08" />
-                </Border.Shadow>
-                <VerticalStackLayout Spacing="16">
-                    <Label Text="{loc:Translate Key=Profile_NotSignedIn}"
-                           FontSize="16"
-                           TextColor="#1C1917"
-                           HorizontalTextAlignment="Center" />
-                    <Button Text="{loc:Translate Key=Profile_GoLogin}"
-                            Command="{Binding GoToLoginCommand}"
-                            BackgroundColor="#EA580C"
-                            TextColor="White"
-                            FontAttributes="Bold"
-                            CornerRadius="14"
-                            HeightRequest="50" />
-                </VerticalStackLayout>
-            </Border>
-
-            <!-- Thông tin cá nhân -->
-            <VerticalStackLayout Spacing="20" IsVisible="{Binding IsLoggedIn}">
-                
-                <!-- Personal Info Card -->
-                <Border Padding="20"
-                        BackgroundColor="White"
-                        Stroke="#FFEDD5"
-                        StrokeThickness="2"
-                        StrokeShape="RoundRectangle 20">
-                    <Border.Shadow>
-                        <Shadow Brush="Black" Offset="0,4" Radius="12" Opacity="0.08" />
-                    </Border.Shadow>
-                    
-                    <VerticalStackLayout Spacing="16">
-                        <Label Text="{loc:Translate Key=Profile_PersonalInfo}"
-                               FontSize="20"
-                               FontAttributes="Bold"
-                               TextColor="#1C1917" />
-
-                        <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="12">
-                            <!-- Username -->
-                            <Label Grid.Row="0" Grid.Column="0" FontSize="15" TextColor="#78716C" Text="{loc:Translate Key=Profile_FieldUsername}" VerticalOptions="Center" />
-                            <Label Grid.Row="0" Grid.Column="1" FontSize="16" FontAttributes="Bold" TextColor="#1C1917" Text="{Binding ProfileUsername}" VerticalOptions="Center" HorizontalTextAlignment="End" LineBreakMode="TailTruncation" />
-                            
-                            <!-- Full Name -->
-                            <Label Grid.Row="1" Grid.Column="0" FontSize="15" TextColor="#78716C" Text="{loc:Translate Key=Profile_FieldFullName}" VerticalOptions="Center" />
-                            <Label Grid.Row="1" Grid.Column="1" FontSize="16" FontAttributes="Bold" TextColor="#1C1917" Text="{Binding ProfileFullName}" VerticalOptions="Center" HorizontalTextAlignment="End" LineBreakMode="WordWrap" />
-                            
-                            <!-- Phone -->
-                            <Label Grid.Row="2" Grid.Column="0" FontSize="15" TextColor="#78716C" Text="{loc:Translate Key=Profile_FieldPhone}" VerticalOptions="Center" />
-                            <Label Grid.Row="2" Grid.Column="1" FontSize="16" FontAttributes="Bold" TextColor="#1C1917" Text="{Binding ProfilePhone}" VerticalOptions="Center" HorizontalTextAlignment="End" />
-                        </Grid>
-                    </VerticalStackLayout>
-                </Border>
-
-                <!-- Change Password Card -->
-                <Border Padding="20"
-                        BackgroundColor="White"
-                        Stroke="#FFEDD5"
-                        StrokeThickness="2"
-                        StrokeShape="RoundRectangle 20">
-                    <Border.Shadow>
-                        <Shadow Brush="Black" Offset="0,4" Radius="12" Opacity="0.08" />
-                    </Border.Shadow>
-                    
-                    <VerticalStackLayout Spacing="16">
-                        <Label Text="{loc:Translate Key=Profile_ChangePassword}"
-                               FontSize="18"
-                               FontAttributes="Bold"
-                               TextColor="#1C1917" />
-                               
-                        <Entry Text="{Binding CurrentPassword}"
-                               Placeholder="{loc:Translate Key=Profile_CurrentPassword}"
-                               IsPassword="True"
-                               TextColor="#1C1917"
-                               PlaceholderColor="#A8A29E"
-                               HeightRequest="50"
-                               ClearButtonVisibility="WhileEditing" />
-                               
-                        <Entry Text="{Binding NewPassword}"
-                               Placeholder="{loc:Translate Key=Profile_NewPassword}"
-                               IsPassword="True"
-                               TextColor="#1C1917"
-                               PlaceholderColor="#A8A29E"
-                               HeightRequest="50"
-                               ClearButtonVisibility="WhileEditing" />
-                               
-                        <Entry Text="{Binding ConfirmPassword}"
-                               Placeholder="{loc:Translate Key=Profile_ConfirmPassword}"
-                               IsPassword="True"
-                               TextColor="#1C1917"
-                               PlaceholderColor="#A8A29E"
-                               HeightRequest="50"
-                               ClearButtonVisibility="WhileEditing" />
-                               
-                        <Button Text="{loc:Translate Key=Profile_SubmitPassword}"
-                                Command="{Binding ChangePasswordCommand}"
-                                BackgroundColor="#10B981"
-                                TextColor="White"
-                                FontAttributes="Bold"
-                                FontSize="16"
-                                CornerRadius="12"
-                                HeightRequest="50"
-                                Margin="0,4,0,0" />
-                    </VerticalStackLayout>
-                </Border>
-            </VerticalStackLayout>
-
-            <!-- Language Section -->
             <Border Padding="20"
                     BackgroundColor="White"
                     Stroke="#FFEDD5"
@@ -147,7 +26,26 @@
                 <Border.Shadow>
                     <Shadow Brush="Black" Offset="0,4" Radius="12" Opacity="0.08" />
                 </Border.Shadow>
-                
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="Chế độ sử dụng"
+                           FontSize="18"
+                           FontAttributes="Bold"
+                           TextColor="#1C1917" />
+                    <Label Text="{Binding StatusMessage}"
+                           FontSize="15"
+                           TextColor="#57534E" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Padding="20"
+                    BackgroundColor="White"
+                    Stroke="#FFEDD5"
+                    StrokeThickness="2"
+                    StrokeShape="RoundRectangle 20">
+                <Border.Shadow>
+                    <Shadow Brush="Black" Offset="0,4" Radius="12" Opacity="0.08" />
+                </Border.Shadow>
+
                 <VerticalStackLayout Spacing="12">
                     <Label Text="{loc:Translate Key=Profile_LanguageLabel}"
                            FontSize="18"
@@ -166,7 +64,6 @@
                 </VerticalStackLayout>
             </Border>
 
-            <!-- Settings / App Info -->
             <Border Padding="20"
                     BackgroundColor="White"
                     Stroke="#FFEDD5"
@@ -175,7 +72,7 @@
                 <Border.Shadow>
                     <Shadow Brush="Black" Offset="0,4" Radius="12" Opacity="0.08" />
                 </Border.Shadow>
-                
+
                 <Grid ColumnDefinitions="*,Auto" VerticalOptions="Center">
                     <Label Text="{loc:Translate Key=Profile_PoiHistory}"
                            FontSize="18"
@@ -194,19 +91,6 @@
                     </Grid.GestureRecognizers>
                 </Grid>
             </Border>
-
-            <!-- Logout Button -->
-            <Button Text="{loc:Translate Key=Profile_Logout}"
-                    Command="{Binding LogoutCommand}"
-                    IsVisible="{Binding IsLoggedIn}"
-                    BackgroundColor="#EF4444"
-                    TextColor="White"
-                    FontAttributes="Bold"
-                    FontSize="16"
-                    CornerRadius="14"
-                    HeightRequest="54"
-                    Margin="0,8,0,24" />
-
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>

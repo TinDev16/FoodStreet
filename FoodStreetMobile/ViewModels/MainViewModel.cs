@@ -243,27 +243,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public async Task<(bool Ok, string Message)> UnlockPoiAsync(string poiId)
     {
-        try
-        {
-            var unlocked = await _poiSyncService.UnlockPoiAsync(poiId);
-            if (!unlocked)
-            {
-                var error = string.IsNullOrWhiteSpace(_poiSyncService.LastError)
-                    ? "Không thể mở khóa POI lúc này."
-                    : _poiSyncService.LastError!;
-                return (false, error);
-            }
-
-            await ReloadPoisAsync(_currentLanguage);
-            return (true, "Mở khóa thành công.");
-        }
-        catch (Exception ex)
-        {
-            var fallback = string.IsNullOrWhiteSpace(ex.Message)
-                ? "Đã xảy ra lỗi không mong muốn khi mở khóa."
-                : ex.Message;
-            return (false, fallback);
-        }
+        _ = poiId;
+        await Task.CompletedTask;
+        return (true, "Ung dung hien khong con yeu cau dang nhap hay mo khoa POI.");
     }
 
     private static string BuildDeterministicPoiId(string shopName, double latitude, double longitude)
@@ -508,3 +490,4 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private void OnPropertyChanged([CallerMemberName] string? name = null)
         => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
+

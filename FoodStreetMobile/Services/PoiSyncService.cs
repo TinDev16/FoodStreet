@@ -1,4 +1,3 @@
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using FoodStreetMobile.Models;
 using Microsoft.Maui.Storage;
@@ -8,7 +7,6 @@ namespace FoodStreetMobile.Services;
 
 public sealed class PoiSyncService
 {
-    public const string MobileJwtPreferenceKey = "mobile_auth_jwt";
 
     private const string BaseUrlsPreferenceKey = "admin_base_urls";
     private static readonly SemaphoreSlim _syncLock = new(1, 1);
@@ -31,22 +29,8 @@ public sealed class PoiSyncService
         Preferences.Set(BaseUrlsPreferenceKey, normalized);
     }
 
-    public void SetMobileJwtToken(string? token)
-    {
-        Preferences.Set(MobileJwtPreferenceKey, token ?? string.Empty);
-    }
-
     public IReadOnlyList<string> GetPreferredBaseUrlsSnapshot()
         => GetPreferredBaseUrls().ToList();
-
-    private void AttachBearerIfAny(HttpRequestMessage request)
-    {
-        var token = Preferences.Get(MobileJwtPreferenceKey, string.Empty);
-        if (!string.IsNullOrWhiteSpace(token))
-        {
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        }
-    }
 
     public async Task<bool> TrySyncAsync(string? languageCode = null)
     {
@@ -121,7 +105,6 @@ public sealed class PoiSyncService
         try
         {
             using var req = new HttpRequestMessage(HttpMethod.Get, endpoint);
-            AttachBearerIfAny(req);
             using var res = await _httpClient.SendAsync(req);
             if (res.IsSuccessStatusCode)
             {
@@ -139,7 +122,6 @@ public sealed class PoiSyncService
 
         var legacyEndpoint = $"{baseUrl}/api/shops?lang={Uri.EscapeDataString(requestedLang)}";
         using var legacyReq = new HttpRequestMessage(HttpMethod.Get, legacyEndpoint);
-        AttachBearerIfAny(legacyReq);
         using var legacyRes = await _httpClient.SendAsync(legacyReq);
         if (!legacyRes.IsSuccessStatusCode)
         {
@@ -255,94 +237,6 @@ public sealed class PoiSyncService
         }
 
         return false;
-    }
-
-    public async Task<bool> UnlockPoiAsync(string poiId)
-    {
-        if (string.IsNullOrWhiteSpace(poiId))
-        {
-            LastError = "POI không hợp lệ.";
-            return false;
-        }
-
-        var normalizedPoiId = poiId.Trim();
-        if (!long.TryParse(normalizedPoiId, out _))
-        {
-            LastError = "POI này chưa hỗ trợ mở khóa (id không hợp lệ).";
-            return false;
-        }
-
-        var token = Preferences.Get(MobileJwtPreferenceKey, string.Empty);
-        if (string.IsNullOrWhiteSpace(token))
-        {
-            LastError = "Bạn cần đăng nhập tài khoản mobile để mở khóa.";
-            return false;
-        }
-
-        LastError = null;
-        var errors = new List<string>();
-        foreach (var baseUrl in GetPreferredBaseUrls())
-        {
-            try
-            {
-                using var req = new HttpRequestMessage(
-                    HttpMethod.Post,
-                    $"{baseUrl}/api/mobile/pois/{Uri.EscapeDataString(normalizedPoiId)}/unlock");
-                req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-                using var response = await _httpClient.SendAsync(req);
-                if (!response.IsSuccessStatusCode)
-                {
-                    var detail = await ReadApiErrorAsync(response);
-                    errors.Add($"{baseUrl}: {(int)response.StatusCode} {detail}");
-                    continue;
-                }
-
-                var connection = await _database.GetConnectionAsync();
-                await connection.ExecuteAsync("UPDATE pois SET is_paid = 1 WHERE id = ?;", normalizedPoiId);
-                _lastSuccessfulBaseUrl = baseUrl;
-                LastError = null;
-                return true;
-            }
-            catch (Exception ex)
-            {
-                errors.Add($"{baseUrl}: {ex.Message}");
-            }
-        }
-
-        if (errors.Count > 0)
-        {
-            LastError = string.Join(" | ", errors);
-        }
-
-        return false;
-    }
-
-    private static async Task<string> ReadApiErrorAsync(HttpResponseMessage response)
-    {
-        try
-        {
-            var body = await response.Content.ReadAsStringAsync();
-            if (string.IsNullOrWhiteSpace(body))
-            {
-                return response.ReasonPhrase ?? "Unknown error";
-            }
-
-            using var doc = System.Text.Json.JsonDocument.Parse(body);
-            if (doc.RootElement.TryGetProperty("error", out var errorNode))
-            {
-                var apiError = errorNode.GetString();
-                if (!string.IsNullOrWhiteSpace(apiError))
-                {
-                    return apiError;
-                }
-            }
-        }
-        catch
-        {
-            // Ignore parser errors and fallback to reason phrase.
-        }
-
-        return response.ReasonPhrase ?? "Unknown error";
     }
 
     private async Task ApplyRemoteDataAsync(string baseUrl, string requestedLang, IReadOnlyList<PoiSyncDto> pois)
@@ -582,6 +476,48 @@ public sealed class PoiSyncService
         return $"{baseUrl}{value}";
     }
 
+    public string GetSessionId()
+    {
+        var sid = Preferences.Get("poi_app_session_id", string.Empty);
+        if (string.IsNullOrWhiteSpace(sid))
+        {
+            sid = $"app_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}_{Guid.NewGuid():N}";
+            Preferences.Set("poi_app_session_id", sid);
+        }
+        return sid;
+    }
+
+    public async Task TrackActivityAsync(string action, string? poiId = null, string langCode = "vi", int? duration = null)
+    {
+        var sid = GetSessionId();
+        foreach (var baseUrl in GetPreferredBaseUrls())
+        {
+            try
+            {
+                var endpoint = $"{baseUrl}/api/public/pois/track-activity";
+                var payload = new
+                {
+                    action = action,
+                    platform = "app",
+                    sessionId = sid,
+                    language = langCode,
+                    poiId = poiId,
+                    deviceType = "mobile",
+                    duration = duration
+                };
+                var response = await _httpClient.PostAsJsonAsync(endpoint, payload);
+                if (response.IsSuccessStatusCode)
+                {
+                    return;
+                }
+            }
+            catch
+            {
+                // Ignore and try next
+            }
+        }
+    }
+
     public sealed class ShopUpsertRequest
     {
         public string? Id { get; set; }
@@ -676,3 +612,5 @@ public sealed class PoiSyncService
         return candidates.FirstOrDefault();
     }
 }
+
+

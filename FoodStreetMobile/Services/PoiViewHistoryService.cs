@@ -4,6 +4,8 @@ namespace FoodStreetMobile.Services;
 
 public sealed class PoiViewHistoryService
 {
+    public const long GuestUserId = 0;
+
     private readonly AppDatabase _database;
 
     public PoiViewHistoryService(AppDatabase database)

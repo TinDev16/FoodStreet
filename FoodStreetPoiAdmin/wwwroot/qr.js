@@ -11,6 +11,7 @@
   const ownerManageNavEl = $("#ownerManageNav");
   const userManageNavEl = $("#userManageNav");
   const qrManageNavEl = $("#qrManageNav");
+  const monitoringNavEl = $("#monitoringNav");
 
   const qrFormEl = $("#qrForm");
   const qrStatusEl = $("#qrStatus");
@@ -121,6 +122,9 @@
     }
     if (qrManageNavEl) {
       qrManageNavEl.hidden = !roleCode;
+    }
+    if (monitoringNavEl) {
+      monitoringNavEl.hidden = !(roleCode === "superadmin" || roleCode === "owner");
     }
   };
 

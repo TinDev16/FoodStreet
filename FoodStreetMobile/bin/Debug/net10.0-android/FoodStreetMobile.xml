@@ -10,26 +10,6 @@
             Tránh dùng URI //MainTabs/... — trên Android dễ gây lỗi khi đổi từ màn Auth.
             </summary>
         </member>
-        <member name="T:FoodStreetMobile.Models.UserProfileEntity">
-            <summary>
-            Bản ghi cache tài khoản đăng nhập trên thiết bị (một hàng, Id = 1).
-            </summary>
-        </member>
-        <member name="T:FoodStreetMobile.Services.AuthService">
-            <summary>
-            Đăng ký / đăng nhập / đăng xuất qua API server; lưu JWT và cache hồ sơ cục bộ (SQLite).
-            </summary>
-        </member>
-        <member name="M:FoodStreetMobile.Services.AuthService.GetApiBaseUrl">
-            <summary>
-            URL API đã lưu sau đăng nhập (ưu tiên cấu hình sync, sau đó base thành công gần nhất).
-            </summary>
-        </member>
-        <member name="M:FoodStreetMobile.Services.AuthService.FormatAuthNetworkError(System.Exception)">
-            <summary>
-            Thông báo thân thiện thay cho chuỗi tiếng Anh của HttpClient (timeout, không kết nối được).
-            </summary>
-        </member>
         <member name="T:FoodStreetMobile.Services.ToastNotificationService">
             <summary>
             Thông báo nổi (toast) ở cuối màn hình — dùng cho đăng nhập/đăng ký và lỗi mạng.
