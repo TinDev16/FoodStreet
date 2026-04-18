@@ -29,10 +29,6 @@
           <i class="fa-solid fa-chart-line"></i>
           <span>Hoạt động Hệ thống</span>
         </a>
-        <a href="/stats.html" class="nav-item" id="navAudioStats">
-          <i class="fa-solid fa-chart-column"></i>
-          <span>Thống kê lượt phát Audio</span>
-        </a>
         <a href="/owner.html" class="nav-item" id="ownerManageNav" hidden>
           <i class="fa-solid fa-user-shield"></i>
           <span>Quản lý Owner</span>
@@ -259,49 +255,6 @@
                   </tr>
                 </thead>
                 <tbody id="deletedPoiRows"></tbody>
-              </table>
-            </div>
-          </section>
-
-          <section class="card span-2" id="audioStatsCard" hidden>
-            <header class="card-header">
-              <div class="card-title">
-                <i class="fa-solid fa-chart-column"></i>
-                <h2>Thống kê lượt phát Audio</h2>
-              </div>
-              <div class="header-actions filters-toolbar">
-                <label>
-                  Từ ngày
-                  <input type="date" id="audioStatsFrom" />
-                </label>
-                <label>
-                  Đến ngày
-                  <input type="date" id="audioStatsTo" />
-                </label>
-                <label>
-                  Sắp xếp
-                  <select id="audioStatsSort">
-                    <option value="desc">Nhiều đến ít</option>
-                    <option value="asc">Ít đến nhiều</option>
-                  </select>
-                </label>
-                <button type="button" id="audioStatsReloadBtn" class="secondary">
-                  <i class="fa-solid fa-rotate-right"></i> Tải lại
-                </button>
-              </div>
-            </header>
-            <div class="stats-summary" id="audioStatsSummary">Chưa có dữ liệu.</div>
-            <div class="table-responsive">
-              <table>
-                <thead>
-                  <tr>
-                    <th width="90">POI ID</th>
-                    <th>Tên POI</th>
-                    <th width="140">Lượt phát</th>
-                    <th width="220">Lần phát gần nhất</th>
-                  </tr>
-                </thead>
-                <tbody id="audioStatsRows"></tbody>
               </table>
             </div>
           </section>

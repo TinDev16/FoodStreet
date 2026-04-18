@@ -159,8 +159,8 @@ async function loadDashboard() {
     });
     
     if (res.status === 401 || res.status === 403) {
-      localStorage.removeItem('poi_admin_token');
-      window.location.replace('/stats.html');
+      localStorage.removeItem('adminToken');
+      window.location.replace('/');
       return;
     }
 

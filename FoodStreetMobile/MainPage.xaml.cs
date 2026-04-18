@@ -1656,32 +1656,6 @@ public partial class MainPage : ContentPage
         return refreshed;
     }
 
-    private async Task TryRecordAudioPlayAsync(PoiViewModel poi)
-    {
-        if (poi is null || string.IsNullOrWhiteSpace(poi.Id))
-        {
-            return;
-        }
-
-        foreach (var baseUrl in GetConfiguredBackendBaseUrls())
-        {
-            try
-            {
-                using var request = new HttpRequestMessage(
-                    HttpMethod.Post,
-                    $"{baseUrl}/api/pois/{Uri.EscapeDataString(poi.Id)}/audio-play");
-                using var response = await HttpClient.SendAsync(request);
-                if (response.IsSuccessStatusCode)
-                {
-                    return;
-                }
-            }
-            catch
-            {
-                // Ignore logging failures so audio playback still starts immediately.
-            }
-        }
-    }
 
     private IEnumerable<string> GetConfiguredBackendBaseUrls()
     {
@@ -1807,7 +1781,6 @@ public partial class MainPage : ContentPage
                 return;
             }
 
-            _ = TryRecordAudioPlayAsync(poi);
             _currentPlaybackSource = PlaybackSourceKind.AudioWeb;
             ShowAudioPlayerHtml(BuildAudioPlayerHtml(audioUri.ToString()));
             return;
@@ -1820,7 +1793,6 @@ public partial class MainPage : ContentPage
             return;
         }
 
-        _ = TryRecordAudioPlayAsync(poi);
         _currentPlaybackSource = PlaybackSourceKind.TtsNative;
         await StartTtsPlayerAsync(narration);
     }

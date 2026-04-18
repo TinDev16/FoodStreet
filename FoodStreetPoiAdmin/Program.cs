@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.HttpOverrides;
+﻿using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Data.Sqlite;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -447,57 +447,6 @@ app.MapGet("/api/pois/admin", async (HttpContext context) =>
     await TryEnsureAdbReverseAsync();
     var items = await GetPoisForAdminListAsync(connectionString, actor);
     return Results.Ok(items);
-}).RequireAuthorization();
-
-app.MapGet("/api/admin/reports/audio-plays", async (HttpContext context) =>
-{
-    if (!TryGetAdminActor(context.User, out var actor))
-    {
-        return Results.Unauthorized();
-    }
-
-    await TryEnsureAdbReverseAsync();
-
-    var sort = NormalizeAudioPlaySort(context.Request.Query["sort"].ToString());
-    var fromDate = ParseDateOnlyFilter(context.Request.Query["from"].ToString());
-    var toDate = ParseDateOnlyFilter(context.Request.Query["to"].ToString());
-    if (!string.IsNullOrWhiteSpace(context.Request.Query["from"]) && fromDate is null)
-    {
-        return Results.BadRequest(new { error = "Gia tri 'from' khong hop le. Dinh dang dung: yyyy-MM-dd." });
-    }
-
-    if (!string.IsNullOrWhiteSpace(context.Request.Query["to"]) && toDate is null)
-    {
-        return Results.BadRequest(new { error = "Gia tri 'to' khong hop le. Dinh dang dung: yyyy-MM-dd." });
-    }
-
-    // Filter dates are VN local (UTC+7). Convert to UTC ISO strings that match
-    // how poi_audio_play_events.created_at is stored (DateTimeOffset.UtcNow.ToString("O")).
-    var vnTz = GetVnTimeZone();
-    string? fromUtc = null;
-    string? toExclusiveUtc = null;
-    if (fromDate is DateOnly f)
-    {
-        var fromLocal = new DateTimeOffset(f.Year, f.Month, f.Day, 0, 0, 0, vnTz.GetUtcOffset(DateTimeOffset.UtcNow));
-        fromUtc = fromLocal.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
-    }
-    if (toDate is DateOnly t)
-    {
-        var nextDay = t.AddDays(1);
-        var toLocalExclusive = new DateTimeOffset(nextDay.Year, nextDay.Month, nextDay.Day, 0, 0, 0, vnTz.GetUtcOffset(DateTimeOffset.UtcNow));
-        toExclusiveUtc = toLocalExclusive.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
-    }
-    var items = await GetPoiAudioPlayStatsAsync(connectionString, actor, fromUtc, toExclusiveUtc, sort);
-    return Results.Ok(new
-    {
-        items,
-        filter = new
-        {
-            from = fromDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-            to = toDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-            sort
-        }
-    });
 }).RequireAuthorization();
 
 // Admin: load core + all translations with ownership filter.
@@ -1219,18 +1168,6 @@ app.MapPost("/api/pois/{id}/restore", async (HttpContext context, string id) =>
     return restored ? Results.Ok(new { id, restored = true }) : Results.NotFound();
 }).RequireAuthorization();
 
-app.MapPost("/api/pois/{id}/audio-play", async (string id) =>
-{
-    await TryEnsureAdbReverseAsync();
-    if (!TryParsePoiId(id, out var poiId))
-    {
-        return Results.BadRequest(new { error = "Invalid id." });
-    }
-
-    var recorded = await RecordPoiAudioPlayAsync(connectionString, poiId);
-    return recorded ? Results.Ok(new { id, recorded = true }) : Results.NotFound();
-});
-
 // Legacy endpoints for older mobile build.
 app.MapGet("/api/shops", async (HttpContext context) =>
 {
@@ -1483,9 +1420,6 @@ static DateOnly? ParseDateOnlyFilter(string? raw)
         ? value
         : null;
 }
-
-static string NormalizeAudioPlaySort(string? raw)
-    => string.Equals(raw, "asc", StringComparison.OrdinalIgnoreCase) ? "asc" : "desc";
 
 async Task<(string? BaseUrl, string? Error)> ResolvePublicBaseUrlForRequestAsync(HttpContext context)
 {
@@ -1810,15 +1744,6 @@ static async Task InitializeDatabaseAsync(string connectionString)
     }
 
     await using (var createUsers = new SqliteCommand("""
-        CREATE TABLE IF NOT EXISTS poi_audio_play_events (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            poi_id INTEGER NOT NULL,
-            created_at TEXT NOT NULL,
-            FOREIGN KEY(poi_id) REFERENCES pois(id) ON DELETE CASCADE
-        );
-        CREATE INDEX IF NOT EXISTS ix_poi_audio_play_events_poi_created_at ON poi_audio_play_events(poi_id, created_at DESC);
-        CREATE INDEX IF NOT EXISTS ix_poi_audio_play_events_created_at ON poi_audio_play_events(created_at DESC);
-
         CREATE TABLE IF NOT EXISTS active_sessions (
             session_id TEXT PRIMARY KEY,
             last_ping_at TEXT NOT NULL,
@@ -1843,6 +1768,7 @@ static async Task InitializeDatabaseAsync(string connectionString)
         CREATE INDEX IF NOT EXISTS ix_user_activity_events_poi_id ON user_activity_events(poi_id);
         CREATE INDEX IF NOT EXISTS ix_user_activity_events_action ON user_activity_events(action);
         CREATE INDEX IF NOT EXISTS ix_user_activity_events_platform ON user_activity_events(platform);
+        CREATE INDEX IF NOT EXISTS ix_user_activity_events_action_created_at ON user_activity_events(action, created_at DESC);
         """, connection))
     {
         await createUsers.ExecuteNonQueryAsync();
@@ -2165,32 +2091,6 @@ static async Task<bool> HasPoiAccessAsync(SqliteConnection connection, long poiI
     return await ownerCheck.ExecuteScalarAsync() is not null;
 }
 
-static async Task<bool> RecordPoiAudioPlayAsync(string connectionString, long poiId)
-{
-    await using var connection = await OpenConnectionAsync(connectionString);
-    await using var existsCommand = new SqliteCommand("""
-        SELECT 1
-        FROM pois
-        WHERE id = $id
-          AND COALESCE(is_deleted, 0) = 0
-        LIMIT 1;
-        """, connection);
-    existsCommand.Parameters.AddWithValue("$id", poiId);
-    if (await existsCommand.ExecuteScalarAsync() is null)
-    {
-        return false;
-    }
-
-    await using var insert = new SqliteCommand("""
-        INSERT INTO poi_audio_play_events (poi_id, created_at)
-        VALUES ($poiId, $createdAt);
-        """, connection);
-    insert.Parameters.AddWithValue("$poiId", poiId);
-    insert.Parameters.AddWithValue("$createdAt", DateTimeOffset.UtcNow.ToString("O"));
-    await insert.ExecuteNonQueryAsync();
-    return true;
-}
-
 static async Task<bool> AssignOwnerToPoiAsync(string connectionString, long poiId, long? ownerId)
 {
     await using var connection = await OpenConnectionAsync(connectionString);
@@ -2272,62 +2172,12 @@ static async Task<List<PoiMobileDto>> GetPoisForMobileAsync(string connectionStr
     return result;
 }
 
-static async Task<List<PoiAudioPlayStatDto>> GetPoiAudioPlayStatsAsync(
-    string connectionString,
-    AdminActor actor,
-    string? fromUtc,
-    string? toExclusiveUtc,
-    string sort)
-{
-    await using var connection = await OpenConnectionAsync(connectionString);
-    var countOrder = string.Equals(sort, "asc", StringComparison.OrdinalIgnoreCase) ? "ASC" : "DESC";
-    var sql = $"""
-        SELECT
-            p.id,
-            COALESCE(NULLIF(t_vi.name, ''), '') AS name_vi,
-            COUNT(e.id) AS play_count,
-            MAX(e.created_at) AS last_played_at
-        FROM pois p
-        LEFT JOIN poi_translations t_vi ON p.id = t_vi.poi_id AND t_vi.lang_code = 'vi'
-        LEFT JOIN poi_audio_play_events e ON e.poi_id = p.id
-            AND ($fromUtc IS NULL OR e.created_at >= $fromUtc)
-            AND ($toExclusiveUtc IS NULL OR e.created_at < $toExclusiveUtc)
-        WHERE COALESCE(p.is_deleted, 0) = 0
-        {(IsOwner(actor) ? "AND p.owner_admin_id = $ownerId" : string.Empty)}
-        GROUP BY p.id, name_vi
-        ORDER BY play_count {countOrder}, p.id ASC;
-        """;
-
-    var result = new List<PoiAudioPlayStatDto>();
-    await using var command = new SqliteCommand(sql, connection);
-    command.Parameters.AddWithValue("$fromUtc", string.IsNullOrWhiteSpace(fromUtc) ? DBNull.Value : fromUtc);
-    command.Parameters.AddWithValue("$toExclusiveUtc", string.IsNullOrWhiteSpace(toExclusiveUtc) ? DBNull.Value : toExclusiveUtc);
-    if (IsOwner(actor))
-    {
-        command.Parameters.AddWithValue("$ownerId", actor.Id);
-    }
-
-    await using var reader = await command.ExecuteReaderAsync();
-    while (await reader.ReadAsync())
-    {
-        result.Add(new PoiAudioPlayStatDto
-        {
-            PoiId = reader.GetInt64(0).ToString(CultureInfo.InvariantCulture),
-            PoiName = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
-            PlayCount = reader.IsDBNull(2) ? 0 : reader.GetInt64(2),
-            LastPlayedAt = reader.IsDBNull(3) ? null : reader.GetString(3)
-        });
-    }
-
-    return result;
-}
-
 static async Task<List<FeaturedPoiDto>> GetFeaturedPoisForPublicAsync(string connectionString, string requestedLang, int limit)
 {
     await using var connection = await OpenConnectionAsync(connectionString);
-    
-    // We use a weighted score from ALL user activities in the last 7 days.
-    // If no activities are found, it falls back to manually set priority and then ID.
+
+    // Popularity = total count of user interactions (scan_qr, play_audio, view_poi) in the last 7 days.
+    // 'ping' heartbeat events are explicitly excluded. Falls back to manually set priority then ID.
     const string sql = """
         SELECT
             p.id,
@@ -2338,12 +2188,7 @@ static async Task<List<FeaturedPoiDto>> GetFeaturedPoisForPublicAsync(string con
         LEFT JOIN (
             SELECT
                 poi_id,
-                SUM(CASE
-                    WHEN action = 'scan_qr' THEN 4
-                    WHEN action = 'play_audio' THEN 3
-                    WHEN action = 'view_poi' THEN 1
-                    ELSE 0
-                END) AS score
+                COUNT(1) AS score
             FROM user_activity_events
             WHERE created_at >= $utcLookback
               AND action IN ('scan_qr', 'play_audio', 'view_poi')
@@ -2920,10 +2765,7 @@ static async Task<bool> RecordUserActivityAsync(
         await upsertSession.ExecuteNonQueryAsync();
     }
 
-    // Only "ping" updates session. We log it in events too but we don't strictly have to. Wait, User asked to log everything into user_activity_events? 
-    // "Ping -> update bảng này. Không lưu ping spam. Không query trực tiếp từ event table."
-    // Yes, we log ping but throttled (checked above).
-    
+    // All activity (including throttled ping) is logged to user_activity_events for unified reporting.
     await using (var insertEvent = new SqliteCommand("""
         INSERT INTO user_activity_events (poi_id, session_id, platform, action, language, device_type, is_real_scan, duration, created_at)
         VALUES ($poi, $sid, $platform, $action, $lang, $device, $isReal, $duration, $now);
@@ -2941,19 +2783,9 @@ static async Task<bool> RecordUserActivityAsync(
         await insertEvent.ExecuteNonQueryAsync();
     }
 
-    if (action == "play_audio" && poiId.HasValue)
-    {
-        // For backwards compatibility and fast query if needed
-        await using var legacyAudio = new SqliteCommand("INSERT INTO poi_audio_play_events (poi_id, created_at) VALUES ($poi, $now);", connection, (SqliteTransaction)transaction);
-        legacyAudio.Parameters.AddWithValue("$poi", poiId.Value);
-        legacyAudio.Parameters.AddWithValue("$now", nowUtc);
-        await legacyAudio.ExecuteNonQueryAsync();
-    }
-
     await transaction.CommitAsync();
     return true;
 }
-
 
 enum DeletePoiResult
 {
@@ -3018,14 +2850,6 @@ sealed class PoiAdminListItemDto
     public string? OwnerAdminId { get; set; }
     public string OwnerUsername { get; set; } = string.Empty;
     public string OwnerFullName { get; set; } = string.Empty;
-}
-
-sealed class PoiAudioPlayStatDto
-{
-    public string PoiId { get; set; } = string.Empty;
-    public string PoiName { get; set; } = string.Empty;
-    public long PlayCount { get; set; }
-    public string? LastPlayedAt { get; set; }
 }
 
 sealed class FeaturedPoiDto
