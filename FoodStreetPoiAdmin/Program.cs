@@ -868,9 +868,12 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
     // 5. Hourly Activity (0-23 in VN Time). When a specific action is selected
     // (via ?action=audio|qr|view|online), only count that action. Otherwise
     // default to all interactions excluding 'ping' heartbeats.
+    // Special case: for 'ping' (Online) we count DISTINCT sessions so the bar
+    // reflects the number of unique online users per hour (not raw heartbeats).
     var hourlyData = new List<object>();
+    string hourlyCountExpr = (actionFilterValue == "ping") ? "COUNT(DISTINCT session_id)" : "COUNT(1)";
     string hourlySql = $@"
-        SELECT CAST(strftime('%H', created_at, '{VN_OFFSET}') AS INTEGER) as hr, COUNT(1) 
+        SELECT CAST(strftime('%H', created_at, '{VN_OFFSET}') AS INTEGER) as hr, {hourlyCountExpr}
         FROM user_activity_events 
         WHERE {actionClauseSpecific} AND {dateFilter} {platformFilter} {langFilter}
         GROUP BY hr ORDER BY hr ASC;";
@@ -890,28 +893,31 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
 
     // 6. Top POI Ranking. Default view uses a weighted score (Scan=3, Audio=2, View=1).
     // When a specific action is selected, rank by raw count of that action only.
+    // For 'ping' (Online) the ranking is not meaningful (heartbeats don't reflect
+    // interest in a POI), so we intentionally return an empty list.
     var topPois = new List<object>();
-    string sortDir = (poiSort == "asc") ? "ASC" : "DESC"; // default DESC
-    string poiRankLang = (!string.IsNullOrEmpty(lang) && lang != "all") ? lang : "vi";
-
-    string poiScoreExpr = actionFilterValue is null
-        ? @"SUM(CASE e.action 
-                   WHEN 'scan_qr' THEN 3 
-                   WHEN 'play_audio' THEN 2 
-                   WHEN 'view_poi' THEN 1 
-                   ELSE 0 END)"
-        : "COUNT(1)";
-
-    string poiSql = $@"
-        SELECT e.poi_id, t.name, {poiScoreExpr} as score
-        FROM user_activity_events e
-        LEFT JOIN poi_translations t ON e.poi_id = t.poi_id AND t.lang_code = $rankLang
-        WHERE e.poi_id IS NOT NULL AND {actionClauseSpecific} AND {dateFilter} {platformFilter} {langFilter}
-        GROUP BY e.poi_id
-        ORDER BY score {sortDir}
-        LIMIT 15;";
-    await using (var cmd = new SqliteCommand(poiSql, conn))
+    if (actionFilterValue != "ping")
     {
+        string sortDir = (poiSort == "asc") ? "ASC" : "DESC"; // default DESC
+        string poiRankLang = (!string.IsNullOrEmpty(lang) && lang != "all") ? lang : "vi";
+
+        string poiScoreExpr = actionFilterValue is null
+            ? @"SUM(CASE e.action 
+                       WHEN 'scan_qr' THEN 3 
+                       WHEN 'play_audio' THEN 2 
+                       WHEN 'view_poi' THEN 1 
+                       ELSE 0 END)"
+            : "COUNT(1)";
+
+        string poiSql = $@"
+            SELECT e.poi_id, t.name, {poiScoreExpr} as score
+            FROM user_activity_events e
+            LEFT JOIN poi_translations t ON e.poi_id = t.poi_id AND t.lang_code = $rankLang
+            WHERE e.poi_id IS NOT NULL AND {actionClauseSpecific} AND {dateFilter} {platformFilter} {langFilter}
+            GROUP BY e.poi_id
+            ORDER BY score {sortDir}
+            LIMIT 15;";
+        await using var cmd = new SqliteCommand(poiSql, conn);
         cmd.Parameters.AddWithValue("$rankLang", poiRankLang);
         if (actionFilterValue is not null) cmd.Parameters.AddWithValue("$actionFilter", actionFilterValue);
         if (period == "custom") { cmd.Parameters.AddWithValue("$from", from); cmd.Parameters.AddWithValue("$to", to); }

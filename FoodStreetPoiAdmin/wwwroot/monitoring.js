@@ -82,10 +82,10 @@ btnRefresh?.addEventListener('click', () => loadDashboard());
 // When a user clicks one of the 4 stat cards, the Hourly + Ranking charts below
 // will be scoped to that single action. Click again to clear.
 const ACTION_META = {
-  online: { label: 'Hoạt động online (ping)', countHeader: 'Lượt ping', icon: 'fa-signal' },
-  audio:  { label: 'Lượt nghe Audio',         countHeader: 'Lượt nghe',  icon: 'fa-headphones' },
-  qr:     { label: 'Lượt quét QR',            countHeader: 'Lượt quét',  icon: 'fa-qrcode' },
-  view:   { label: 'Lượt xem POI',            countHeader: 'Lượt xem',   icon: 'fa-eye' },
+  online: { label: 'User online',     countHeader: 'Số user online', icon: 'fa-signal' },
+  audio:  { label: 'Lượt nghe Audio', countHeader: 'Lượt nghe',      icon: 'fa-headphones' },
+  qr:     { label: 'Lượt quét QR',    countHeader: 'Lượt quét',      icon: 'fa-qrcode' },
+  view:   { label: 'Lượt xem POI',    countHeader: 'Lượt xem',       icon: 'fa-eye' },
 };
 
 let selectedAction = null;
@@ -103,12 +103,22 @@ function updateChartLabels() {
   const meta = selectedAction ? ACTION_META[selectedAction] : null;
 
   if (hourlySub) {
-    hourlySub.textContent = meta ? `Chỉ tính: ${meta.label}` : 'Tất cả tương tác (trừ ping)';
+    if (selectedAction === 'online') {
+      hourlySub.textContent = 'Số user duy nhất online trong mỗi khung giờ';
+    } else if (meta) {
+      hourlySub.textContent = `Chỉ tính: ${meta.label}`;
+    } else {
+      hourlySub.textContent = 'Tất cả tương tác (trừ ping)';
+    }
   }
   if (rankSub) {
-    rankSub.textContent = meta
-      ? `Chỉ tính: ${meta.label}`
-      : 'Điểm = Quét QR × 3 + Nghe Audio × 2 + Xem POI × 1';
+    if (selectedAction === 'online') {
+      rankSub.textContent = 'Không áp dụng cho Online theo thời gian thực';
+    } else if (meta) {
+      rankSub.textContent = `Chỉ tính: ${meta.label}`;
+    } else {
+      rankSub.textContent = 'Điểm = Quét QR × 3 + Nghe Audio × 2 + Xem POI × 1';
+    }
   }
   if (rankHeader) {
     rankHeader.textContent = meta ? meta.countHeader : 'Tổng tương tác';
@@ -277,6 +287,11 @@ function renderHourlyChart(hourlyData, action) {
 function renderPoiRanking(topPois, action) {
   const container = document.getElementById('poiRankingRows');
   if (!container) return;
+
+  if (action === 'online') {
+    container.innerHTML = '<tr><td colspan="4" class="text-center muted" style="padding: 40px;">Xếp hạng không áp dụng cho bộ lọc "Online theo thời gian thực". Bỏ chọn thẻ này để xem xếp hạng.</td></tr>';
+    return;
+  }
   
   if (topPois.length === 0) {
     const emptyMsg = action
