@@ -47,6 +47,9 @@ if (payload) {
   
   if (isSuper) {
     document.getElementById('ownerManageNav').hidden = false;
+  }
+  
+  if (isSuper || isOwner) {
     document.getElementById('qrManageNav').hidden = false;
   }
   

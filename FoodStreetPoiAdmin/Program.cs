@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Data.Sqlite;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -624,7 +624,7 @@ app.MapGet("/qr/scan", (HttpContext context) =>
 <body>
     <div style='text-align: center;'>
         <div class='loader'></div>
-        <div>Đang chuyển hướng, vui lòng chờ...</div>
+        <div>Loading...</div>
     </div>
     <script>
         setTimeout(async () => {{
@@ -696,6 +696,9 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
 
     await using var conn = await OpenConnectionAsync(connectionString);
 
+    bool isOwner = IsOwner(actor);
+    string ownerWhere = isOwner ? "AND p.owner_admin_id = $ownerId" : "";
+
     // Normalize optional single-action filter for Hourly + Ranking charts.
     // Accept both short aliases (online/audio/qr/view) and raw action names.
     string? actionFilterValue = null;
@@ -713,14 +716,34 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
     }
     // When a specific action is selected we lock both charts to that action only;
     // otherwise we keep the default (exclude 'ping' heartbeats so interactions are clean).
-    string actionClauseSpecific = actionFilterValue is null ? "action != 'ping'" : "action = $actionFilter";
+    string actionClauseSpecific = actionFilterValue is null ? "uae.action != 'ping'" : "uae.action = $actionFilter";
 
     // 1. Online now (last 20s based on UTC)
     long onlineNow = 0;
-    string onlineSql = "SELECT COUNT(DISTINCT session_id) FROM active_sessions WHERE strftime('%s', 'now') - strftime('%s', last_ping_at) <= 20";
-    if (!string.IsNullOrEmpty(platform) && platform != "all") onlineSql += " AND platform = $platform";
+    string onlineSql;
+    if (!isOwner)
+    {
+        onlineSql = "SELECT COUNT(DISTINCT session_id) FROM active_sessions WHERE last_ping_at >= datetime('now', '-20 seconds')";
+        if (!string.IsNullOrEmpty(platform) && platform != "all") onlineSql += " AND platform = $platform";
+    }
+    else
+    {
+        // For Owners: must check both session liveness and interaction with their POIs.
+        onlineSql = @$"
+            SELECT COUNT(DISTINCT s.session_id)
+            FROM active_sessions s
+            JOIN user_activity_events uae ON uae.session_id = s.session_id
+            JOIN pois p ON p.id = uae.poi_id
+            WHERE s.last_ping_at >= datetime('now', '-20 seconds')
+              AND uae.created_at >= datetime('now', '-20 seconds')
+              AND p.owner_admin_id = $ownerId
+            ";
+        if (!string.IsNullOrEmpty(platform) && platform != "all") onlineSql += " AND s.platform = $platform";
+    }
+
     await using (var cmd = new SqliteCommand(onlineSql, conn))
     {
+        if (isOwner) cmd.Parameters.AddWithValue("$ownerId", actor.Id);
         if (!string.IsNullOrEmpty(platform) && platform != "all") cmd.Parameters.AddWithValue("$platform", platform);
         var res = await cmd.ExecuteScalarAsync();
         if (res != null) onlineNow = Convert.ToInt64(res, CultureInfo.InvariantCulture);
@@ -776,18 +799,20 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
     var sqliteVnOffset = GetSqliteOffset(vnTz, nowUtc);
 
     
-    string platformFilter = (!string.IsNullOrEmpty(platform) && platform != "all") ? " AND platform = $platform" : "";
-    string langFilter = (!string.IsNullOrEmpty(lang) && lang != "all") ? " AND language = $lang" : "";
+    string platformFilter = (!string.IsNullOrEmpty(platform) && platform != "all") ? " AND uae.platform = $platform" : "";
+    string langFilter = (!string.IsNullOrEmpty(lang) && lang != "all") ? " AND uae.language = $lang" : "";
     
     // 3. Summary stats for select period
     long periodAudioPlays = 0;
     long periodQrScans = 0;
     long periodViews = 0;
     string summarySql = $@"
-        SELECT action, COUNT(1) 
-        FROM user_activity_events 
-        WHERE {dateFilter} {platformFilter} {langFilter}
-        GROUP BY action;";
+        SELECT uae.action, COUNT(1) 
+        FROM user_activity_events uae
+        JOIN pois p ON p.id = uae.poi_id
+        WHERE uae.created_at >= $startUtc AND uae.created_at < $endUtc
+          {platformFilter} {langFilter} {ownerWhere}
+        GROUP BY uae.action;";
     
     await using (var cmd = new SqliteCommand(summarySql, conn))
     {
@@ -810,16 +835,19 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
     // 4. Chart Data (Grouped by Date in VN Time)
     var chartData = new List<object>();
     string chartSql = $@"
-        SELECT date(created_at, $sqliteOffset) as dt, action, COUNT(1) as c, platform
-        FROM user_activity_events
-        WHERE {dateFilter} {platformFilter} {langFilter}
-        GROUP BY dt, action, platform
+        SELECT date(uae.created_at, $sqliteOffset) as dt, uae.action, COUNT(1) as c, uae.platform
+        FROM user_activity_events uae
+        JOIN pois p ON p.id = uae.poi_id
+        WHERE uae.created_at >= $startUtc AND uae.created_at < $endUtc
+          {platformFilter} {langFilter} {ownerWhere}
+        GROUP BY dt, uae.action, uae.platform
         ORDER BY dt ASC;";
     await using (var cmd = new SqliteCommand(chartSql, conn))
     {
         cmd.Parameters.AddWithValue("$startUtc", startUtc.ToString("O"));
         cmd.Parameters.AddWithValue("$endUtc", endUtc.ToString("O"));
         cmd.Parameters.AddWithValue("$sqliteOffset", sqliteVnOffset);
+        if (isOwner) cmd.Parameters.AddWithValue("$ownerId", actor.Id);
         if (!string.IsNullOrEmpty(platformFilter)) cmd.Parameters.AddWithValue("$platform", platform);
         if (!string.IsNullOrEmpty(langFilter)) cmd.Parameters.AddWithValue("$lang", lang);
 
@@ -841,17 +869,20 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
     // Special case: for 'ping' (Online) we count DISTINCT sessions so the bar
     // reflects the number of unique online users per hour (not raw heartbeats).
     var hourlyData = new List<object>();
-    string hourlyCountExpr = (actionFilterValue == "ping") ? "COUNT(DISTINCT session_id)" : "COUNT(1)";
+    string hourlyCountExpr = (actionFilterValue == "ping") ? "COUNT(DISTINCT uae.session_id)" : "COUNT(1)";
     string hourlySql = $@"
-        SELECT CAST(strftime('%H', created_at, $sqliteOffset) AS INTEGER) as hr, {hourlyCountExpr}
-        FROM user_activity_events 
-        WHERE {actionClauseSpecific} AND {dateFilter} {platformFilter} {langFilter}
+        SELECT CAST(strftime('%H', uae.created_at, $sqliteOffset) AS INTEGER) as hr, {hourlyCountExpr}
+        FROM user_activity_events uae
+        JOIN pois p ON p.id = uae.poi_id
+        WHERE {actionClauseSpecific} AND uae.created_at >= $startUtc AND uae.created_at < $endUtc
+          {platformFilter} {langFilter} {ownerWhere}
         GROUP BY hr ORDER BY hr ASC;";
     await using (var cmd = new SqliteCommand(hourlySql, conn))
     {
         cmd.Parameters.AddWithValue("$startUtc", startUtc.ToString("O"));
         cmd.Parameters.AddWithValue("$endUtc", endUtc.ToString("O"));
         cmd.Parameters.AddWithValue("$sqliteOffset", sqliteVnOffset);
+        if (isOwner) cmd.Parameters.AddWithValue("$ownerId", actor.Id);
         if (actionFilterValue is not null) cmd.Parameters.AddWithValue("$actionFilter", actionFilterValue);
         if (!string.IsNullOrEmpty(platformFilter)) cmd.Parameters.AddWithValue("$platform", platform);
         if (!string.IsNullOrEmpty(langFilter)) cmd.Parameters.AddWithValue("$lang", lang);
@@ -874,7 +905,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         string poiRankLang = (!string.IsNullOrEmpty(lang) && lang != "all") ? lang : "vi";
 
         string poiScoreExpr = actionFilterValue is null
-            ? @"SUM(CASE e.action 
+            ? @"SUM(CASE uae.action 
                        WHEN 'scan_qr' THEN 3 
                        WHEN 'play_audio' THEN 2 
                        WHEN 'view_poi' THEN 1 
@@ -882,17 +913,27 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
             : "COUNT(1)";
 
         string poiSql = $@"
-            SELECT e.poi_id, t.name, {poiScoreExpr} as score
-            FROM user_activity_events e
-            LEFT JOIN poi_translations t ON e.poi_id = t.poi_id AND t.lang_code = $rankLang
-            WHERE e.poi_id IS NOT NULL AND {actionClauseSpecific} AND {dateFilter} {platformFilter} {langFilter}
-            GROUP BY e.poi_id
+            SELECT uae.poi_id, t.name, {poiScoreExpr} as score
+            FROM user_activity_events uae
+            JOIN pois p ON p.id = uae.poi_id
+            LEFT JOIN (
+                SELECT poi_id, name 
+                FROM poi_translations 
+                WHERE lang_code = $rankLang
+                GROUP BY poi_id
+            ) t ON uae.poi_id = t.poi_id
+            WHERE uae.poi_id IS NOT NULL 
+              AND {actionClauseSpecific} 
+              AND uae.created_at >= $startUtc AND uae.created_at < $endUtc
+              {platformFilter} {langFilter} {ownerWhere}
+            GROUP BY uae.poi_id
             ORDER BY score {sortDir}
             LIMIT 15;";
         await using var cmd = new SqliteCommand(poiSql, conn);
         cmd.Parameters.AddWithValue("$startUtc", startUtc.ToString("O"));
         cmd.Parameters.AddWithValue("$endUtc", endUtc.ToString("O"));
         cmd.Parameters.AddWithValue("$rankLang", poiRankLang);
+        if (isOwner) cmd.Parameters.AddWithValue("$ownerId", actor.Id);
         if (actionFilterValue is not null) cmd.Parameters.AddWithValue("$actionFilter", actionFilterValue);
         if (!string.IsNullOrEmpty(platformFilter)) cmd.Parameters.AddWithValue("$platform", platform);
         if (!string.IsNullOrEmpty(langFilter)) cmd.Parameters.AddWithValue("$lang", lang);
@@ -1769,6 +1810,7 @@ static async Task InitializeDatabaseAsync(string connectionString)
         CREATE INDEX IF NOT EXISTS ix_user_activity_events_action ON user_activity_events(action);
         CREATE INDEX IF NOT EXISTS ix_user_activity_events_platform ON user_activity_events(platform);
         CREATE INDEX IF NOT EXISTS ix_user_activity_events_action_created_at ON user_activity_events(action, created_at DESC);
+        CREATE INDEX IF NOT EXISTS ix_active_sessions_ping ON active_sessions(last_ping_at);
         """, connection))
     {
         await createUsers.ExecuteNonQueryAsync();
