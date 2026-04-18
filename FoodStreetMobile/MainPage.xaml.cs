@@ -101,6 +101,7 @@ public partial class MainPage : ContentPage
     private bool _isAdvancingQueue;
     private bool _isAutoPlaySubscriptionActive;
     private bool _isSearchSelectionActive;
+    private bool _hasCenteredOnUser;
 
     private bool _sheetInitialized;
     private double _sheetExpandedTranslation;
@@ -172,6 +173,10 @@ public partial class MainPage : ContentPage
     {
         MainThread.BeginInvokeOnMainThread(() =>
         {
+            var previousSelectedPoiId = _selectedPoi?.Id;
+            var previousPlaybackPoiId = _currentPlaybackPoi?.Id;
+            var previousQueuedPoiId = _queuedPlaybackPoi?.Id;
+
             DetachPoiPinEvents();
             PoiMap.IsShowingUser = true;
             PoiMap.Pins.Clear();
@@ -183,20 +188,57 @@ public partial class MainPage : ContentPage
                 _foodZoneCircle = null;
             }
 
-            _activePoiPin = null;
             _searchPin = null;
-            _selectedPoi = null;
             _selectedSearchResult = null;
             _isSearchSelectionActive = false;
             _lastRouteSummary = null;
-            PlayAudioButton.IsEnabled = false;
-            ResetPlaybackQueueState();
-            HideAudioPlayer();
+
+            PoiViewModel? restoredSelected = null;
+            PoiViewModel? restoredPlayback = null;
+            PoiViewModel? restoredQueued = null;
 
             foreach (var poi in pois)
             {
                 AddPoiRadiusCircle(poi);
-                PoiMap.Pins.Add(CreatePoiPin(poi));
+                var pin = CreatePoiPin(poi);
+                PoiMap.Pins.Add(pin);
+
+                if (string.Equals(poi.Id, previousSelectedPoiId, StringComparison.Ordinal)) restoredSelected = poi;
+                if (string.Equals(poi.Id, previousPlaybackPoiId, StringComparison.Ordinal)) restoredPlayback = poi;
+                if (string.Equals(poi.Id, previousQueuedPoiId, StringComparison.Ordinal)) restoredQueued = poi;
+            }
+
+            // Restore references to current instances
+            _currentPlaybackPoi = restoredPlayback;
+            _queuedPlaybackPoi = restoredQueued;
+
+            if (restoredSelected != null)
+            {
+                _selectedPoi = restoredSelected;
+                PlayAudioButton.IsEnabled = HasPlayableAudio(restoredSelected);
+                UpdateBottomSheetContent(restoredSelected, resetPlayerState: false);
+
+                // Fix active pin to maintain highlight
+                _activePoiPin = PoiMap.Pins.FirstOrDefault(p => _poiPins.TryGetValue(p, out var vm) && vm.Id == restoredSelected.Id);
+            }
+            else
+            {
+                // The selected POI was removed or not found
+                _selectedPoi = null;
+                _activePoiPin = null;
+                PlayAudioButton.IsEnabled = false;
+
+                // Stop playback if the playing POI is also gone
+                if (_currentPlaybackPoi == null)
+                {
+                    HideAudioPlayer(resetPlaybackQueueState: true);
+                }
+            }
+
+            // If we were playing but the POI is now gone, stop the player
+            if (previousPlaybackPoiId != null && restoredPlayback == null)
+            {
+                StopCurrentPlaybackOnly();
             }
 
 #if ANDROID
@@ -205,15 +247,23 @@ public partial class MainPage : ContentPage
 
             if (pois.Count > 0)
             {
-                var south = pois.Min(p => p.Latitude);
-                var north = pois.Max(p => p.Latitude);
-                var west = pois.Min(p => p.Longitude);
-                var east = pois.Max(p => p.Longitude);
-                MoveMapToBounds(south, west, north, east);
+                if (!_hasCenteredOnUser)
+                {
+                    _hasCenteredOnUser = true;
+                    var south = pois.Min(p => p.Latitude);
+                    var north = pois.Max(p => p.Latitude);
+                    var west = pois.Min(p => p.Longitude);
+                    var east = pois.Max(p => p.Longitude);
+                    MoveMapToBounds(south, west, north, east);
+                }
             }
             else
             {
-                MoveMapTo(DefaultLatitude, DefaultLongitude);
+                if (!_hasCenteredOnUser)
+                {
+                    _hasCenteredOnUser = true;
+                    MoveMapTo(DefaultLatitude, DefaultLongitude);
+                }
             }
         });
     }
