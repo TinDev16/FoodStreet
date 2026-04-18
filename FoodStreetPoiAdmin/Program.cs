@@ -102,7 +102,7 @@ app.Use(async (context, next) =>
         try
         {
             var logPath = Path.Combine(dataDirectory, "server-errors.log");
-            var entry = $"-----{Environment.NewLine}{DateTimeOffset.Now:O}{Environment.NewLine}{ex}{Environment.NewLine}";
+            var entry = $"-----{Environment.NewLine}{DateTimeOffset.UtcNow:O}{Environment.NewLine}{ex}{Environment.NewLine}";
             await File.AppendAllTextAsync(logPath, entry);
         }
         catch
@@ -473,18 +473,18 @@ app.MapGet("/api/admin/reports/audio-plays", async (HttpContext context) =>
 
     // Filter dates are VN local (UTC+7). Convert to UTC ISO strings that match
     // how poi_audio_play_events.created_at is stored (DateTimeOffset.UtcNow.ToString("O")).
-    var vnOffset = TimeSpan.FromHours(7);
+    var vnTz = GetVnTimeZone();
     string? fromUtc = null;
     string? toExclusiveUtc = null;
     if (fromDate is DateOnly f)
     {
-        var fromLocal = new DateTimeOffset(f.Year, f.Month, f.Day, 0, 0, 0, vnOffset);
+        var fromLocal = new DateTimeOffset(f.Year, f.Month, f.Day, 0, 0, 0, vnTz.GetUtcOffset(DateTimeOffset.UtcNow));
         fromUtc = fromLocal.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
     }
     if (toDate is DateOnly t)
     {
         var nextDay = t.AddDays(1);
-        var toLocalExclusive = new DateTimeOffset(nextDay.Year, nextDay.Month, nextDay.Day, 0, 0, 0, vnOffset);
+        var toLocalExclusive = new DateTimeOffset(nextDay.Year, nextDay.Month, nextDay.Day, 0, 0, 0, vnTz.GetUtcOffset(DateTimeOffset.UtcNow));
         toExclusiveUtc = toLocalExclusive.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
     }
     var items = await GetPoiAudioPlayStatsAsync(connectionString, actor, fromUtc, toExclusiveUtc, sort);
@@ -746,9 +746,6 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
     await TryEnsureAdbReverseAsync();
 
     await using var conn = await OpenConnectionAsync(connectionString);
-    
-    const string VN_OFFSET = "+7 hours";
-    const string VN_TO_UTC = "-7 hours";
 
     // Normalize optional single-action filter for Hourly + Ranking charts.
     // Accept both short aliases (online/audio/qr/view) and raw action names.
@@ -769,7 +766,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
     // otherwise we keep the default (exclude 'ping' heartbeats so interactions are clean).
     string actionClauseSpecific = actionFilterValue is null ? "action != 'ping'" : "action = $actionFilter";
 
-    // 1. Online now (last 20s for robustness)
+    // 1. Online now (last 20s based on UTC)
     long onlineNow = 0;
     string onlineSql = "SELECT COUNT(DISTINCT session_id) FROM active_sessions WHERE strftime('%s', 'now') - strftime('%s', last_ping_at) <= 20";
     if (!string.IsNullOrEmpty(platform) && platform != "all") onlineSql += " AND platform = $platform";
@@ -784,30 +781,51 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         return Results.Ok(new { onlineNow });
     }
     
+    var vnTz = GetVnTimeZone();
+    var nowUtc = DateTimeOffset.UtcNow;
+    var nowVn = TimeZoneInfo.ConvertTime(nowUtc, vnTz);
+
     // 2. Filter logic for historical data (Index-friendly UTC boundaries)
-    string dateFilter = "1=1";
-    if (period == "today") 
+    DateTimeOffset startUtc = DateTimeOffset.MinValue;
+    DateTimeOffset endUtc = DateTimeOffset.MaxValue;
+
+    if (period == "today")
     {
-        dateFilter = $"created_at >= datetime('now', '{VN_OFFSET}', 'start of day', '{VN_TO_UTC}') AND created_at < datetime('now', '{VN_OFFSET}', 'start of day', '+1 day', '{VN_TO_UTC}')";
+        var startVn = new DateTimeOffset(nowVn.Year, nowVn.Month, nowVn.Day, 0, 0, 0, vnTz.GetUtcOffset(nowVn));
+        startUtc = startVn.ToUniversalTime();
+        endUtc = startUtc.AddDays(1);
     }
-    else if (period == "week") 
+    else if (period == "week")
     {
-        dateFilter = $"created_at >= datetime('now', '{VN_OFFSET}', 'start of day', '-7 days', '{VN_TO_UTC}')";
+        var startVn = new DateTimeOffset(nowVn.Year, nowVn.Month, nowVn.Day, 0, 0, 0, vnTz.GetUtcOffset(nowVn)).AddDays(-7);
+        startUtc = startVn.ToUniversalTime();
     }
-    else if (period == "month") 
+    else if (period == "month")
     {
-        dateFilter = $"created_at >= datetime('now', '{VN_OFFSET}', 'start of day', '-30 days', '{VN_TO_UTC}')";
+        var startVn = new DateTimeOffset(nowVn.Year, nowVn.Month, nowVn.Day, 0, 0, 0, vnTz.GetUtcOffset(nowVn)).AddDays(-30);
+        startUtc = startVn.ToUniversalTime();
     }
-    else if (period == "year") 
+    else if (period == "year")
     {
-        dateFilter = $"created_at >= datetime('now', '{VN_OFFSET}', 'start of day', '-1 year', '{VN_TO_UTC}')";
+        var startVn = new DateTimeOffset(nowVn.Year, nowVn.Month, nowVn.Day, 0, 0, 0, vnTz.GetUtcOffset(nowVn)).AddDays(-365);
+        startUtc = startVn.ToUniversalTime();
     }
     else if (period == "custom" && !string.IsNullOrEmpty(from) && !string.IsNullOrEmpty(to))
     {
-        // For custom range, we assume 'from' and 'to' are YYYY-MM-DD in VN timezone.
-        // Boundary: from 00:00:00 VN to 23:59:59 VN.
-        dateFilter = $"created_at >= datetime($from, '00:00:00', '{VN_TO_UTC}') AND created_at <= datetime($to, '23:59:59', '{VN_TO_UTC}')";
+        var f = ParseDateOnlyFilter(from);
+        var t = ParseDateOnlyFilter(to);
+        if (f.HasValue && t.HasValue)
+        {
+            var startVn = new DateTimeOffset(f.Value.Year, f.Value.Month, f.Value.Day, 0, 0, 0, vnTz.GetUtcOffset(nowVn));
+            startUtc = startVn.ToUniversalTime();
+            var endVn = new DateTimeOffset(t.Value.Year, t.Value.Month, t.Value.Day, 23, 59, 59, 999, vnTz.GetUtcOffset(nowVn));
+            endUtc = endVn.ToUniversalTime();
+        }
     }
+
+    string dateFilter = "created_at >= $startUtc AND created_at < $endUtc";
+    var sqliteVnOffset = GetSqliteOffset(vnTz, nowUtc);
+
     
     string platformFilter = (!string.IsNullOrEmpty(platform) && platform != "all") ? " AND platform = $platform" : "";
     string langFilter = (!string.IsNullOrEmpty(lang) && lang != "all") ? " AND language = $lang" : "";
@@ -824,7 +842,8 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
     
     await using (var cmd = new SqliteCommand(summarySql, conn))
     {
-        if (period == "custom") { cmd.Parameters.AddWithValue("$from", from); cmd.Parameters.AddWithValue("$to", to); }
+        cmd.Parameters.AddWithValue("$startUtc", startUtc.ToString("O"));
+        cmd.Parameters.AddWithValue("$endUtc", endUtc.ToString("O"));
         if (!string.IsNullOrEmpty(platformFilter)) cmd.Parameters.AddWithValue("$platform", platform);
         if (!string.IsNullOrEmpty(langFilter)) cmd.Parameters.AddWithValue("$lang", lang);
 
@@ -842,14 +861,16 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
     // 4. Chart Data (Grouped by Date in VN Time)
     var chartData = new List<object>();
     string chartSql = $@"
-        SELECT date(created_at, '{VN_OFFSET}') as dt, action, COUNT(1) as c, platform
+        SELECT date(created_at, $sqliteOffset) as dt, action, COUNT(1) as c, platform
         FROM user_activity_events
         WHERE {dateFilter} {platformFilter} {langFilter}
         GROUP BY dt, action, platform
         ORDER BY dt ASC;";
     await using (var cmd = new SqliteCommand(chartSql, conn))
     {
-        if (period == "custom") { cmd.Parameters.AddWithValue("$from", from); cmd.Parameters.AddWithValue("$to", to); }
+        cmd.Parameters.AddWithValue("$startUtc", startUtc.ToString("O"));
+        cmd.Parameters.AddWithValue("$endUtc", endUtc.ToString("O"));
+        cmd.Parameters.AddWithValue("$sqliteOffset", sqliteVnOffset);
         if (!string.IsNullOrEmpty(platformFilter)) cmd.Parameters.AddWithValue("$platform", platform);
         if (!string.IsNullOrEmpty(langFilter)) cmd.Parameters.AddWithValue("$lang", lang);
 
@@ -873,14 +894,16 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
     var hourlyData = new List<object>();
     string hourlyCountExpr = (actionFilterValue == "ping") ? "COUNT(DISTINCT session_id)" : "COUNT(1)";
     string hourlySql = $@"
-        SELECT CAST(strftime('%H', created_at, '{VN_OFFSET}') AS INTEGER) as hr, {hourlyCountExpr}
+        SELECT CAST(strftime('%H', created_at, $sqliteOffset) AS INTEGER) as hr, {hourlyCountExpr}
         FROM user_activity_events 
         WHERE {actionClauseSpecific} AND {dateFilter} {platformFilter} {langFilter}
         GROUP BY hr ORDER BY hr ASC;";
     await using (var cmd = new SqliteCommand(hourlySql, conn))
     {
+        cmd.Parameters.AddWithValue("$startUtc", startUtc.ToString("O"));
+        cmd.Parameters.AddWithValue("$endUtc", endUtc.ToString("O"));
+        cmd.Parameters.AddWithValue("$sqliteOffset", sqliteVnOffset);
         if (actionFilterValue is not null) cmd.Parameters.AddWithValue("$actionFilter", actionFilterValue);
-        if (period == "custom") { cmd.Parameters.AddWithValue("$from", from); cmd.Parameters.AddWithValue("$to", to); }
         if (!string.IsNullOrEmpty(platformFilter)) cmd.Parameters.AddWithValue("$platform", platform);
         if (!string.IsNullOrEmpty(langFilter)) cmd.Parameters.AddWithValue("$lang", lang);
 
@@ -918,9 +941,10 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
             ORDER BY score {sortDir}
             LIMIT 15;";
         await using var cmd = new SqliteCommand(poiSql, conn);
+        cmd.Parameters.AddWithValue("$startUtc", startUtc.ToString("O"));
+        cmd.Parameters.AddWithValue("$endUtc", endUtc.ToString("O"));
         cmd.Parameters.AddWithValue("$rankLang", poiRankLang);
         if (actionFilterValue is not null) cmd.Parameters.AddWithValue("$actionFilter", actionFilterValue);
-        if (period == "custom") { cmd.Parameters.AddWithValue("$from", from); cmd.Parameters.AddWithValue("$to", to); }
         if (!string.IsNullOrEmpty(platformFilter)) cmd.Parameters.AddWithValue("$platform", platform);
         if (!string.IsNullOrEmpty(langFilter)) cmd.Parameters.AddWithValue("$lang", lang);
 
@@ -1373,6 +1397,24 @@ app.MapDelete("/api/shops/{id}", async (string id) =>
 });
 
 app.Run();
+
+static TimeZoneInfo GetVnTimeZone()
+{
+    try 
+    {
+        return TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+    }
+    catch (TimeZoneNotFoundException)
+    {
+        return TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh");
+    }
+}
+
+static string GetSqliteOffset(TimeZoneInfo tz, DateTimeOffset nowUtc)
+{
+    var offset = tz.GetUtcOffset(nowUtc);
+    return $"{(offset.Ticks >= 0 ? "+" : "-")}{offset.Hours:D2}:{offset.Minutes:D2}";
+}
 
 async Task TryEnsureAdbReverseAsync()
 {
@@ -2302,7 +2344,7 @@ static async Task<List<FeaturedPoiDto>> GetFeaturedPoisForPublicAsync(string con
                     ELSE 0
                 END) AS score
             FROM user_activity_events
-            WHERE created_at >= datetime('now', '-7 days')
+            WHERE created_at >= $utcLookback
               AND action IN ('scan_qr', 'play_audio', 'view_poi')
             GROUP BY poi_id
         ) stats ON p.id = stats.poi_id
@@ -2316,8 +2358,10 @@ static async Task<List<FeaturedPoiDto>> GetFeaturedPoisForPublicAsync(string con
 
     var result = new List<FeaturedPoiDto>();
     await using var command = new SqliteCommand(sql, connection);
+    var utcLookback = DateTimeOffset.UtcNow.AddDays(-7).ToString("O");
     command.Parameters.AddWithValue("$lang_code", requestedLang);
     command.Parameters.AddWithValue("$limit", limit);
+    command.Parameters.AddWithValue("$utcLookback", utcLookback);
     await using var reader = await command.ExecuteReaderAsync();
     while (await reader.ReadAsync())
     {
