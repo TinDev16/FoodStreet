@@ -1413,7 +1413,8 @@ static TimeZoneInfo GetVnTimeZone()
 static string GetSqliteOffset(TimeZoneInfo tz, DateTimeOffset nowUtc)
 {
     var offset = tz.GetUtcOffset(nowUtc);
-    return $"{(offset.Ticks >= 0 ? "+" : "-")}{offset.Hours:D2}:{offset.Minutes:D2}";
+    var hours = offset.TotalHours;
+    return $"{(hours >= 0 ? "+" : "-")}{Math.Abs(hours):0} hours";
 }
 
 async Task TryEnsureAdbReverseAsync()

@@ -244,7 +244,7 @@ function renderMainChart(chartData) {
 function renderHourlyChart(hourlyData, action) {
   const hours = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
   const counts = hours.map(h => {
-    const found = hourlyData.find(d => d.hour === h);
+    const found = hourlyData.find(d => parseInt(d.hour) == parseInt(h));
     return found ? found.count : 0;
   });
 
