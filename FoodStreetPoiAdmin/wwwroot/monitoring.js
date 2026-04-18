@@ -79,6 +79,58 @@ filterPeriod?.addEventListener('change', () => {
 
 btnRefresh?.addEventListener('click', () => loadDashboard());
 
+// When a user clicks one of the 4 stat cards, the Hourly + Ranking charts below
+// will be scoped to that single action. Click again to clear.
+const ACTION_META = {
+  online: { label: 'Hoạt động online (ping)', countHeader: 'Lượt ping', icon: 'fa-signal' },
+  audio:  { label: 'Lượt nghe Audio',         countHeader: 'Lượt nghe',  icon: 'fa-headphones' },
+  qr:     { label: 'Lượt quét QR',            countHeader: 'Lượt quét',  icon: 'fa-qrcode' },
+  view:   { label: 'Lượt xem POI',            countHeader: 'Lượt xem',   icon: 'fa-eye' },
+};
+
+let selectedAction = null;
+
+function applyCardActiveState() {
+  document.querySelectorAll('.stat-card.clickable').forEach(card => {
+    card.classList.toggle('active', card.dataset.action === selectedAction);
+  });
+}
+
+function updateChartLabels() {
+  const hourlySub = document.getElementById('hourlyChartSubtitle');
+  const rankSub = document.getElementById('poiRankingSubtitle');
+  const rankHeader = document.getElementById('poiRankingCountHeader');
+  const meta = selectedAction ? ACTION_META[selectedAction] : null;
+
+  if (hourlySub) {
+    hourlySub.textContent = meta ? `Chỉ tính: ${meta.label}` : 'Tất cả tương tác (trừ ping)';
+  }
+  if (rankSub) {
+    rankSub.textContent = meta
+      ? `Chỉ tính: ${meta.label}`
+      : 'Điểm = Quét QR × 3 + Nghe Audio × 2 + Xem POI × 1';
+  }
+  if (rankHeader) {
+    rankHeader.textContent = meta ? meta.countHeader : 'Tổng tương tác';
+  }
+}
+
+document.querySelectorAll('.stat-card.clickable').forEach(card => {
+  const handler = () => {
+    const next = card.dataset.action;
+    selectedAction = (selectedAction === next) ? null : next;
+    applyCardActiveState();
+    loadDashboard();
+  };
+  card.addEventListener('click', handler);
+  card.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handler();
+    }
+  });
+});
+
 async function loadDashboard() {
   try {
     const params = new URLSearchParams();
@@ -90,6 +142,7 @@ async function loadDashboard() {
     }
     if (filterLang.value !== 'all') params.set('lang', filterLang.value);
     if (filterPoiSort.value) params.set('poiSort', filterPoiSort.value);
+    if (selectedAction) params.set('action', selectedAction);
 
     const res = await fetch('/api/admin/reports/user-activities?' + params.toString(), {
       headers: { 'Authorization': 'Bearer ' + token }
@@ -109,9 +162,10 @@ async function loadDashboard() {
     document.getElementById('valQrScans').textContent = data.periodQrScans || 0;
     document.getElementById('valViews').textContent = data.periodViews || 0;
     
+    updateChartLabels();
     renderMainChart(data.chartData || []);
-    renderHourlyChart(data.hourlyData || []);
-    renderPoiRanking(data.topPois || []);
+    renderHourlyChart(data.hourlyData || [], selectedAction);
+    renderPoiRanking(data.topPois || [], selectedAction);
   } catch(e) {
     console.error(e);
   }
@@ -177,16 +231,19 @@ function renderMainChart(chartData) {
   }
 }
 
-function renderHourlyChart(hourlyData) {
+function renderHourlyChart(hourlyData, action) {
   const hours = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
   const counts = hours.map(h => {
     const found = hourlyData.find(d => d.hour === h);
     return found ? found.count : 0;
   });
 
+  const meta = action ? ACTION_META[action] : null;
+  const seriesName = meta ? meta.countHeader : 'Tổng tương tác';
+
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
   const options = {
-    series: [{ name: 'Tổng tương tác', data: counts }],
+    series: [{ name: seriesName, data: counts }],
     chart: {
       type: 'bar',
       height: 350,
@@ -217,12 +274,15 @@ function renderHourlyChart(hourlyData) {
   }
 }
 
-function renderPoiRanking(topPois) {
+function renderPoiRanking(topPois, action) {
   const container = document.getElementById('poiRankingRows');
   if (!container) return;
   
   if (topPois.length === 0) {
-    container.innerHTML = '<tr><td colspan="4" class="text-center muted">Không có dữ liệu trong khoảng thời gian này.</td></tr>';
+    const emptyMsg = action
+      ? `Không có ${ACTION_META[action]?.label?.toLowerCase() || 'dữ liệu'} trong khoảng thời gian này.`
+      : 'Không có dữ liệu trong khoảng thời gian này.';
+    container.innerHTML = `<tr><td colspan="4" class="text-center muted">${emptyMsg}</td></tr>`;
     return;
   }
 

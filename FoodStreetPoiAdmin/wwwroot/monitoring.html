@@ -67,6 +67,44 @@
       box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
     }
 
+    .stat-card.clickable {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .stat-card.clickable.active {
+      border-color: #4f46e5;
+      box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.25), 0 8px 25px rgba(79, 70, 229, 0.15);
+    }
+
+    [data-theme="dark"] .stat-card.clickable.active {
+      border-color: #818cf8;
+      box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.4), 0 8px 25px rgba(79, 70, 229, 0.3);
+    }
+
+    .stat-card.clickable.active::after {
+      content: '\f00c';
+      font-family: 'Font Awesome 6 Free';
+      font-weight: 900;
+      position: absolute;
+      bottom: 12px;
+      right: 14px;
+      font-size: 0.75rem;
+      color: #4f46e5;
+      background: rgba(79, 70, 229, 0.1);
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    [data-theme="dark"] .stat-card.clickable.active::after {
+      color: #818cf8;
+      background: rgba(129, 140, 248, 0.2);
+    }
+
     .stat-icon {
       width: 48px;
       height: 48px;
@@ -389,8 +427,8 @@
             </button>
           </section>
 
-          <div class="monitoring-grid">
-            <div class="stat-card">
+          <div class="monitoring-grid" id="statCardsGrid">
+            <div class="stat-card clickable" data-action="online" role="button" tabindex="0" title="Lọc biểu đồ theo hoạt động online">
               <div class="online-indicator">
                 <div class="ping-dot"></div> Trực tiếp
               </div>
@@ -399,19 +437,19 @@
               <div class="stat-label">Online theo thời gian thực</div>
             </div>
             
-            <div class="stat-card">
+            <div class="stat-card clickable" data-action="audio" role="button" tabindex="0" title="Lọc biểu đồ theo lượt nghe Audio">
               <div class="stat-icon icon-primary"><i class="fa-solid fa-headphones"></i></div>
               <div class="stat-value" id="valAudioPlays">0</div>
               <div class="stat-label">Lượt nghe Audio</div>
             </div>
 
-            <div class="stat-card">
+            <div class="stat-card clickable" data-action="qr" role="button" tabindex="0" title="Lọc biểu đồ theo lượt quét QR">
               <div class="stat-icon icon-warning"><i class="fa-solid fa-qrcode"></i></div>
               <div class="stat-value" id="valQrScans">0</div>
               <div class="stat-label">Lượt quét QR</div>
             </div>
 
-            <div class="stat-card">
+            <div class="stat-card clickable" data-action="view" role="button" tabindex="0" title="Lọc biểu đồ theo lượt xem POI">
               <div class="stat-icon icon-info"><i class="fa-solid fa-eye"></i></div>
               <div class="stat-value" id="valViews">0</div>
               <div class="stat-label">Lượt xem POI</div>
@@ -435,6 +473,7 @@
                   <i class="fa-solid fa-clock"></i>
                   <h2 style="font-size: 1.25rem;">Phân bổ theo giờ</h2>
                 </div>
+                <div id="hourlyChartSubtitle" class="muted" style="font-size: 0.8rem; margin-top: 4px;">Tất cả tương tác</div>
               </header>
               <div id="hourlyChart" style="min-height: 350px;"></div>
             </section>
@@ -444,8 +483,9 @@
             <header class="card-header" style="border-bottom: 1px solid var(--border-color); margin-bottom: 16px;">
               <div class="card-title" style="margin-bottom: 0;">
                 <i class="fa-solid fa-ranking-star"></i>
-                <h2 style="font-size: 1.25rem;">Xếp hạng mức độ quan tâm POI</h2>
+                <h2 style="font-size: 1.25rem;">Xếp hạng</h2>
               </div>
+              <div id="poiRankingSubtitle" class="muted" style="font-size: 0.8rem; margin-top: 4px;">Điểm = Quét QR × 3 + Nghe Audio × 2 + Xem POI × 1</div>
             </header>
             <div class="table-responsive">
               <table class="ranking-table" id="poiRankingTable">
@@ -453,7 +493,7 @@
                   <tr>
                     <th width="80">Hạng</th>
                     <th>Tên Điểm đến (POI)</th>
-                    <th width="150" style="text-align: right;">Tổng tương tác</th>
+                    <th width="150" style="text-align: right;" id="poiRankingCountHeader">Tổng tương tác</th>
                     <th width="200">Mức độ</th>
                   </tr>
                 </thead>

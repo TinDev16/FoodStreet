@@ -740,7 +740,7 @@ app.MapPost("/api/public/pois/track-activity", async (TrackActivityRequest reque
 });
 
 app.MapGet("/api/admin/reports/user-activities", async (HttpContext context, 
-    string? platform, string? period, string? from, string? to, string? lang, string? poiSort, string? fields) =>
+    string? platform, string? period, string? from, string? to, string? lang, string? poiSort, string? fields, string? action) =>
 {
     if (!TryGetAdminActor(context.User, out var actor)) return Results.Unauthorized();
     await TryEnsureAdbReverseAsync();
@@ -749,6 +749,25 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
     
     const string VN_OFFSET = "+7 hours";
     const string VN_TO_UTC = "-7 hours";
+
+    // Normalize optional single-action filter for Hourly + Ranking charts.
+    // Accept both short aliases (online/audio/qr/view) and raw action names.
+    string? actionFilterValue = null;
+    if (!string.IsNullOrWhiteSpace(action))
+    {
+        var a = action.Trim().ToLowerInvariant();
+        actionFilterValue = a switch
+        {
+            "online" or "ping" => "ping",
+            "audio" or "play_audio" => "play_audio",
+            "qr" or "scan_qr" => "scan_qr",
+            "view" or "view_poi" => "view_poi",
+            _ => null
+        };
+    }
+    // When a specific action is selected we lock both charts to that action only;
+    // otherwise we keep the default (exclude 'ping' heartbeats so interactions are clean).
+    string actionClauseSpecific = actionFilterValue is null ? "action != 'ping'" : "action = $actionFilter";
 
     // 1. Online now (last 20s for robustness)
     long onlineNow = 0;
@@ -846,15 +865,18 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         }
     }
 
-    // 5. Hourly Activity (0-23 in VN Time)
+    // 5. Hourly Activity (0-23 in VN Time). When a specific action is selected
+    // (via ?action=audio|qr|view|online), only count that action. Otherwise
+    // default to all interactions excluding 'ping' heartbeats.
     var hourlyData = new List<object>();
     string hourlySql = $@"
         SELECT CAST(strftime('%H', created_at, '{VN_OFFSET}') AS INTEGER) as hr, COUNT(1) 
         FROM user_activity_events 
-        WHERE {dateFilter} {platformFilter} {langFilter}
+        WHERE {actionClauseSpecific} AND {dateFilter} {platformFilter} {langFilter}
         GROUP BY hr ORDER BY hr ASC;";
     await using (var cmd = new SqliteCommand(hourlySql, conn))
     {
+        if (actionFilterValue is not null) cmd.Parameters.AddWithValue("$actionFilter", actionFilterValue);
         if (period == "custom") { cmd.Parameters.AddWithValue("$from", from); cmd.Parameters.AddWithValue("$to", to); }
         if (!string.IsNullOrEmpty(platformFilter)) cmd.Parameters.AddWithValue("$platform", platform);
         if (!string.IsNullOrEmpty(langFilter)) cmd.Parameters.AddWithValue("$lang", lang);
@@ -866,28 +888,32 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         }
     }
 
-    // 6. Top POI Activity Ranking (Weighted Score: Scan=3, Audio=2, View=1, Exclude Ping)
+    // 6. Top POI Ranking. Default view uses a weighted score (Scan=3, Audio=2, View=1).
+    // When a specific action is selected, rank by raw count of that action only.
     var topPois = new List<object>();
     string sortDir = (poiSort == "asc") ? "ASC" : "DESC"; // default DESC
     string poiRankLang = (!string.IsNullOrEmpty(lang) && lang != "all") ? lang : "vi";
-    
-    // We use a weighted score for "Interest" instead of just raw count.
-    string poiSql = $@"
-        SELECT e.poi_id, t.name, 
-               SUM(CASE e.action 
+
+    string poiScoreExpr = actionFilterValue is null
+        ? @"SUM(CASE e.action 
                    WHEN 'scan_qr' THEN 3 
                    WHEN 'play_audio' THEN 2 
                    WHEN 'view_poi' THEN 1 
-                   ELSE 0 END) as score
+                   ELSE 0 END)"
+        : "COUNT(1)";
+
+    string poiSql = $@"
+        SELECT e.poi_id, t.name, {poiScoreExpr} as score
         FROM user_activity_events e
         LEFT JOIN poi_translations t ON e.poi_id = t.poi_id AND t.lang_code = $rankLang
-        WHERE e.poi_id IS NOT NULL AND action != 'ping' AND {dateFilter} {platformFilter} {langFilter}
+        WHERE e.poi_id IS NOT NULL AND {actionClauseSpecific} AND {dateFilter} {platformFilter} {langFilter}
         GROUP BY e.poi_id
         ORDER BY score {sortDir}
         LIMIT 15;";
     await using (var cmd = new SqliteCommand(poiSql, conn))
     {
         cmd.Parameters.AddWithValue("$rankLang", poiRankLang);
+        if (actionFilterValue is not null) cmd.Parameters.AddWithValue("$actionFilter", actionFilterValue);
         if (period == "custom") { cmd.Parameters.AddWithValue("$from", from); cmd.Parameters.AddWithValue("$to", to); }
         if (!string.IsNullOrEmpty(platformFilter)) cmd.Parameters.AddWithValue("$platform", platform);
         if (!string.IsNullOrEmpty(langFilter)) cmd.Parameters.AddWithValue("$lang", lang);
@@ -910,7 +936,8 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         periodViews,
         chartData,
         hourlyData,
-        topPois
+        topPois,
+        activeAction = actionFilterValue
     });
 }).RequireAuthorization();
 
