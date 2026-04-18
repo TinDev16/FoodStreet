@@ -471,8 +471,22 @@ app.MapGet("/api/admin/reports/audio-plays", async (HttpContext context) =>
         return Results.BadRequest(new { error = "Gia tri 'to' khong hop le. Dinh dang dung: yyyy-MM-dd." });
     }
 
-    var fromUtc = fromDate?.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).ToString("O");
-    var toExclusiveUtc = toDate?.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).ToString("O");
+    // Filter dates are VN local (UTC+7). Convert to UTC ISO strings that match
+    // how poi_audio_play_events.created_at is stored (DateTimeOffset.UtcNow.ToString("O")).
+    var vnOffset = TimeSpan.FromHours(7);
+    string? fromUtc = null;
+    string? toExclusiveUtc = null;
+    if (fromDate is DateOnly f)
+    {
+        var fromLocal = new DateTimeOffset(f.Year, f.Month, f.Day, 0, 0, 0, vnOffset);
+        fromUtc = fromLocal.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
+    }
+    if (toDate is DateOnly t)
+    {
+        var nextDay = t.AddDays(1);
+        var toLocalExclusive = new DateTimeOffset(nextDay.Year, nextDay.Month, nextDay.Day, 0, 0, 0, vnOffset);
+        toExclusiveUtc = toLocalExclusive.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
+    }
     var items = await GetPoiAudioPlayStatsAsync(connectionString, actor, fromUtc, toExclusiveUtc, sort);
     return Results.Ok(new
     {
