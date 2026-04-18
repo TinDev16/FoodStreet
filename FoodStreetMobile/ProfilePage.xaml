@@ -18,24 +18,7 @@
                        HorizontalTextAlignment="Center" />
             </VerticalStackLayout>
 
-            <Border Padding="20"
-                    BackgroundColor="White"
-                    Stroke="#FFEDD5"
-                    StrokeThickness="2"
-                    StrokeShape="RoundRectangle 20">
-                <Border.Shadow>
-                    <Shadow Brush="Black" Offset="0,4" Radius="12" Opacity="0.08" />
-                </Border.Shadow>
-                <VerticalStackLayout Spacing="12">
-                    <Label Text="Chế độ sử dụng"
-                           FontSize="18"
-                           FontAttributes="Bold"
-                           TextColor="#1C1917" />
-                    <Label Text="{Binding StatusMessage}"
-                           FontSize="15"
-                           TextColor="#57534E" />
-                </VerticalStackLayout>
-            </Border>
+
 
             <Border Padding="20"
                     BackgroundColor="White"

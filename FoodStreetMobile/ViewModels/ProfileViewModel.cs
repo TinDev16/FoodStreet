@@ -13,7 +13,7 @@ public sealed class ProfileViewModel : INotifyPropertyChanged
     private readonly AppLanguageService _languageService;
     private readonly IServiceProvider _services;
     private AppLanguageOption? _selectedLanguage;
-    private string _statusMessage = "Ứng dụng hiện hoạt động không cần đăng nhập.";
+
 
     public ProfileViewModel(AppLanguageService languageService, IServiceProvider services)
     {
@@ -42,20 +42,7 @@ public sealed class ProfileViewModel : INotifyPropertyChanged
 
     public ICommand OpenPoiHistoryCommand { get; }
 
-    public string StatusMessage
-    {
-        get => _statusMessage;
-        private set
-        {
-            if (_statusMessage == value)
-            {
-                return;
-            }
 
-            _statusMessage = value;
-            OnPropertyChanged();
-        }
-    }
 
     public AppLanguageOption? SelectedLanguage
     {
@@ -90,9 +77,10 @@ public sealed class ProfileViewModel : INotifyPropertyChanged
                 await Shell.Current.Navigation.PushAsync(page);
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            StatusMessage = ex.Message;
+            // Error logging could be added here if needed, 
+            // but the StatusMessage is no longer displayed on the Profile page.
         }
     }
 
