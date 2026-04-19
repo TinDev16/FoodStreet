@@ -7,3 +7,7 @@ obj/
 FoodStreetMobile/obj/
 .vs/
 App_Data/*.log
+*.txt
+logcat.txt
+
+FoodStreetMobile/logcat.txt
