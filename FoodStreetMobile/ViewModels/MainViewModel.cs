@@ -123,7 +123,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public string CurrentLanguage => _currentLanguage;
 
-    public event Action<IReadOnlyList<PoiViewModel>>? PoisLoaded;
+    public event Action<IReadOnlyList<PoiViewModel>, bool>? PoisLoaded;
     public event Action<PoiViewModel?>? ActivePoiChanged;
     public event Action<Location>? UserLocationChanged;
     public event Action<PoiViewModel>? AutoPlayPoiRequested;
@@ -168,13 +168,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _currentLanguage = string.IsNullOrWhiteSpace(languageCode) ? "vi" : languageCode.Trim().ToLowerInvariant();
         await _poiRepository.SetCurrentLanguageAsync(_currentLanguage);
         OnPropertyChanged(nameof(CurrentLanguage));
-        await ReloadPoisAsync(_currentLanguage);
+        await ReloadPoisAsync(_currentLanguage, isSilentSync: false);
     }
 
     public async Task RefreshFromServerAsync()
     {
         var synced = await _poiSyncService.TrySyncAsync(_currentLanguage);
-        await ReloadPoisAsync(_currentLanguage);
+        await ReloadPoisAsync(_currentLanguage, isSilentSync: false);
         if (synced)
         {
             var source = string.IsNullOrWhiteSpace(_poiSyncService.LastSuccessfulBaseUrl)
@@ -271,7 +271,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         return $"{normalizedName}_{lat}_{lon}".Replace('.', '_');
     }
 
-    private async Task ReloadPoisAsync(string languageCode)
+    private async Task ReloadPoisAsync(string languageCode, bool isSilentSync)
     {
         var sourcePois = await _poiRepository.GetPoisAsync(languageCode);
 
@@ -305,7 +305,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             // Sort if priority changed significantly or just to maintain order
             // (Optional, omitted for simplicity unless requested)
 
-            PoisLoaded?.Invoke(Pois);
+            PoisLoaded?.Invoke(Pois, isSilentSync);
         });
     }
 
@@ -404,7 +404,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 return;
             }
 
-            await ReloadPoisAsync(_currentLanguage);
+            await ReloadPoisAsync(_currentLanguage, isSilentSync: true);
         }
         finally
         {

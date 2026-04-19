@@ -168,52 +168,86 @@ public partial class MainPage : ContentPage
         }
     }
 
-    private void OnPoisLoaded(IReadOnlyList<PoiViewModel> pois)
+    private void OnPoisLoaded(IReadOnlyList<PoiViewModel> pois, bool isSilentSync)
     {
         MainThread.BeginInvokeOnMainThread(() =>
         {
-            DetachPoiPinEvents();
-            PoiMap.IsShowingUser = true;
-            PoiMap.Pins.Clear();
-            ClearRoute();
-            ClearPoiRadiusCircles();
-            if (_foodZoneCircle is not null && PoiMap.MapElements.Contains(_foodZoneCircle))
+            if (!isSilentSync)
             {
-                PoiMap.MapElements.Remove(_foodZoneCircle);
-                _foodZoneCircle = null;
-            }
+                DetachPoiPinEvents();
+                PoiMap.IsShowingUser = true;
+                PoiMap.Pins.Clear();
+                ClearRoute();
+                ClearPoiRadiusCircles();
+                if (_foodZoneCircle is not null && PoiMap.MapElements.Contains(_foodZoneCircle))
+                {
+                    PoiMap.MapElements.Remove(_foodZoneCircle);
+                    _foodZoneCircle = null;
+                }
 
-            _activePoiPin = null;
-            _searchPin = null;
-            _selectedPoi = null;
-            _selectedSearchResult = null;
-            _isSearchSelectionActive = false;
-            _lastRouteSummary = null;
-            PlayAudioButton.IsEnabled = false;
-            ResetPlaybackQueueState();
-            HideAudioPlayer();
+                _activePoiPin = null;
+                _searchPin = null;
+                _selectedPoi = null;
+                _selectedSearchResult = null;
+                _isSearchSelectionActive = false;
+                _lastRouteSummary = null;
+                PlayAudioButton.IsEnabled = false;
+                ResetPlaybackQueueState();
+                HideAudioPlayer();
 
-            foreach (var poi in pois)
-            {
-                AddPoiRadiusCircle(poi);
-                PoiMap.Pins.Add(CreatePoiPin(poi));
-            }
+                foreach (var poi in pois)
+                {
+                    AddPoiRadiusCircle(poi);
+                    PoiMap.Pins.Add(CreatePoiPin(poi));
+                }
 
 #if ANDROID
-            _ = ApplyAndroidPoiMarkerUiAsync();
+                _ = ApplyAndroidPoiMarkerUiAsync();
 #endif
 
-            if (pois.Count > 0)
-            {
-                var south = pois.Min(p => p.Latitude);
-                var north = pois.Max(p => p.Latitude);
-                var west = pois.Min(p => p.Longitude);
-                var east = pois.Max(p => p.Longitude);
-                MoveMapToBounds(south, west, north, east);
+                if (pois.Count > 0)
+                {
+                    var south = pois.Min(p => p.Latitude);
+                    var north = pois.Max(p => p.Latitude);
+                    var west = pois.Min(p => p.Longitude);
+                    var east = pois.Max(p => p.Longitude);
+                    MoveMapToBounds(south, west, north, east);
+                }
+                else
+                {
+                    MoveMapTo(DefaultLatitude, DefaultLongitude);
+                }
             }
             else
             {
-                MoveMapTo(DefaultLatitude, DefaultLongitude);
+                // Silent update: do not reset active selections or stop playback
+                var currentIds = new HashSet<string>(pois.Select(p => p.Id));
+                var toRemove = _poiPins.Where(kvp => !currentIds.Contains(kvp.Value.Id)).Select(kvp => kvp.Key).ToList();
+                foreach (var pin in toRemove)
+                {
+                    RemovePin(pin);
+                }
+
+                ClearPoiRadiusCircles();
+                if (_foodZoneCircle is not null && PoiMap.MapElements.Contains(_foodZoneCircle))
+                {
+                    PoiMap.MapElements.Remove(_foodZoneCircle);
+                    _foodZoneCircle = null;
+                }
+
+                var existingPinPoiIds = new HashSet<string>(_poiPins.Values.Select(p => p.Id));
+                foreach (var poi in pois)
+                {
+                    AddPoiRadiusCircle(poi);
+                    if (!existingPinPoiIds.Contains(poi.Id))
+                    {
+                        PoiMap.Pins.Add(CreatePoiPin(poi));
+                    }
+                }
+
+#if ANDROID
+                _ = ApplyAndroidPoiMarkerUiAsync();
+#endif
             }
         });
     }
@@ -275,7 +309,7 @@ public partial class MainPage : ContentPage
             _lastRouteSummary = null;
             await RecordPoiViewAsync(poi);
             PlayAudioButton.IsEnabled = HasPlayableAudio(poi);
-            UpdateBottomSheetContent(poi, resetPlayerState: false);
+            UpdateBottomSheetContent(poi, resetPlayerState: true);
             await ShowSheetPartialAsync();
             await RequestAutoPlaybackAsync(poi);
         });
