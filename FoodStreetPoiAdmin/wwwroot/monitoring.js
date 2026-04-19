@@ -128,6 +128,20 @@ function updateChartLabels() {
   }
 }
 
+// Helper to generate a full range of dates between start and end (inclusive)
+function generateDateRange(startDate, endDate) {
+  const dates = [];
+  const start = new Date(startDate + "T00:00:00Z");
+  const end = new Date(endDate + "T00:00:00Z");
+  let current = new Date(start);
+
+  while (current <= end) {
+    dates.push(current.toISOString().split('T')[0]);
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+  return dates;
+}
+
 document.querySelectorAll('.stat-card.clickable').forEach(card => {
   const handler = () => {
     const next = card.dataset.action;
@@ -176,7 +190,7 @@ async function loadDashboard() {
     document.getElementById('valViews').textContent = data.periodViews || 0;
     
     updateChartLabels();
-    renderMainChart(data.chartData || []);
+    renderMainChart(data.chartData || [], data.startDate, data.endDate);
     renderHourlyChart(data.hourlyData || [], selectedAction);
     renderPoiRanking(data.topPois || [], selectedAction);
   } catch(e) {
@@ -184,8 +198,11 @@ async function loadDashboard() {
   }
 }
 
-function renderMainChart(chartData) {
-  const dates = [...new Set(chartData.map(d => d.date))].sort();
+function renderMainChart(chartData, startDate, endDate) {
+  // Use the full range of dates provided by the backend to ensure gaps are filled with 0.
+  const dates = (startDate && endDate) 
+    ? generateDateRange(startDate, endDate)
+    : [...new Set(chartData.map(d => d.date))].sort();
   
   const audioPlays = dates.map(dt => {
     return chartData.filter(d => d.date === dt && d.action === 'play_audio')
@@ -204,11 +221,14 @@ function renderMainChart(chartData) {
 
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
+  // Map to [timestamp, value] format for ApexCharts datetime axis.
+  const formatSeries = (data) => data.map((v, i) => [new Date(dates[i] + "T00:00:00Z").getTime(), v]);
+
   const options = {
     series: [
-      { name: 'Lượt xem POI', data: views },
-      { name: 'Nghe Audio', data: audioPlays },
-      { name: 'Quét QR', data: qrScans }
+      { name: 'Lượt xem POI', data: formatSeries(views) },
+      { name: 'Nghe Audio', data: formatSeries(audioPlays) },
+      { name: 'Quét QR', data: formatSeries(qrScans) }
     ],
     colors: ['#0ea5e9', '#f59e0b', '#10b981'],
     chart: {
@@ -216,21 +236,28 @@ function renderMainChart(chartData) {
       height: 350,
       fontFamily: 'Outfit, sans-serif',
       toolbar: { show: false },
-      background: 'transparent'
+      background: 'transparent',
+      animations: { enabled: true, easing: 'easeinout', speed: 800 }
     },
     theme: { mode: isDark ? 'dark' : 'light' },
     dataLabels: { enabled: false },
     stroke: { curve: 'smooth', width: 3 },
     xaxis: {
-      categories: dates.map(d => d.split('-').slice(1).reverse().join('/')),
-      labels: { rotate: -45 }
+      type: 'datetime',
+      labels: {
+        datetimeUTC: true,
+        format: 'dd/MM'
+      }
     },
     fill: {
       type: 'gradient',
       gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.05, stops: [0, 100] }
     },
     legend: { position: 'top', horizontalAlign: 'right' },
-    tooltip: { theme: isDark ? 'dark' : 'light' }
+    tooltip: { 
+      theme: isDark ? 'dark' : 'light',
+      x: { format: 'dd/MM/yyyy' }
+    }
   };
 
   const chartElement = document.querySelector("#activityChart");

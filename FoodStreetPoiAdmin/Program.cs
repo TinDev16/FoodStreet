@@ -735,7 +735,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
             JOIN user_activity_events uae ON uae.session_id = s.session_id
             JOIN pois p ON p.id = uae.poi_id
             WHERE s.last_ping_at >= datetime('now', '-20 seconds')
-              AND uae.created_at >= datetime('now', '-20 seconds')
+              AND uae.created_at >= datetime('now', '-10 minutes')
               AND p.owner_admin_id = $ownerId
             ";
         if (!string.IsNullOrEmpty(platform) && platform != "all") onlineSql += " AND s.platform = $platform";
@@ -760,27 +760,33 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
     // 2. Filter logic for historical data (Index-friendly UTC boundaries)
     DateTimeOffset startUtc = DateTimeOffset.MinValue;
     DateTimeOffset endUtc = DateTimeOffset.MaxValue;
+    string startDateStr = "";
+    string endDateStr = nowVn.ToString("yyyy-MM-dd");
 
     if (period == "today")
     {
         var startVn = new DateTimeOffset(nowVn.Year, nowVn.Month, nowVn.Day, 0, 0, 0, vnTz.GetUtcOffset(nowVn));
         startUtc = startVn.ToUniversalTime();
         endUtc = startUtc.AddDays(1);
+        startDateStr = endDateStr;
     }
     else if (period == "week")
     {
-        var startVn = new DateTimeOffset(nowVn.Year, nowVn.Month, nowVn.Day, 0, 0, 0, vnTz.GetUtcOffset(nowVn)).AddDays(-7);
+        var startVn = new DateTimeOffset(nowVn.Year, nowVn.Month, nowVn.Day, 0, 0, 0, vnTz.GetUtcOffset(nowVn)).AddDays(-6);
         startUtc = startVn.ToUniversalTime();
+        startDateStr = startVn.ToString("yyyy-MM-dd");
     }
     else if (period == "month")
     {
-        var startVn = new DateTimeOffset(nowVn.Year, nowVn.Month, nowVn.Day, 0, 0, 0, vnTz.GetUtcOffset(nowVn)).AddDays(-30);
+        var startVn = new DateTimeOffset(nowVn.Year, nowVn.Month, nowVn.Day, 0, 0, 0, vnTz.GetUtcOffset(nowVn)).AddDays(-29);
         startUtc = startVn.ToUniversalTime();
+        startDateStr = startVn.ToString("yyyy-MM-dd");
     }
     else if (period == "year")
     {
-        var startVn = new DateTimeOffset(nowVn.Year, nowVn.Month, nowVn.Day, 0, 0, 0, vnTz.GetUtcOffset(nowVn)).AddDays(-365);
+        var startVn = new DateTimeOffset(nowVn.Year, nowVn.Month, nowVn.Day, 0, 0, 0, vnTz.GetUtcOffset(nowVn)).AddDays(-364);
         startUtc = startVn.ToUniversalTime();
+        startDateStr = startVn.ToString("yyyy-MM-dd");
     }
     else if (period == "custom" && !string.IsNullOrEmpty(from) && !string.IsNullOrEmpty(to))
     {
@@ -792,6 +798,8 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
             startUtc = startVn.ToUniversalTime();
             var endVn = new DateTimeOffset(t.Value.Year, t.Value.Month, t.Value.Day, 23, 59, 59, 999, vnTz.GetUtcOffset(nowVn));
             endUtc = endVn.ToUniversalTime();
+            startDateStr = f.Value.ToString("yyyy-MM-dd");
+            endDateStr = t.Value.ToString("yyyy-MM-dd");
         }
     }
 
@@ -818,6 +826,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
     {
         cmd.Parameters.AddWithValue("$startUtc", startUtc.ToString("O"));
         cmd.Parameters.AddWithValue("$endUtc", endUtc.ToString("O"));
+        if (isOwner) cmd.Parameters.AddWithValue("$ownerId", actor.Id);
         if (!string.IsNullOrEmpty(platformFilter)) cmd.Parameters.AddWithValue("$platform", platform);
         if (!string.IsNullOrEmpty(langFilter)) cmd.Parameters.AddWithValue("$lang", lang);
 
@@ -957,7 +966,9 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         chartData,
         hourlyData,
         topPois,
-        activeAction = actionFilterValue
+        activeAction = actionFilterValue,
+        startDate = startDateStr,
+        endDate = endDateStr
     });
 }).RequireAuthorization();
 

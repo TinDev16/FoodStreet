@@ -1152,7 +1152,6 @@ D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\bin\Debug\net10.0\System.IdentityMode
 D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\k9mnuggnn9-{0}-7q20j1m7ro-7q20j1m7ro.gz
 D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\ypiyamc441-{0}-dkoa6w56gw-dkoa6w56gw.gz
 D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\guzmfxddfb-{0}-zbd58qpa12-zbd58qpa12.gz
-D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\bq0z4a3njl-{0}-u64vv2kfaf-u64vv2kfaf.gz
 D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\3sodcubq1x-{0}-ry5y9auqa9-ry5y9auqa9.gz
 D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\nnk9e9ukq2-{0}-uxudmsngq4-uxudmsngq4.gz
 D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\c1c5jflion-{0}-m8stzhy1a5-m8stzhy1a5.gz
@@ -1161,3 +1160,4 @@ D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\a07yuef3
 D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\3bji9ljz8n-{0}-u1p284ot39-u1p284ot39.gz
 D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\hza5fypx46-{0}-0mi9bh100r-0mi9bh100r.gz
 D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\tihf3uqke4-{0}-l1twyhfz71-l1twyhfz71.gz
+D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\bq0z4a3njl-{0}-o84x5dpkxl-o84x5dpkxl.gz
