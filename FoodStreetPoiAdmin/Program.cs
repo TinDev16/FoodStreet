@@ -3087,6 +3087,57 @@ static async Task<bool> RecordUserActivityAsync(
         }
     }
 
+    // Smart Logging: 'ping' heartbeats are UPSERTED per session to avoid cluttering the log table
+    // while meaningful interactions (Scan, Audio, View) always get new historical rows.
+    bool wasUpserted = false;
+    if (action == "ping")
+    {
+        await using (var updatePing = new SqliteCommand("""
+            UPDATE user_activity_events 
+            SET created_at = $now, 
+                ip_address = $ip, 
+                screen_info = $screen,
+                browser_family = $browser,
+                os_family = $os
+            WHERE session_id = $sid AND action = 'ping';
+            """, connection, (SqliteTransaction)transaction))
+        {
+            updatePing.Parameters.AddWithValue("$sid", sessionId);
+            updatePing.Parameters.AddWithValue("$now", nowUtc);
+            updatePing.Parameters.AddWithValue("$ip", (object?)ipAddress ?? DBNull.Value);
+            updatePing.Parameters.AddWithValue("$screen", (object?)screenInfo ?? DBNull.Value);
+            updatePing.Parameters.AddWithValue("$browser", (object?)browser ?? DBNull.Value);
+            updatePing.Parameters.AddWithValue("$os", (object?)os ?? DBNull.Value);
+            var rowsAffected = await updatePing.ExecuteNonQueryAsync();
+            if (rowsAffected > 0) wasUpserted = true;
+        }
+    }
+
+    if (!wasUpserted)
+    {
+        await using (var insertEvent = new SqliteCommand("""
+            INSERT INTO user_activity_events (poi_id, session_id, device_id, platform, action, language, device_type, browser_family, os_family, ip_address, screen_info, is_real_scan, duration, created_at)
+            VALUES ($poi, $sid, $did, $platform, $action, $lang, $device, $browser, $os, $ip, $screen, $isReal, $duration, $now);
+            """, connection, (SqliteTransaction)transaction))
+        {
+            insertEvent.Parameters.AddWithValue("$poi", poiId.HasValue ? (object)poiId.Value : DBNull.Value);
+            insertEvent.Parameters.AddWithValue("$sid", sessionId);
+            insertEvent.Parameters.AddWithValue("$did", (object?)deviceId ?? DBNull.Value);
+            insertEvent.Parameters.AddWithValue("$platform", platform);
+            insertEvent.Parameters.AddWithValue("$action", action);
+            insertEvent.Parameters.AddWithValue("$lang", language ?? "vi");
+            insertEvent.Parameters.AddWithValue("$device", (object?)deviceType ?? DBNull.Value);
+            insertEvent.Parameters.AddWithValue("$browser", (object?)browser ?? DBNull.Value);
+            insertEvent.Parameters.AddWithValue("$os", (object?)os ?? DBNull.Value);
+            insertEvent.Parameters.AddWithValue("$ip", (object?)ipAddress ?? DBNull.Value);
+            insertEvent.Parameters.AddWithValue("$screen", (object?)screenInfo ?? DBNull.Value);
+            insertEvent.Parameters.AddWithValue("$isReal", isRealScan.HasValue ? (object)isRealScan.Value : DBNull.Value);
+            insertEvent.Parameters.AddWithValue("$duration", duration.HasValue ? (object)duration.Value : DBNull.Value);
+            insertEvent.Parameters.AddWithValue("$now", nowUtc);
+            await insertEvent.ExecuteNonQueryAsync();
+        }
+    }
+
     await transaction.CommitAsync();
     return true;
 }
