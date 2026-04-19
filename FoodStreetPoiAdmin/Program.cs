@@ -3046,8 +3046,10 @@ static async Task<bool> RecordUserActivityAsync(
 
     var (browser, os) = ParseUserAgent(userAgent);
 
+    // --- Database Persistence ---
     await using var transaction = await connection.BeginTransactionAsync();
 
+    // 1. Maintain Real-time Session Status
     await using (var upsertSession = new SqliteCommand("""
         INSERT INTO active_sessions (session_id, last_ping_at, platform)
         VALUES ($sid, $now, $platform)
@@ -3060,41 +3062,16 @@ static async Task<bool> RecordUserActivityAsync(
         await upsertSession.ExecuteNonQueryAsync();
     }
 
-    // All activity (excluding 'ping' heartbeats) is logged to user_activity_events for unified reporting.
-    // 'ping' is only used to maintain 'active_sessions' for real-time online count.
-    if (action != "ping")
-    {
-        await using (var insertEvent = new SqliteCommand("""
-            INSERT INTO user_activity_events (poi_id, session_id, device_id, platform, action, language, device_type, browser_family, os_family, ip_address, screen_info, is_real_scan, duration, created_at)
-            VALUES ($poi, $sid, $did, $platform, $action, $lang, $device, $browser, $os, $ip, $screen, $isReal, $duration, $now);
-            """, connection, (SqliteTransaction)transaction))
-        {
-            insertEvent.Parameters.AddWithValue("$poi", poiId.HasValue ? (object)poiId.Value : DBNull.Value);
-            insertEvent.Parameters.AddWithValue("$sid", sessionId);
-            insertEvent.Parameters.AddWithValue("$did", (object?)deviceId ?? DBNull.Value);
-            insertEvent.Parameters.AddWithValue("$platform", platform);
-            insertEvent.Parameters.AddWithValue("$action", action);
-            insertEvent.Parameters.AddWithValue("$lang", language ?? "vi");
-            insertEvent.Parameters.AddWithValue("$device", (object?)deviceType ?? DBNull.Value);
-            insertEvent.Parameters.AddWithValue("$browser", (object?)browser ?? DBNull.Value);
-            insertEvent.Parameters.AddWithValue("$os", (object?)os ?? DBNull.Value);
-            insertEvent.Parameters.AddWithValue("$ip", (object?)ipAddress ?? DBNull.Value);
-            insertEvent.Parameters.AddWithValue("$screen", (object?)screenInfo ?? DBNull.Value);
-            insertEvent.Parameters.AddWithValue("$isReal", isRealScan.HasValue ? (object)isRealScan.Value : DBNull.Value);
-            insertEvent.Parameters.AddWithValue("$duration", duration.HasValue ? (object)duration.Value : DBNull.Value);
-            insertEvent.Parameters.AddWithValue("$now", nowUtc);
-            await insertEvent.ExecuteNonQueryAsync();
-        }
-    }
-
-    // Smart Logging: 'ping' heartbeats are UPSERTED per session to avoid cluttering the log table
-    // while meaningful interactions (Scan, Audio, View) always get new historical rows.
+    // 2. Smart Logging for Historical/Live History
+    // Heartbeats (ping) are UPSERTED per session/device to prevent log table flooding.
+    // Meaningful interactions (Scan, Audio, View) always get new historical rows.
     bool wasUpserted = false;
     if (action == "ping")
     {
         await using (var updatePing = new SqliteCommand("""
             UPDATE user_activity_events 
             SET created_at = $now, 
+                poi_id = $poi,
                 ip_address = $ip, 
                 screen_info = $screen,
                 browser_family = $browser,
@@ -3103,11 +3080,13 @@ static async Task<bool> RecordUserActivityAsync(
             """, connection, (SqliteTransaction)transaction))
         {
             updatePing.Parameters.AddWithValue("$sid", sessionId);
+            updatePing.Parameters.AddWithValue("$poi", poiId.HasValue ? (object)poiId.Value : DBNull.Value);
             updatePing.Parameters.AddWithValue("$now", nowUtc);
             updatePing.Parameters.AddWithValue("$ip", (object?)ipAddress ?? DBNull.Value);
             updatePing.Parameters.AddWithValue("$screen", (object?)screenInfo ?? DBNull.Value);
             updatePing.Parameters.AddWithValue("$browser", (object?)browser ?? DBNull.Value);
             updatePing.Parameters.AddWithValue("$os", (object?)os ?? DBNull.Value);
+            
             var rowsAffected = await updatePing.ExecuteNonQueryAsync();
             if (rowsAffected > 0) wasUpserted = true;
         }
