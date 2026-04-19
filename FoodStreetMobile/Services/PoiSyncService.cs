@@ -477,6 +477,17 @@ public sealed class PoiSyncService
         return $"{baseUrl}{value}";
     }
 
+    public string GetDeviceId()
+    {
+        var id = Preferences.Get("device_id", string.Empty);
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            id = Guid.NewGuid().ToString("N");
+            Preferences.Set("device_id", id);
+        }
+        return id;
+    }
+
     public string GetSessionId()
     {
         var sid = Preferences.Get("session_id", string.Empty);
@@ -501,6 +512,7 @@ public sealed class PoiSyncService
                     action = action,
                     platform = "app",
                     sessionId = sid,
+                    deviceId = GetDeviceId(),
                     language = langCode,
                     poiId = poiId,
                     deviceType = "mobile",

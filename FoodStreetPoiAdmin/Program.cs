@@ -3072,14 +3072,19 @@ static async Task<bool> RecordUserActivityAsync(
             UPDATE user_activity_events 
             SET created_at = $now, 
                 poi_id = $poi,
+                session_id = $sid,
                 ip_address = $ip, 
                 screen_info = $screen,
                 browser_family = $browser,
                 os_family = $os
-            WHERE session_id = $sid AND action = 'ping';
+            WHERE action = 'ping' AND (
+                (device_id IS NOT NULL AND device_id = $did)
+                OR (device_id IS NULL AND session_id = $sid)
+            );
             """, connection, (SqliteTransaction)transaction))
         {
             updatePing.Parameters.AddWithValue("$sid", sessionId);
+            updatePing.Parameters.AddWithValue("$did", (object?)deviceId ?? DBNull.Value);
             updatePing.Parameters.AddWithValue("$poi", poiId.HasValue ? (object)poiId.Value : DBNull.Value);
             updatePing.Parameters.AddWithValue("$now", nowUtc);
             updatePing.Parameters.AddWithValue("$ip", (object?)ipAddress ?? DBNull.Value);
