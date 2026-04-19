@@ -614,7 +614,7 @@ app.MapGet("/qr/scan", (HttpContext context) =>
 <html>
 <head>
     <title>Đang xác thực...</title>
-    <meta name='viewport' content='width=device-width, initial-scale=1'>
+    <meta name=""viewport"" content=""width=device-width, initial-scale=1"">
     <style>
         body {{ font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f8fafc; color: #334155; }}
         .loader {{ border: 4px solid #e2e8f0; border-top: 4px solid #4f46e5; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px; }}
@@ -622,28 +622,40 @@ app.MapGet("/qr/scan", (HttpContext context) =>
     </style>
 </head>
 <body>
-    <div style='text-align: center;'>
-        <div class='loader'></div>
+    <div style=""text-align: center;"">
+        <div class=""loader""></div>
         <div>Loading...</div>
     </div>
     <script>
+        function getOrCreateDeviceId() {{
+            let id = localStorage.getItem(""device_id"");
+            if (!id) {{
+                try {{ id = crypto.randomUUID(); }} 
+                catch(e) {{ id = ""dev_"" + Date.now() + ""_"" + Math.random().toString(36).substring(2); }}
+                localStorage.setItem(""device_id"", id);
+            }}
+            return id;
+        }}
+
         setTimeout(async () => {{
-            const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+            const isTouch = (""ontouchstart"" in window) || (navigator.maxTouchPoints > 0);
             const screenWidth = window.screen.width;
-            let sid = localStorage.getItem('session_id');
-            if (!sid) {{ sid = 'web_' + Date.now() + '_' + Math.random().toString(36).substring(2); localStorage.setItem('session_id', sid); }}
+            const screenInfo = JSON.stringify({{ w: window.screen.width, h: window.screen.height, dpr: window.devicePixelRatio || 1 }});
+            const deviceId = getOrCreateDeviceId();
+            let sid = localStorage.getItem(""session_id"");
+            if (!sid) {{ sid = ""web_"" + Date.now() + ""_"" + Math.random().toString(36).substring(2); localStorage.setItem(""session_id"", sid); }}
 
             try {{
-                const res = await fetch('/api/public/qr/confirm', {{
-                    method: 'POST',
-                    headers: {{ 'Content-Type': 'application/json' }},
-                    body: JSON.stringify({{ screenWidth, isTouch, code: '{WebUtility.HtmlEncode(code)}', sessionId: sid }})
+                const res = await fetch(""/api/public/qr/confirm"", {{
+                    method: ""POST"",
+                    headers: {{ ""Content-Type"": ""application/json"" }},
+                    body: JSON.stringify({{ screenWidth, isTouch, code: ""{WebUtility.HtmlEncode(code)}"", sessionId: sid, deviceId, screenInfo }})
                 }});
                 const data = await res.json();
                 if (data && data.url) window.location.replace(data.url);
-                else window.location.replace('/poi.html?id=' + encodeURIComponent('{WebUtility.HtmlEncode(code)}'));
+                else window.location.replace(""/poi.html?id="" + encodeURIComponent(""{WebUtility.HtmlEncode(code)}""));
             }} catch(e) {{
-                window.location.replace('/poi.html?id=' + encodeURIComponent('{WebUtility.HtmlEncode(code)}'));
+                window.location.replace(""/poi.html?id="" + encodeURIComponent(""{WebUtility.HtmlEncode(code)}""));
             }}
         }}, 300);
     </script>
@@ -664,14 +676,30 @@ app.MapPost("/api/public/qr/confirm", async (HttpContext context, QrConfirmReque
     
     var sid = string.IsNullOrWhiteSpace(req.SessionId) ? ($"anon_{Guid.NewGuid():N}") : req.SessionId;
     
-    await RecordUserActivityAsync(connectionString, sid, "web", "scan_qr", "vi", deviceType, poiId, isReal ? 1 : 0, null);
+    var ua = context.Request.Headers["User-Agent"].ToString();
+    var ip = context.Connection.RemoteIpAddress?.ToString();
+
+    await RecordUserActivityAsync(
+        connectionString, 
+        sid, 
+        "web", 
+        "scan_qr", 
+        "vi", 
+        deviceType, 
+        poiId, 
+        isReal ? 1 : 0, 
+        null,
+        req.DeviceId,
+        ua,
+        ip,
+        req.ScreenInfo);
     
     var (baseUrl, _) = await ResolvePublicBaseUrlForRequestAsync(context);
     var url = BuildPublicPoiUrl(baseUrl ?? "", poiId ?? 0, "vi");
     return Results.Ok(new { url });
 });
 
-app.MapPost("/api/public/pois/track-activity", async (TrackActivityRequest request) =>
+app.MapPost("/api/public/pois/track-activity", async (HttpContext context, TrackActivityRequest request) =>
 {
     await TryEnsureAdbReverseAsync();
     
@@ -683,8 +711,25 @@ app.MapPost("/api/public/pois/track-activity", async (TrackActivityRequest reque
     if (!string.IsNullOrWhiteSpace(request.PoiId)) {
         if (TryParsePoiId(request.PoiId, out var p)) poiId = p;
     }
+
+    var ua = context.Request.Headers["User-Agent"].ToString();
+    var ip = context.Connection.RemoteIpAddress?.ToString();
     
-    var recorded = await RecordUserActivityAsync(connectionString, request.SessionId, request.Platform, request.Action, request.Language, request.DeviceType, poiId, null, request.Duration);
+    var recorded = await RecordUserActivityAsync(
+        connectionString, 
+        request.SessionId, 
+        request.Platform, 
+        request.Action, 
+        request.Language, 
+        request.DeviceType, 
+        poiId, 
+        null, 
+        request.Duration,
+        request.DeviceId,
+        ua,
+        ip,
+        request.ScreenInfo);
+
     return recorded ? Results.Ok(new { recorded = true }) : Results.Problem("Cannot record activity.");
 });
 
@@ -958,17 +1003,140 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         }
     }
 
+    // 7. NEW: Unique Devices Count
+    long totalUniqueDevices = 0;
+    string uniqueDevicesSql = $@"
+        SELECT COUNT(DISTINCT uae.device_id) 
+        FROM user_activity_events uae
+        JOIN pois p ON p.id = uae.poi_id
+        WHERE uae.created_at >= $startUtc AND uae.created_at < $endUtc
+          {platformFilter} {langFilter} {ownerWhere};";
+    await using (var cmd = new SqliteCommand(uniqueDevicesSql, conn))
+    {
+        cmd.Parameters.AddWithValue("$startUtc", startUtc.ToString("O"));
+        cmd.Parameters.AddWithValue("$endUtc", endUtc.ToString("O"));
+        if (isOwner) cmd.Parameters.AddWithValue("$ownerId", actor.Id);
+        if (!string.IsNullOrEmpty(platformFilter)) cmd.Parameters.AddWithValue("$platform", platform);
+        if (!string.IsNullOrEmpty(langFilter)) cmd.Parameters.AddWithValue("$lang", lang);
+        var res = await cmd.ExecuteScalarAsync();
+        totalUniqueDevices = Convert.ToInt64(res);
+    }
+
+    // 8. NEW: Browser & OS Breakdown
+    var browserStats = new List<object>();
+    var osStats = new List<object>();
+    
+    string browserSql = $@"
+        SELECT browser_family, COUNT(1) as c 
+        FROM user_activity_events uae
+        JOIN pois p ON p.id = uae.poi_id
+        WHERE uae.created_at >= $startUtc AND uae.created_at < $endUtc
+          {platformFilter} {langFilter} {ownerWhere}
+        GROUP BY browser_family ORDER BY c DESC LIMIT 5;";
+    await using (var cmd = new SqliteCommand(browserSql, conn))
+    {
+        cmd.Parameters.AddWithValue("$startUtc", startUtc.ToString("O"));
+        cmd.Parameters.AddWithValue("$endUtc", endUtc.ToString("O"));
+        if (isOwner) cmd.Parameters.AddWithValue("$ownerId", actor.Id);
+        var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync()) browserStats.Add(new { label = reader.IsDBNull(0) ? "Unknown" : reader.GetString(0), count = reader.GetInt32(1) });
+    }
+
+    string osSql = $@"
+        SELECT os_family, COUNT(1) as c 
+        FROM user_activity_events uae
+        JOIN pois p ON p.id = uae.poi_id
+        WHERE uae.created_at >= $startUtc AND uae.created_at < $endUtc
+          {platformFilter} {langFilter} {ownerWhere}
+        GROUP BY os_family ORDER BY c DESC LIMIT 5;";
+    await using (var cmd = new SqliteCommand(osSql, conn))
+    {
+        cmd.Parameters.AddWithValue("$startUtc", startUtc.ToString("O"));
+        cmd.Parameters.AddWithValue("$endUtc", endUtc.ToString("O"));
+        if (isOwner) cmd.Parameters.AddWithValue("$ownerId", actor.Id);
+        var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync()) osStats.Add(new { label = reader.IsDBNull(0) ? "Unknown" : reader.GetString(0), count = reader.GetInt32(1) });
+    }
+
+    // 9. NEW: Paginated Detailed Logs
+    int pageIndex = 0;
+    int pageSize = 50;
+    if (int.TryParse(context.Request.Query["page"], out var pIdx)) pageIndex = Math.Max(0, pIdx);
+    if (int.TryParse(context.Request.Query["pageSize"], out var pSize)) pageSize = Math.Clamp(pSize, 10, 200);
+
+    var recentLogs = new List<object>();
+    int totalLogCount = 0;
+
+    string logCountSql = $@"
+        SELECT COUNT(1) FROM user_activity_events uae
+        JOIN pois p ON p.id = uae.poi_id
+        WHERE {actionClauseSpecific} AND uae.created_at >= $startUtc AND uae.created_at < $endUtc
+          {platformFilter} {langFilter} {ownerWhere};";
+    await using (var cmd = new SqliteCommand(logCountSql, conn))
+    {
+        cmd.Parameters.AddWithValue("$startUtc", startUtc.ToString("O"));
+        cmd.Parameters.AddWithValue("$endUtc", endUtc.ToString("O"));
+        if (isOwner) cmd.Parameters.AddWithValue("$ownerId", actor.Id);
+        if (actionFilterValue is not null) cmd.Parameters.AddWithValue("$actionFilter", actionFilterValue);
+        totalLogCount = Convert.ToInt32(await cmd.ExecuteScalarAsync());
+    }
+
+    string logSql = $@"
+        SELECT uae.id, uae.poi_id, t.name as poi_name, uae.action, uae.platform, uae.device_id, uae.browser_family, uae.os_family, uae.ip_address, uae.screen_info, uae.created_at
+        FROM user_activity_events uae
+        LEFT JOIN pois p ON p.id = uae.poi_id
+        LEFT JOIN (
+            SELECT poi_id, name FROM poi_translations WHERE lang_code = 'vi' GROUP BY poi_id
+        ) t ON uae.poi_id = t.poi_id
+        WHERE {actionClauseSpecific} AND uae.created_at >= $startUtc AND uae.created_at < $endUtc
+          {platformFilter} {langFilter} {ownerWhere}
+        ORDER BY uae.created_at DESC
+        LIMIT $limit OFFSET $offset;";
+    await using (var cmd = new SqliteCommand(logSql, conn))
+    {
+        cmd.Parameters.AddWithValue("$startUtc", startUtc.ToString("O"));
+        cmd.Parameters.AddWithValue("$endUtc", endUtc.ToString("O"));
+        cmd.Parameters.AddWithValue("$limit", pageSize);
+        cmd.Parameters.AddWithValue("$offset", pageIndex * pageSize);
+        if (isOwner) cmd.Parameters.AddWithValue("$ownerId", actor.Id);
+        if (actionFilterValue is not null) cmd.Parameters.AddWithValue("$actionFilter", actionFilterValue);
+        if (!string.IsNullOrEmpty(platformFilter)) cmd.Parameters.AddWithValue("$platform", platform);
+        if (!string.IsNullOrEmpty(langFilter)) cmd.Parameters.AddWithValue("$lang", lang);
+
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            recentLogs.Add(new {
+                id = reader.GetInt64(0),
+                poiId = reader.IsDBNull(1) ? null : (object)reader.GetInt64(1).ToString(),
+                poiName = reader.IsDBNull(2) ? null : reader.GetString(2),
+                action = reader.GetString(3),
+                platform = reader.GetString(4),
+                deviceId = reader.IsDBNull(5) ? null : reader.GetString(5),
+                browser = reader.IsDBNull(6) ? null : reader.GetString(6),
+                os = reader.IsDBNull(7) ? null : reader.GetString(7),
+                ip = reader.IsDBNull(8) ? null : reader.GetString(8),
+                screenInfo = reader.IsDBNull(9) ? null : reader.GetString(9),
+                createdAt = reader.GetString(10)
+            });
+        }
+    }
+
     return Results.Ok(new {
         onlineNow,
         periodAudioPlays,
         periodQrScans,
         periodViews,
+        startDate = startDateStr,
+        endDate = endDateStr,
         chartData,
         hourlyData,
         topPois,
-        activeAction = actionFilterValue,
-        startDate = startDateStr,
-        endDate = endDateStr
+        totalUniqueDevices,
+        browserStats,
+        osStats,
+        recentLogs,
+        totalLogCount
     });
 }).RequireAuthorization();
 
@@ -1806,10 +1974,15 @@ static async Task InitializeDatabaseAsync(string connectionString)
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             poi_id INTEGER,
             session_id TEXT NOT NULL,
+            device_id TEXT,
             platform TEXT NOT NULL,
             action TEXT NOT NULL,
             language TEXT,
             device_type TEXT,
+            browser_family TEXT,
+            os_family TEXT,
+            ip_address TEXT,
+            screen_info TEXT,
             is_real_scan INTEGER,
             duration INTEGER,
             created_at TEXT NOT NULL,
@@ -1826,6 +1999,23 @@ static async Task InitializeDatabaseAsync(string connectionString)
     {
         await createUsers.ExecuteNonQueryAsync();
     }
+
+    // New Columns Migrations
+    await AddColumnIfNotExists(connection, "user_activity_events", "device_id", "TEXT");
+    await AddColumnIfNotExists(connection, "user_activity_events", "browser_family", "TEXT");
+    await AddColumnIfNotExists(connection, "user_activity_events", "os_family", "TEXT");
+    await AddColumnIfNotExists(connection, "user_activity_events", "ip_address", "TEXT");
+    await AddColumnIfNotExists(connection, "user_activity_events", "screen_info", "TEXT");
+
+    // NEW Indices for migrations
+    await using (var cmdIndices = new SqliteCommand("""
+        CREATE INDEX IF NOT EXISTS ix_user_activity_events_device_id ON user_activity_events(device_id);
+    """, connection))
+    {
+        await cmdIndices.ExecuteNonQueryAsync();
+    }
+
+    await CleanupOldLogsAsync(connection);
 
     await AddColumnIfNotExists(connection, "admin_accounts", "is_deleted", "INTEGER NOT NULL DEFAULT 0");
     await AddColumnIfNotExists(connection, "admin_accounts", "deleted_at", "TEXT");
@@ -2775,6 +2965,42 @@ static async Task<List<string>> TranslateTextsAsync(
 }
 
 
+static async Task CleanupOldLogsAsync(SqliteConnection conn)
+{
+    try
+    {
+        // Retention: 90 days
+        const string sql = "DELETE FROM user_activity_events WHERE created_at < datetime('now', '-90 days');";
+        await using var cmd = new SqliteCommand(sql, conn);
+        await cmd.ExecuteNonQueryAsync();
+    }
+    catch { }
+}
+
+static (string Browser, string OS) ParseUserAgent(string? ua)
+{
+    if (string.IsNullOrWhiteSpace(ua)) return ("Unknown", "Unknown");
+
+    var browser = "Other";
+    var os = "Other";
+
+    // Basic OS Detection
+    if (ua.Contains("Windows", StringComparison.OrdinalIgnoreCase)) os = "Windows";
+    else if (ua.Contains("Android", StringComparison.OrdinalIgnoreCase)) os = "Android";
+    else if (ua.Contains("iPhone", StringComparison.OrdinalIgnoreCase) || ua.Contains("iPad", StringComparison.OrdinalIgnoreCase)) os = "iOS";
+    else if (ua.Contains("Mac OS X", StringComparison.OrdinalIgnoreCase)) os = "macOS";
+    else if (ua.Contains("Linux", StringComparison.OrdinalIgnoreCase)) os = "Linux";
+
+    // Basic Browser Detection
+    if (ua.Contains("Edg/", StringComparison.OrdinalIgnoreCase)) browser = "Edge";
+    else if (ua.Contains("Chrome/", StringComparison.OrdinalIgnoreCase)) browser = "Chrome";
+    else if (ua.Contains("Safari/", StringComparison.OrdinalIgnoreCase) && !ua.Contains("Chrome/", StringComparison.OrdinalIgnoreCase)) browser = "Safari";
+    else if (ua.Contains("Firefox/", StringComparison.OrdinalIgnoreCase)) browser = "Firefox";
+    else if (ua.Contains("OPR/", StringComparison.OrdinalIgnoreCase) || ua.Contains("Opera/", StringComparison.OrdinalIgnoreCase)) browser = "Opera";
+
+    return (browser, os);
+}
+
 static async Task<bool> RecordUserActivityAsync(
     string connectionString,
     string sessionId,
@@ -2784,12 +3010,26 @@ static async Task<bool> RecordUserActivityAsync(
     string? deviceType,
     long? poiId,
     int? isRealScan,
-    int? duration)
+    int? duration,
+    string? deviceId = null,
+    string? userAgent = null,
+    string? ipAddress = null,
+    string? screenInfo = null)
 {
     await using var connection = await OpenConnectionAsync(connectionString);
     var nowUtc = DateTimeOffset.UtcNow.ToString("O");
 
-    // Throttling for 'ping' events: only update if last ping was more than 30 seconds ago
+    // Spam/Rate Limiting: Max 40 events per minute per deviceId
+    if (!string.IsNullOrWhiteSpace(deviceId))
+    {
+        const string checkSpamSql = "SELECT COUNT(1) FROM user_activity_events WHERE device_id = $did AND created_at > datetime('now', '-1 minute')";
+        await using var spamCmd = new SqliteCommand(checkSpamSql, connection);
+        spamCmd.Parameters.AddWithValue("$did", deviceId);
+        var recentCount = Convert.ToInt64(await spamCmd.ExecuteScalarAsync());
+        if (recentCount > 40) return true; // Silently ignore spam
+    }
+
+    // Throttling for 'ping' events: only update if last ping was more than 4 seconds ago
     if (action == "ping")
     {
         await using var checkCmd = new SqliteCommand("SELECT last_ping_at FROM active_sessions WHERE session_id = $sid;", connection);
@@ -2803,6 +3043,8 @@ static async Task<bool> RecordUserActivityAsync(
             }
         }
     }
+
+    var (browser, os) = ParseUserAgent(userAgent);
 
     await using var transaction = await connection.BeginTransactionAsync();
 
@@ -2820,18 +3062,23 @@ static async Task<bool> RecordUserActivityAsync(
 
     // All activity (including throttled ping) is logged to user_activity_events for unified reporting.
     await using (var insertEvent = new SqliteCommand("""
-        INSERT INTO user_activity_events (poi_id, session_id, platform, action, language, device_type, is_real_scan, duration, created_at)
-        VALUES ($poi, $sid, $platform, $action, $lang, $device, $isReal, $duration, $now);
+        INSERT INTO user_activity_events (poi_id, session_id, device_id, platform, action, language, device_type, browser_family, os_family, ip_address, screen_info, is_real_scan, duration, created_at)
+        VALUES ($poi, $sid, $did, $platform, $action, $lang, $device, $browser, $os, $ip, $screen, $isReal, $duration, $now);
         """, connection, (SqliteTransaction)transaction))
     {
-        insertEvent.Parameters.AddWithValue("$poi", poiId.HasValue ? poiId.Value : DBNull.Value);
+        insertEvent.Parameters.AddWithValue("$poi", poiId.HasValue ? (object)poiId.Value : DBNull.Value);
         insertEvent.Parameters.AddWithValue("$sid", sessionId);
+        insertEvent.Parameters.AddWithValue("$did", (object?)deviceId ?? DBNull.Value);
         insertEvent.Parameters.AddWithValue("$platform", platform);
         insertEvent.Parameters.AddWithValue("$action", action);
         insertEvent.Parameters.AddWithValue("$lang", language ?? "vi");
         insertEvent.Parameters.AddWithValue("$device", (object?)deviceType ?? DBNull.Value);
-        insertEvent.Parameters.AddWithValue("$isReal", isRealScan.HasValue ? isRealScan.Value : DBNull.Value);
-        insertEvent.Parameters.AddWithValue("$duration", duration.HasValue ? duration.Value : DBNull.Value);
+        insertEvent.Parameters.AddWithValue("$browser", (object?)browser ?? DBNull.Value);
+        insertEvent.Parameters.AddWithValue("$os", (object?)os ?? DBNull.Value);
+        insertEvent.Parameters.AddWithValue("$ip", (object?)ipAddress ?? DBNull.Value);
+        insertEvent.Parameters.AddWithValue("$screen", (object?)screenInfo ?? DBNull.Value);
+        insertEvent.Parameters.AddWithValue("$isReal", isRealScan.HasValue ? (object)isRealScan.Value : DBNull.Value);
+        insertEvent.Parameters.AddWithValue("$duration", duration.HasValue ? (object)duration.Value : DBNull.Value);
         insertEvent.Parameters.AddWithValue("$now", nowUtc);
         await insertEvent.ExecuteNonQueryAsync();
     }
@@ -3038,10 +3285,12 @@ sealed class TrackActivityRequest
     public string? Action { get; set; }
     public string? Platform { get; set; }
     public string? SessionId { get; set; }
+    public string? DeviceId { get; set; }
     public string? Language { get; set; }
     public string? PoiId { get; set; }
     public string? DeviceType { get; set; }
     public int? Duration { get; set; }
+    public string? ScreenInfo { get; set; }
 }
 
 sealed class QrConfirmRequest
@@ -3050,4 +3299,46 @@ sealed class QrConfirmRequest
     public bool IsTouch { get; set; }
     public string? Code { get; set; }
     public string? SessionId { get; set; }
+    public string? DeviceId { get; set; }
+    public string? ScreenInfo { get; set; }
 }
+
+sealed class UserActivityLogDto
+{
+    public long Id { get; set; }
+    public string? PoiId { get; set; }
+    public string? PoiName { get; set; }
+    public string Action { get; set; } = string.Empty;
+    public string Platform { get; set; } = string.Empty;
+    public string? DeviceId { get; set; }
+    public string? Browser { get; set; }
+    public string? OS { get; set; }
+    public string? IP { get; set; }
+    public string? ScreenInfo { get; set; }
+    public string CreatedAt { get; set; } = string.Empty;
+}
+
+sealed class DashboardReportsResponse
+{
+    public long OnlineNow { get; set; }
+    public long PeriodAudioPlays { get; set; }
+    public long PeriodQrScans { get; set; }
+    public long PeriodViews { get; set; }
+    public string StartDate { get; set; } = string.Empty;
+    public string EndDate { get; set; } = string.Empty;
+    public List<ChartPointDto> ChartData { get; set; } = [];
+    public List<HourlyPointDto> HourlyData { get; set; } = [];
+    public List<PoiRankingDto> TopPois { get; set; } = [];
+    
+    // New analytics fields
+    public long TotalUniqueDevices { get; set; }
+    public List<StatBreakdownDto> BrowserStats { get; set; } = [];
+    public List<StatBreakdownDto> OsStats { get; set; } = [];
+    public List<UserActivityLogDto> RecentLogs { get; set; } = [];
+    public int TotalLogCount { get; set; }
+}
+
+sealed class ChartPointDto { public string Date { get; set; } = ""; public string Action { get; set; } = ""; public int Count { get; set; } }
+sealed class HourlyPointDto { public int Hour { get; set; } public int Count { get; set; } }
+sealed class PoiRankingDto { public string PoiId { get; set; } = ""; public string Name { get; set; } = ""; public int Count { get; set; } }
+sealed class StatBreakdownDto { public string Label { get; set; } = ""; public int Count { get; set; } }

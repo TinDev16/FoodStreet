@@ -284,11 +284,34 @@
     return res.json();
   };
 
+  const getOrCreateDeviceId = () => {
+    let id = localStorage.getItem("device_id");
+    if (!id) {
+        try {
+            id = crypto.randomUUID();
+        } catch(e) {
+            id = 'dev_' + Date.now() + '_' + Math.random().toString(36).substring(2);
+        }
+        localStorage.setItem("device_id", id);
+    }
+    return id;
+  };
+
+  const getScreenInfo = () => {
+    return JSON.stringify({
+        w: window.screen.width,
+        h: window.screen.height,
+        dpr: window.devicePixelRatio || 1
+    });
+  };
+
   const trackActivity = async (action, overrideParams = {}) => {
     try {
         const sid = localStorage.getItem('session_id') || ('web_' + Date.now() + '_' + Math.random().toString(36).substring(2));
         localStorage.setItem('session_id', sid);
         state.sessionId = sid;
+
+        const did = getOrCreateDeviceId();
 
         await fetch('/api/public/pois/track-activity', {
             method: 'POST',
@@ -297,9 +320,11 @@
                 action,
                 platform: 'web',
                 sessionId: sid,
+                deviceId: did,
                 language: state.lang,
                 poiId: state.poiId,
                 deviceType: 'web',
+                screenInfo: getScreenInfo(),
                 ...overrideParams
             })
         });

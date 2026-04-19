@@ -320,6 +320,61 @@
       background: #4f46e5;
       border-radius: 4px;
     }
+
+    /* New Pagination Button Styles */
+    .pagination-btn {
+      background: rgba(99, 102, 241, 0.1) !important;
+      color: #818cf8 !important;
+      border: 1px solid rgba(99, 102, 241, 0.3) !important;
+      transition: all 0.25s ease !important;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    [data-theme="dark"] .pagination-btn {
+      background: rgba(129, 140, 248, 0.15) !important;
+      border-color: rgba(129, 140, 248, 0.25) !important;
+    }
+
+    .pagination-btn:hover:not(:disabled) {
+      background: #6366f1 !important;
+      color: white !important;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+
+    .pagination-btn:disabled {
+      opacity: 0.3 !important;
+      cursor: not-allowed !important;
+      background: rgba(255, 255, 255, 0.05) !important;
+      color: var(--text-muted) !important;
+      border-color: transparent !important;
+      transform: none !important;
+      box-shadow: none !important;
+    }
+
+    /* Table Text Color Tuning */
+    #logTable tbody td, #logTable thead th {
+      color: #000000 !important;
+    }
+    #logTable td.muted, #logTable .muted {
+      color: #334155 !important;
+    }
+
+    [data-theme="dark"] #logTable tbody td {
+      color: #f8fafc !important;
+    }
+    [data-theme="dark"] #logTable thead th {
+      color: #94a3b8 !important;
+    }
+    [data-theme="dark"] #logTable td.muted, [data-theme="dark"] #logTable .muted {
+      color: #94a3b8 !important;
+    }
   </style>
 </head>
 
@@ -425,7 +480,7 @@
           </section>
 
           <div class="monitoring-grid" id="statCardsGrid">
-            <div class="stat-card clickable" data-action="online" role="button" tabindex="0" title="Lọc biểu đồ theo hoạt động online">
+            <div class="stat-card clickable" data-action="online" role="button" tabindex="0" title="Lượt xem số thiết bị đang tương tác">
               <div class="online-indicator">
                 <div class="ping-dot"></div> Trực tiếp
               </div>
@@ -433,23 +488,23 @@
               <div class="stat-value" id="valOnlineNow">0</div>
               <div class="stat-label">Online theo thời gian thực</div>
             </div>
-            
-            <div class="stat-card clickable" data-action="audio" role="button" tabindex="0" title="Lọc biểu đồ theo lượt nghe Audio">
-              <div class="stat-icon icon-primary"><i class="fa-solid fa-headphones"></i></div>
-              <div class="stat-value" id="valAudioPlays">0</div>
+
+            <div class="stat-card clickable" data-action="audio" role="button" tabindex="0" title="Lượt nghe Audio">
+              <div class="stat-icon icon-info"><i class="fa-solid fa-headphones"></i></div>
+              <div class="stat-value" id="valPeriodAudioPlays">0</div>
               <div class="stat-label">Lượt nghe Audio</div>
             </div>
 
-            <div class="stat-card clickable" data-action="qr" role="button" tabindex="0" title="Lọc biểu đồ theo lượt quét QR">
+            <div class="stat-card clickable" data-action="qr" role="button" tabindex="0" title="Lượt quét QR">
               <div class="stat-icon icon-warning"><i class="fa-solid fa-qrcode"></i></div>
-              <div class="stat-value" id="valQrScans">0</div>
+              <div class="stat-value" id="valPeriodQrScans">0</div>
               <div class="stat-label">Lượt quét QR</div>
             </div>
-
-            <div class="stat-card clickable" data-action="view" role="button" tabindex="0" title="Lọc biểu đồ theo lượt xem POI">
-              <div class="stat-icon icon-info"><i class="fa-solid fa-eye"></i></div>
-              <div class="stat-value" id="valViews">0</div>
-              <div class="stat-label">Lượt xem POI</div>
+            
+            <div class="stat-card clickable" data-action="view" role="button" tabindex="0" title="Lượt xem POI">
+                <div class="stat-icon icon-primary"><i class="fa-solid fa-eye"></i></div>
+                <div class="stat-value" id="valPeriodViews">0</div>
+                <div class="stat-label">Lượt xem POI</div>
             </div>
           </div>
 
@@ -480,7 +535,7 @@
             <header class="card-header" style="border-bottom: 1px solid var(--border-color); margin-bottom: 16px;">
               <div class="card-title" style="margin-bottom: 0;">
                 <i class="fa-solid fa-ranking-star"></i>
-                <h2 style="font-size: 1.25rem;">Xếp hạng</h2>
+                <h2 style="font-size: 1.25rem;">Xếp hạng POI</h2>
               </div>
               <div id="poiRankingSubtitle" class="muted" style="font-size: 0.8rem; margin-top: 4px;">Điểm = Quét QR × 3 + Nghe Audio × 2 + Xem POI × 1</div>
             </header>
@@ -491,13 +546,49 @@
                     <th width="80">Hạng</th>
                     <th>Tên Điểm đến (POI)</th>
                     <th width="150" style="text-align: right;" id="poiRankingCountHeader">Tổng tương tác</th>
-                    <th width="200">Mức độ</th>
                   </tr>
                 </thead>
                 <tbody id="poiRankingRows">
-                  <tr><td colspan="4" class="text-center muted" style="padding: 40px;">Đang tải dữ liệu...</td></tr>
+                  <tr><td colspan="3" class="text-center muted" style="padding: 40px;">Đang tải dữ liệu...</td></tr>
                 </tbody>
               </table>
+            </div>
+          </section>
+
+          <section class="chart-container">
+            <header class="card-header" style="border-bottom: 1px solid var(--border-color); margin-bottom: 16px;">
+              <div class="card-title" style="margin-bottom: 0; cursor: pointer;" id="btnToggleLogCollapse">
+                <i class="fa-solid fa-list-ul"></i>
+                <h2 style="font-size: 1.25rem;">Nhật ký tương tác chi tiết <i class="fa-solid fa-chevron-down" style="font-size: 0.9rem; margin-left:8px; opacity:0.6;"></i></h2>
+              </div>
+              <div class="header-actions">
+                <button id="btnExportLogs" class="secondary small"><i class="fa-solid fa-download"></i> Xuất CSV</button>
+              </div>
+            </header>
+            
+            <div id="logCollapsibleContent">
+                <div class="table-responsive">
+                  <table class="ranking-table" id="logTable">
+                    <thead>
+                      <tr>
+                        <th width="160">Thời gian (VN)</th>
+                        <th width="200">Điểm đến (POI)</th>
+                        <th>Thông tin Thiết bị chi tiết</th>
+                        <th width="120">IP</th>
+                      </tr>
+                    </thead>
+                    <tbody id="logRows">
+                      <tr><td colspan="4" class="text-center muted" style="padding: 40px;">Đang tải nhật ký...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="actions" style="justify-content: space-between; align-items: center; margin-top: 16px;">
+                    <div class="muted small" id="logPaginationInfo">Đang tải...</div>
+                    <div style="display: flex; gap: 10px;">
+                        <button id="btnPrevLog" class="pagination-btn" disabled title="Trang trước"><i class="fa-solid fa-chevron-left"></i></button>
+                        <button id="btnNextLog" class="pagination-btn" disabled title="Trang sau"><i class="fa-solid fa-chevron-right"></i></button>
+                    </div>
+                </div>
             </div>
           </section>
 
