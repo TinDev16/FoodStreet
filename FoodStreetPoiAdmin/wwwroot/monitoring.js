@@ -17,7 +17,13 @@ if (themeToggleBtn) {
     const newTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', newTheme);
     localStorage.setItem('poi_theme', newTheme);
-    ['activityChartVar', 'hourlyChartVar', 'browserChartVar', 'osChartVar'].forEach(key => {
+    
+    // Update all charts in the registry
+    Object.values(charts).forEach(c => {
+        if (c) c.updateOptions({ theme: { mode: newTheme } });
+    });
+    // Legacy support for vars not in registry yet
+    ['activityChartVar', 'hourlyChartVar'].forEach(key => {
         if (window[key]) window[key].updateOptions({ theme: { mode: newTheme } });
     });
   });
@@ -47,6 +53,7 @@ if (payload) {
 }
 
 // --- STATE ---
+const charts = {};
 let selectedAction = null;
 let logPage = 0;
 let logPageSize = 10;
@@ -64,7 +71,6 @@ const filterPlatform = document.getElementById('filterPlatform');
 const filterPeriod = document.getElementById('filterPeriod');
 const filterFrom = document.getElementById('filterFrom');
 const filterTo = document.getElementById('filterTo');
-const filterLang = document.getElementById('filterLang');
 const filterPoiSort = document.getElementById('filterPoiSort');
 const btnRefresh = document.getElementById('btnRefresh');
 const customDateRange = document.getElementById('customDateRange');
@@ -169,7 +175,6 @@ async function loadDashboard() {
       params.set('from', filterFrom.value);
       params.set('to', filterTo.value);
     }
-    if (filterLang.value !== 'all') params.set('lang', filterLang.value);
     if (filterPoiSort.value) params.set('poiSort', filterPoiSort.value);
     if (selectedAction && selectedAction !== 'all') params.set('action', selectedAction);
     
@@ -201,6 +206,9 @@ async function loadDashboard() {
     updateChartLabels();
     renderMainChart(data.chartData || [], data.startDate, data.endDate);
     renderHourlyChart(data.hourlyData || [], selectedAction);
+    
+    renderDonutChart('langChart', data.langStats || []);
+
     renderPoiRanking(data.topPois || [], selectedAction);
     renderDetailedLogs(data.recentLogs || []);
     
@@ -275,19 +283,45 @@ function renderHourlyChart(hourlyData, action) {
   }
 }
 
-function renderDonutChart(selector, varKey, stats) {
+function renderDonutChart(id, stats) {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    if (!stats || stats.length === 0) {
+        el.innerHTML = '<div style="height:250px; display:flex; align-items:center; justify-content:center;" class="muted small text-center">Chưa có dữ liệu</div>';
+        if (charts[id]) {
+            charts[id].destroy();
+            charts[id] = null;
+        }
+        return;
+    }
+
+    const labels = stats.map(s => s.label);
+    const series = stats.map(s => s.count);
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    if (charts[id]) {
+        charts[id].updateOptions({ labels, series });
+        return;
+    }
+
     const options = {
-        series: stats.map(s => s.count),
-        labels: stats.map(s => s.label),
+        series,
+        labels,
         chart: { type: 'donut', height: 250, fontFamily: 'Outfit, sans-serif', background: 'transparent' },
         stroke: { show: false },
-        legend: { position: 'bottom', labels: { colors: isDark ? '#94a3b8' : '#334155' } },
+        legend: { 
+            position: 'bottom', 
+            labels: { colors: isDark ? '#94a3b8' : '#334155' } 
+        },
         dataLabels: { enabled: false },
         theme: { mode: isDark ? 'dark' : 'light' },
         colors: ['#6366f1', '#10b981', '#f59e0b', '#0ea5e9', '#ef4444'],
         plotOptions: { pie: { donut: { size: '75%' } } }
     };
+
+    charts[id] = new ApexCharts(el, options);
+    charts[id].render();
 }
 
 function renderDetailedLogs(logs) {

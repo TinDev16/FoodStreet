@@ -455,18 +455,7 @@
                 <input type="date" id="filterTo" />
               </div>
             </div>
-            <div class="filter-item">
-              <label>Ngôn ngữ</label>
-              <select id="filterLang">
-                <option value="all">Tất cả</option>
-                <option value="vi">Tiếng Việt</option>
-                <option value="en">English</option>
-                <option value="ko">Korean</option>
-                <option value="zh">Chinese</option>
-                <option value="ja">Japanese</option>
-                <option value="ru">Russian</option>
-              </select>
-            </div>
+
             <div class="filter-item">
               <label>Sắp xếp POI</label>
               <select id="filterPoiSort">
@@ -522,14 +511,24 @@
             <section class="chart-container" style="margin-bottom: 0;">
               <header class="card-header" style="border: none; padding-bottom: 0;">
                 <div class="card-title" style="margin-bottom: 0;">
-                  <i class="fa-solid fa-clock"></i>
-                  <h2 style="font-size: 1.25rem;">Phân bổ theo giờ</h2>
+                  <i class="fa-solid fa-language"></i>
+                  <h2 style="font-size: 1.25rem;">Ngôn ngữ sử dụng</h2>
                 </div>
-                <div id="hourlyChartSubtitle" class="muted" style="font-size: 0.8rem; margin-top: 4px;">Tất cả tương tác</div>
               </header>
-              <div id="hourlyChart" style="min-height: 350px;"></div>
+              <div id="langChart" style="min-height: 350px;"></div>
             </section>
           </div>
+
+          <section class="chart-container" style="margin-top: 24px;">
+            <header class="card-header" style="border: none; padding-bottom: 0;">
+              <div class="card-title" style="margin-bottom: 0;">
+                <i class="fa-solid fa-clock"></i>
+                <h2 style="font-size: 1.25rem;">Phân bổ theo giờ</h2>
+              </div>
+              <div id="hourlyChartSubtitle" class="muted" style="font-size: 0.8rem; margin-top: 4px;">Tất cả tương tác</div>
+            </header>
+            <div id="hourlyChart" style="min-height: 250px;"></div>
+          </section>
 
           <section class="chart-container">
             <header class="card-header" style="border-bottom: 1px solid var(--border-color); margin-bottom: 16px;">

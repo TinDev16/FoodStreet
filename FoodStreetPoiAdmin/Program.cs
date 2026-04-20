@@ -738,7 +738,7 @@ app.MapPost("/api/public/pois/track-activity", async (HttpContext context, Track
 });
 
 app.MapGet("/api/admin/reports/user-activities", async (HttpContext context, 
-    string? platform, string? period, string? from, string? to, string? lang, string? poiSort, string? fields, string? action) =>
+    string? platform, string? period, string? from, string? to, string? poiSort, string? fields, string? action) =>
 {
     if (!TryGetAdminActor(context.User, out var actor)) return Results.Unauthorized();
     await TryEnsureAdbReverseAsync();
@@ -852,12 +852,11 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         }
     }
 
-    string dateFilter = "created_at >= $startUtc AND created_at < $endUtc";
+
     var sqliteVnOffset = GetSqliteOffset(vnTz, nowUtc);
 
     
     string platformFilter = (!string.IsNullOrEmpty(platform) && platform != "all") ? " AND uae.platform = $platform" : "";
-    string langFilter = (!string.IsNullOrEmpty(lang) && lang != "all") ? " AND uae.language = $lang" : "";
     
     // 3. Summary stats for select period
     long periodAudioPlays = 0;
@@ -868,7 +867,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         FROM user_activity_events uae
         LEFT JOIN pois p ON p.id = uae.poi_id
         WHERE uae.created_at >= $startUtc AND uae.created_at < $endUtc
-          {platformFilter} {langFilter} {ownerWhere}
+          {platformFilter} {ownerWhere}
         GROUP BY uae.action;";
     
     await using (var cmd = new SqliteCommand(summarySql, conn))
@@ -877,7 +876,6 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         cmd.Parameters.AddWithValue("$endUtc", endUtc.ToString("O"));
         if (isOwner) cmd.Parameters.AddWithValue("$ownerId", actor.Id);
         if (!string.IsNullOrEmpty(platformFilter)) cmd.Parameters.AddWithValue("$platform", platform);
-        if (!string.IsNullOrEmpty(langFilter)) cmd.Parameters.AddWithValue("$lang", lang);
 
         await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync())
@@ -897,7 +895,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         FROM user_activity_events uae
         LEFT JOIN pois p ON p.id = uae.poi_id
         WHERE uae.created_at >= $startUtc AND uae.created_at < $endUtc
-          {platformFilter} {langFilter} {ownerWhere}
+          {platformFilter} {ownerWhere}
         GROUP BY dt, uae.action, uae.platform
         ORDER BY dt ASC;";
     await using (var cmd = new SqliteCommand(chartSql, conn))
@@ -907,7 +905,6 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         cmd.Parameters.AddWithValue("$sqliteOffset", sqliteVnOffset);
         if (isOwner) cmd.Parameters.AddWithValue("$ownerId", actor.Id);
         if (!string.IsNullOrEmpty(platformFilter)) cmd.Parameters.AddWithValue("$platform", platform);
-        if (!string.IsNullOrEmpty(langFilter)) cmd.Parameters.AddWithValue("$lang", lang);
 
         await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync())
@@ -933,7 +930,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         FROM user_activity_events uae
         LEFT JOIN pois p ON p.id = uae.poi_id
         WHERE {actionClauseSpecific} AND uae.created_at >= $startUtc AND uae.created_at < $endUtc
-          {platformFilter} {langFilter} {ownerWhere}
+          {platformFilter} {ownerWhere}
         GROUP BY hr ORDER BY hr ASC;";
     await using (var cmd = new SqliteCommand(hourlySql, conn))
     {
@@ -943,7 +940,6 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         if (isOwner) cmd.Parameters.AddWithValue("$ownerId", actor.Id);
         if (actionFilterValue is not null) cmd.Parameters.AddWithValue("$actionFilter", actionFilterValue);
         if (!string.IsNullOrEmpty(platformFilter)) cmd.Parameters.AddWithValue("$platform", platform);
-        if (!string.IsNullOrEmpty(langFilter)) cmd.Parameters.AddWithValue("$lang", lang);
 
         await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync())
@@ -960,7 +956,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
     if (actionFilterValue != "ping")
     {
         string sortDir = (poiSort == "asc") ? "ASC" : "DESC"; // default DESC
-        string poiRankLang = (!string.IsNullOrEmpty(lang) && lang != "all") ? lang : "vi";
+        string poiRankLang = "vi";
 
         string poiScoreExpr = actionFilterValue is null
             ? @"SUM(CASE uae.action 
@@ -983,7 +979,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
             WHERE uae.poi_id IS NOT NULL 
               AND {actionClauseSpecific} 
               AND uae.created_at >= $startUtc AND uae.created_at < $endUtc
-              {platformFilter} {langFilter} {ownerWhere}
+              {platformFilter} {ownerWhere}
             GROUP BY uae.poi_id
             ORDER BY score {sortDir}
             LIMIT 15;";
@@ -994,7 +990,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         if (isOwner) cmd.Parameters.AddWithValue("$ownerId", actor.Id);
         if (actionFilterValue is not null) cmd.Parameters.AddWithValue("$actionFilter", actionFilterValue);
         if (!string.IsNullOrEmpty(platformFilter)) cmd.Parameters.AddWithValue("$platform", platform);
-        if (!string.IsNullOrEmpty(langFilter)) cmd.Parameters.AddWithValue("$lang", lang);
+
 
         await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync())
@@ -1014,58 +1010,35 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         FROM user_activity_events uae
         LEFT JOIN pois p ON p.id = uae.poi_id
         WHERE uae.created_at >= $startUtc AND uae.created_at < $endUtc
-          {platformFilter} {langFilter} {ownerWhere};";
+          {platformFilter} {ownerWhere};";
     await using (var cmd = new SqliteCommand(uniqueDevicesSql, conn))
     {
         cmd.Parameters.AddWithValue("$startUtc", startUtc.ToString("O"));
         cmd.Parameters.AddWithValue("$endUtc", endUtc.ToString("O"));
         if (isOwner) cmd.Parameters.AddWithValue("$ownerId", actor.Id);
         if (!string.IsNullOrEmpty(platformFilter)) cmd.Parameters.AddWithValue("$platform", platform);
-        if (!string.IsNullOrEmpty(langFilter)) cmd.Parameters.AddWithValue("$lang", lang);
         var res = await cmd.ExecuteScalarAsync();
         totalUniqueDevices = Convert.ToInt64(res);
     }
 
-    // 8. NEW: Browser & OS Breakdown
-    var browserStats = new List<object>();
-    var osStats = new List<object>();
-    
-    string browserSql = $@"
-        SELECT browser_family, COUNT(1) as c 
+    // 8. NEW: Breakdown Stats (Language)
+    var langStats = new List<object>();
+
+    string langStatsSql = $@"
+        SELECT COALESCE(NULLIF(uae.language, ''), 'unknown') as label, COUNT(1) as c 
         FROM user_activity_events uae
         LEFT JOIN pois p ON p.id = uae.poi_id
         WHERE uae.created_at >= $startUtc AND uae.created_at < $endUtc
-          {platformFilter} {langFilter} {ownerWhere}
-        GROUP BY browser_family ORDER BY c DESC LIMIT 5;";
-    await using (var cmd = new SqliteCommand(browserSql, conn))
+          {platformFilter} {ownerWhere}
+        GROUP BY label ORDER BY c DESC;";
+    await using (var cmd = new SqliteCommand(langStatsSql, conn))
     {
         cmd.Parameters.AddWithValue("$startUtc", startUtc.ToString("O"));
         cmd.Parameters.AddWithValue("$endUtc", endUtc.ToString("O"));
         if (isOwner) cmd.Parameters.AddWithValue("$ownerId", actor.Id);
         if (!string.IsNullOrEmpty(platformFilter)) cmd.Parameters.AddWithValue("$platform", platform);
-        if (!string.IsNullOrEmpty(langFilter)) cmd.Parameters.AddWithValue("$lang", lang);
-        
-        await using var reader = await cmd.ExecuteReaderAsync();
-        while (await reader.ReadAsync()) browserStats.Add(new { label = reader.IsDBNull(0) ? "Unknown" : reader.GetString(0), count = reader.GetInt32(1) });
-    }
-
-    string osSql = $@"
-        SELECT os_family, COUNT(1) as c 
-        FROM user_activity_events uae
-        LEFT JOIN pois p ON p.id = uae.poi_id
-        WHERE uae.created_at >= $startUtc AND uae.created_at < $endUtc
-          {platformFilter} {langFilter} {ownerWhere}
-        GROUP BY os_family ORDER BY c DESC LIMIT 5;";
-    await using (var cmd = new SqliteCommand(osSql, conn))
-    {
-        cmd.Parameters.AddWithValue("$startUtc", startUtc.ToString("O"));
-        cmd.Parameters.AddWithValue("$endUtc", endUtc.ToString("O"));
-        if (isOwner) cmd.Parameters.AddWithValue("$ownerId", actor.Id);
-        if (!string.IsNullOrEmpty(platformFilter)) cmd.Parameters.AddWithValue("$platform", platform);
-        if (!string.IsNullOrEmpty(langFilter)) cmd.Parameters.AddWithValue("$lang", lang);
-
-        await using var reader = await cmd.ExecuteReaderAsync();
-        while (await reader.ReadAsync()) osStats.Add(new { label = reader.IsDBNull(0) ? "Unknown" : reader.GetString(0), count = reader.GetInt32(1) });
+        var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync()) langStats.Add(new { label = reader.GetString(0), count = reader.GetInt32(1) });
     }
 
     // 9. NEW: Paginated Detailed Logs
@@ -1081,7 +1054,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         SELECT COUNT(1) FROM user_activity_events uae
         LEFT JOIN pois p ON p.id = uae.poi_id
         WHERE {actionClauseSpecific} AND uae.created_at >= $startUtc AND uae.created_at < $endUtc
-          {platformFilter} {langFilter} {ownerWhere};";
+          {platformFilter} {ownerWhere};";
     await using (var cmd = new SqliteCommand(logCountSql, conn))
     {
         cmd.Parameters.AddWithValue("$startUtc", startUtc.ToString("O"));
@@ -1089,7 +1062,6 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         if (isOwner) cmd.Parameters.AddWithValue("$ownerId", actor.Id);
         if (actionFilterValue is not null) cmd.Parameters.AddWithValue("$actionFilter", actionFilterValue);
         if (!string.IsNullOrEmpty(platformFilter)) cmd.Parameters.AddWithValue("$platform", platform);
-        if (!string.IsNullOrEmpty(langFilter)) cmd.Parameters.AddWithValue("$lang", lang);
 
         totalLogCount = Convert.ToInt32(await cmd.ExecuteScalarAsync());
     }
@@ -1102,7 +1074,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
             SELECT poi_id, name FROM poi_translations WHERE lang_code = 'vi' GROUP BY poi_id
         ) t ON uae.poi_id = t.poi_id
         WHERE {actionClauseSpecific} AND uae.created_at >= $startUtc AND uae.created_at < $endUtc
-          {platformFilter} {langFilter} {ownerWhere}
+          {platformFilter} {ownerWhere}
         ORDER BY uae.created_at DESC
         LIMIT $limit OFFSET $offset;";
     await using (var cmd = new SqliteCommand(logSql, conn))
@@ -1114,7 +1086,6 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         if (isOwner) cmd.Parameters.AddWithValue("$ownerId", actor.Id);
         if (actionFilterValue is not null) cmd.Parameters.AddWithValue("$actionFilter", actionFilterValue);
         if (!string.IsNullOrEmpty(platformFilter)) cmd.Parameters.AddWithValue("$platform", platform);
-        if (!string.IsNullOrEmpty(langFilter)) cmd.Parameters.AddWithValue("$lang", lang);
 
         await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync())
@@ -1146,8 +1117,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         hourlyData,
         topPois,
         totalUniqueDevices,
-        browserStats,
-        osStats,
+        langStats,
         recentLogs,
         totalLogCount
     });
