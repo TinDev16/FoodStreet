@@ -2020,14 +2020,10 @@ static async Task InitializeDatabaseAsync(string connectionString)
         await backfillAdminDeleteStatus.ExecuteNonQueryAsync();
     }
 
-    await using (var dropUserPoiAccess = new SqliteCommand("DROP TABLE IF EXISTS user_poi_access;", connection))
+    foreach (var table in new[] { "role_permissions", "user_roles", "permissions", "roles", "users", "poi_audio_play_events", "poi_images", "user_poi_access", "app_users" })
     {
-        await dropUserPoiAccess.ExecuteNonQueryAsync();
-    }
-
-    await using (var dropAppUsers = new SqliteCommand("DROP TABLE IF EXISTS app_users;", connection))
-    {
-        await dropAppUsers.ExecuteNonQueryAsync();
+        await using var dropCmd = new SqliteCommand($"DROP TABLE IF EXISTS {table};", connection);
+        await dropCmd.ExecuteNonQueryAsync();
     }
 }
 
