@@ -862,7 +862,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
     string summarySql = $@"
         SELECT uae.action, COUNT(1) 
         FROM user_activity_events uae
-        JOIN pois p ON p.id = uae.poi_id
+        LEFT JOIN pois p ON p.id = uae.poi_id
         WHERE uae.created_at >= $startUtc AND uae.created_at < $endUtc
           {platformFilter} {langFilter} {ownerWhere}
         GROUP BY uae.action;";
@@ -891,7 +891,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
     string chartSql = $@"
         SELECT date(uae.created_at, $sqliteOffset) as dt, uae.action, COUNT(1) as c, uae.platform
         FROM user_activity_events uae
-        JOIN pois p ON p.id = uae.poi_id
+        LEFT JOIN pois p ON p.id = uae.poi_id
         WHERE uae.created_at >= $startUtc AND uae.created_at < $endUtc
           {platformFilter} {langFilter} {ownerWhere}
         GROUP BY dt, uae.action, uae.platform
@@ -927,7 +927,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
     string hourlySql = $@"
         SELECT CAST(strftime('%H', uae.created_at, $sqliteOffset) AS INTEGER) as hr, {hourlyCountExpr}
         FROM user_activity_events uae
-        JOIN pois p ON p.id = uae.poi_id
+        LEFT JOIN pois p ON p.id = uae.poi_id
         WHERE {actionClauseSpecific} AND uae.created_at >= $startUtc AND uae.created_at < $endUtc
           {platformFilter} {langFilter} {ownerWhere}
         GROUP BY hr ORDER BY hr ASC;";
@@ -969,7 +969,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         string poiSql = $@"
             SELECT uae.poi_id, t.name, {poiScoreExpr} as score
             FROM user_activity_events uae
-            JOIN pois p ON p.id = uae.poi_id
+            LEFT JOIN pois p ON p.id = uae.poi_id
             LEFT JOIN (
                 SELECT poi_id, name 
                 FROM poi_translations 
@@ -1008,7 +1008,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
     string uniqueDevicesSql = $@"
         SELECT COUNT(DISTINCT uae.device_id) 
         FROM user_activity_events uae
-        JOIN pois p ON p.id = uae.poi_id
+        LEFT JOIN pois p ON p.id = uae.poi_id
         WHERE uae.created_at >= $startUtc AND uae.created_at < $endUtc
           {platformFilter} {langFilter} {ownerWhere};";
     await using (var cmd = new SqliteCommand(uniqueDevicesSql, conn))
@@ -1029,7 +1029,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
     string browserSql = $@"
         SELECT browser_family, COUNT(1) as c 
         FROM user_activity_events uae
-        JOIN pois p ON p.id = uae.poi_id
+        LEFT JOIN pois p ON p.id = uae.poi_id
         WHERE uae.created_at >= $startUtc AND uae.created_at < $endUtc
           {platformFilter} {langFilter} {ownerWhere}
         GROUP BY browser_family ORDER BY c DESC LIMIT 5;";
@@ -1045,7 +1045,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
     string osSql = $@"
         SELECT os_family, COUNT(1) as c 
         FROM user_activity_events uae
-        JOIN pois p ON p.id = uae.poi_id
+        LEFT JOIN pois p ON p.id = uae.poi_id
         WHERE uae.created_at >= $startUtc AND uae.created_at < $endUtc
           {platformFilter} {langFilter} {ownerWhere}
         GROUP BY os_family ORDER BY c DESC LIMIT 5;";
@@ -1069,7 +1069,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
 
     string logCountSql = $@"
         SELECT COUNT(1) FROM user_activity_events uae
-        JOIN pois p ON p.id = uae.poi_id
+        LEFT JOIN pois p ON p.id = uae.poi_id
         WHERE {actionClauseSpecific} AND uae.created_at >= $startUtc AND uae.created_at < $endUtc
           {platformFilter} {langFilter} {ownerWhere};";
     await using (var cmd = new SqliteCommand(logCountSql, conn))
