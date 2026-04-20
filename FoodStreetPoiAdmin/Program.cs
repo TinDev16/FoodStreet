@@ -768,7 +768,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
     string onlineSql;
     if (!isOwner)
     {
-        onlineSql = "SELECT COUNT(DISTINCT session_id) FROM active_sessions WHERE last_ping_at >= datetime('now', '-20 seconds')";
+        onlineSql = "SELECT COUNT(DISTINCT session_id) FROM active_sessions WHERE datetime(last_ping_at) >= datetime('now', '-20 seconds')";
         if (!string.IsNullOrEmpty(platform) && platform != "all") onlineSql += " AND platform = $platform";
     }
     else
@@ -779,8 +779,8 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
             FROM active_sessions s
             JOIN user_activity_events uae ON uae.session_id = s.session_id
             JOIN pois p ON p.id = uae.poi_id
-            WHERE s.last_ping_at >= datetime('now', '-20 seconds')
-              AND uae.created_at >= datetime('now', '-10 minutes')
+            WHERE datetime(s.last_ping_at) >= datetime('now', '-20 seconds')
+              AND datetime(uae.created_at) >= datetime('now', '-10 minutes')
               AND p.owner_admin_id = $ownerId
             ";
         if (!string.IsNullOrEmpty(platform) && platform != "all") onlineSql += " AND s.platform = $platform";
@@ -2970,7 +2970,7 @@ static async Task CleanupOldLogsAsync(SqliteConnection conn)
     try
     {
         // Retention: 90 days
-        const string sql = "DELETE FROM user_activity_events WHERE created_at < datetime('now', '-90 days');";
+        const string sql = "DELETE FROM user_activity_events WHERE datetime(created_at) < datetime('now', '-90 days');";
         await using var cmd = new SqliteCommand(sql, conn);
         await cmd.ExecuteNonQueryAsync();
     }
@@ -3022,7 +3022,7 @@ static async Task<bool> RecordUserActivityAsync(
     // Spam/Rate Limiting: Max 40 events per minute per deviceId
     if (!string.IsNullOrWhiteSpace(deviceId))
     {
-        const string checkSpamSql = "SELECT COUNT(1) FROM user_activity_events WHERE device_id = $did AND created_at > datetime('now', '-1 minute')";
+        const string checkSpamSql = "SELECT COUNT(1) FROM user_activity_events WHERE device_id = $did AND datetime(created_at) > datetime('now', '-1 minute')";
         await using var spamCmd = new SqliteCommand(checkSpamSql, connection);
         spamCmd.Parameters.AddWithValue("$did", deviceId);
         var recentCount = Convert.ToInt64(await spamCmd.ExecuteScalarAsync());
