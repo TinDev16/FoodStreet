@@ -1028,7 +1028,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         SELECT COALESCE(NULLIF(uae.language, ''), 'unknown') as label, COUNT(1) as c 
         FROM user_activity_events uae
         LEFT JOIN pois p ON p.id = uae.poi_id
-        WHERE uae.created_at >= $startUtc AND uae.created_at < $endUtc
+        WHERE {actionClauseSpecific} AND uae.created_at >= $startUtc AND uae.created_at < $endUtc
           {platformFilter} {ownerWhere}
         GROUP BY label ORDER BY c DESC;";
     await using (var cmd = new SqliteCommand(langStatsSql, conn))
@@ -1036,6 +1036,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         cmd.Parameters.AddWithValue("$startUtc", startUtc.ToString("O"));
         cmd.Parameters.AddWithValue("$endUtc", endUtc.ToString("O"));
         if (isOwner) cmd.Parameters.AddWithValue("$ownerId", actor.Id);
+        if (actionFilterValue is not null) cmd.Parameters.AddWithValue("$actionFilter", actionFilterValue);
         if (!string.IsNullOrEmpty(platformFilter)) cmd.Parameters.AddWithValue("$platform", platform);
         var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync()) langStats.Add(new { label = reader.GetString(0), count = reader.GetInt32(1) });
