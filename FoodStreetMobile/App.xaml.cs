@@ -21,7 +21,7 @@ public partial class App : Application
             {
                 try
                 {
-                    await poiSyncService.TrackActivityAsync("ping", null, "vi");
+                    await poiSyncService.TrackActivityAsync("ping", null, languageService.CurrentLanguage);
                 }
                 catch { }
                 await Task.Delay(TimeSpan.FromSeconds(35));

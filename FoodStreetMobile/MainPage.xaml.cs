@@ -3093,5 +3093,3 @@ public partial class MainPage : ContentPage
         _routePolyline = null;
     }
 }
-
-

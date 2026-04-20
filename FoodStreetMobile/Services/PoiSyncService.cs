@@ -499,7 +499,7 @@ public sealed class PoiSyncService
         return sid;
     }
 
-    public async Task TrackActivityAsync(string action, string? poiId = null, string langCode = "vi", int? duration = null)
+    public async Task TrackActivityAsync(string action, string? poiId = null, string? langCode = null, int? duration = null)
     {
         var sid = GetSessionId();
         foreach (var baseUrl in GetPreferredBaseUrls())
@@ -507,13 +507,14 @@ public sealed class PoiSyncService
             try
             {
                 var endpoint = $"{baseUrl}/api/public/pois/track-activity";
+                var requestedLang = langCode ?? "vi";
                 var payload = new
                 {
                     action = action,
                     platform = "app",
                     sessionId = sid,
                     deviceId = GetDeviceId(),
-                    language = langCode,
+                    language = requestedLang,
                     poiId = poiId,
                     deviceType = "mobile",
                     duration = duration

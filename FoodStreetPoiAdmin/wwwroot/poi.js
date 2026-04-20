@@ -41,6 +41,7 @@
     guestUserId: 0,
     appHandOffDone: false,
     sessionId: "",
+    storageKey: "poiAppLanguage"
   };
 
   const INSTALL_PROMPT_DISABLED_KEY = "poiDisableAppInstallPrompt";
@@ -557,12 +558,14 @@
     if (!state.languages.some((x) => x.code === state.lang)) {
       state.lang = state.languages.some((x) => x.code === "vi") ? "vi" : (state.languages[0]?.code || "vi");
     }
+    localStorage.setItem(state.storageKey, state.lang);
     langSelectEl.value = state.lang;
   };
 
   const initEvents = () => {
     langSelectEl.addEventListener("change", async () => {
       state.lang = toLangCode(langSelectEl.value || "vi");
+      localStorage.setItem(state.storageKey, state.lang);
       updateStaticUiTexts();
       const url = new URL(window.location.href);
       url.searchParams.set("lang", state.lang);
@@ -645,7 +648,13 @@
   const init = async () => {
     const search = new URLSearchParams(window.location.search);
     state.poiId = (search.get("id") || "").trim();
-    state.lang = toLangCode(search.get("lang") || "vi");
+    
+    // Resolve language: 1. URL param, 2. localStorage, 3. Navigator, 4. Fallback "vi"
+    const urlLang = search.get("lang");
+    const storedLang = localStorage.getItem(state.storageKey);
+    const navLang = navigator.language;
+    
+    state.lang = toLangCode(urlLang || storedLang || navLang || "vi");
     updateStaticUiTexts();
 
     await initAppHandOff();

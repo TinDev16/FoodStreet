@@ -153,7 +153,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         {
             _heartbeatTimer = Application.Current.Dispatcher.CreateTimer();
             _heartbeatTimer.Interval = TimeSpan.FromSeconds(5);
-            _heartbeatTimer.Tick += (s, e) => _ = _poiSyncService.TrackActivityAsync("ping");
+            _heartbeatTimer.Tick += (s, e) => _ = _poiSyncService.TrackActivityAsync("ping", null, _currentLanguage);
         }
         _heartbeatTimer?.Start();
     }
@@ -168,6 +168,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _currentLanguage = string.IsNullOrWhiteSpace(languageCode) ? "vi" : languageCode.Trim().ToLowerInvariant();
         await _poiRepository.SetCurrentLanguageAsync(_currentLanguage);
         OnPropertyChanged(nameof(CurrentLanguage));
+
+        // Ensure we sync the new language data before reloading the UI
+        StatusText = "Downloading translations...";
+        await _poiSyncService.TrySyncAsync(_currentLanguage);
+        
         await ReloadPoisAsync(_currentLanguage, isSilentSync: false);
     }
 

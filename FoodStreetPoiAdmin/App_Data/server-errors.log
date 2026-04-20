@@ -643,3 +643,408 @@ System.InvalidOperationException: Must add values for the following parameters: 
    at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
    at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
    at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in D:\HK2 N3\C#\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-20T16:43:03.1996178+00:00
+System.InvalidOperationException: Must add values for the following parameters: $lang
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync()
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1045
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1047
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1129
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-20T16:43:10.8862060+00:00
+System.InvalidOperationException: Must add values for the following parameters: $lang
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync()
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1045
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1047
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1129
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-20T16:43:14.1161403+00:00
+System.InvalidOperationException: Must add values for the following parameters: $lang
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync()
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1045
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1047
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1129
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-20T16:43:16.2578442+00:00
+System.InvalidOperationException: Must add values for the following parameters: $lang
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync()
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1045
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1047
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1129
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-20T16:43:16.7121431+00:00
+System.InvalidOperationException: Must add values for the following parameters: $lang
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync()
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1045
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1047
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1129
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-20T16:43:16.9092237+00:00
+System.InvalidOperationException: Must add values for the following parameters: $lang
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync()
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1045
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1047
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1129
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-20T16:43:17.0586404+00:00
+System.InvalidOperationException: Must add values for the following parameters: $lang
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync()
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1045
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1047
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1129
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-20T16:43:17.2343433+00:00
+System.InvalidOperationException: Must add values for the following parameters: $lang
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync()
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1045
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1047
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1129
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-20T16:43:17.4243576+00:00
+System.InvalidOperationException: Must add values for the following parameters: $lang
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync()
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1045
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1047
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1129
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-20T16:43:27.2141703+00:00
+System.InvalidOperationException: Must add values for the following parameters: $lang
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync()
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1045
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1047
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1129
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-20T16:43:30.7289009+00:00
+System.InvalidOperationException: Must add values for the following parameters: $lang
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync()
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1045
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1047
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1129
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-20T16:43:34.6694234+00:00
+System.InvalidOperationException: Must add values for the following parameters: $lang
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync()
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1045
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1047
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1129
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-20T16:43:37.9693353+00:00
+System.InvalidOperationException: Must add values for the following parameters: $lang
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync()
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1045
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1047
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1129
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-20T16:43:46.6892504+00:00
+System.InvalidOperationException: Must add values for the following parameters: $lang
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync()
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1045
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1047
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1129
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-20T16:43:49.2561755+00:00
+System.InvalidOperationException: Must add values for the following parameters: $lang
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync()
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1045
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1047
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1129
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-20T16:43:50.5159013+00:00
+System.InvalidOperationException: Must add values for the following parameters: $lang
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync()
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1045
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1047
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1129
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-20T16:43:52.6706794+00:00
+System.InvalidOperationException: Must add values for the following parameters: $lang
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync()
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1045
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1047
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1129
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-20T16:43:53.2594945+00:00
+System.InvalidOperationException: Must add values for the following parameters: $lang
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync()
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1045
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1047
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1129
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-20T16:43:55.3518195+00:00
+System.InvalidOperationException: Must add values for the following parameters: $lang
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync()
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1045
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1047
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1129
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-20T16:43:57.2545185+00:00
+System.InvalidOperationException: Must add values for the following parameters: $lang
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync()
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1045
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1047
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1129
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-20T16:43:58.0758017+00:00
+System.InvalidOperationException: Must add values for the following parameters: $lang
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync()
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1045
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1047
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1129
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98
+-----
+2026-04-20T16:43:58.3416624+00:00
+System.InvalidOperationException: Must add values for the following parameters: $lang
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync()
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1045
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1047
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__28>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 1129
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Http.RequestDelegateFactory.ExecuteTaskResult[T](Task`1 task, HttpContext httpContext)
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>g__AwaitRequestTask|7_0(Endpoint endpoint, Task requestTask, ILogger logger)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\Program.cs:line 98

@@ -660,19 +660,19 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\ACER\\.nuget\\packages\\": {}
+    "C:\\Users\\lenovo\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\HK2 N3\\C#\\FoodStreet\\FoodStreetPoiAdmin\\FoodStreetPoiAdmin.csproj",
+      "projectUniqueName": "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetPoiAdmin\\FoodStreetPoiAdmin.csproj",
       "projectName": "FoodStreetPoiAdmin",
-      "projectPath": "D:\\HK2 N3\\C#\\FoodStreet\\FoodStreetPoiAdmin\\FoodStreetPoiAdmin.csproj",
-      "packagesPath": "C:\\Users\\ACER\\.nuget\\packages\\",
-      "outputPath": "D:\\HK2 N3\\C#\\FoodStreet\\FoodStreetPoiAdmin\\obj\\",
+      "projectPath": "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetPoiAdmin\\FoodStreetPoiAdmin.csproj",
+      "packagesPath": "C:\\Users\\lenovo\\.nuget\\packages\\",
+      "outputPath": "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetPoiAdmin\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "C:\\Users\\ACER\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        "C:\\Users\\lenovo\\AppData\\Roaming\\NuGet\\NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net10.0"

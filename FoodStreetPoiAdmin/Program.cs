@@ -674,8 +674,12 @@ app.MapPost("/api/public/qr/confirm", async (HttpContext context, QrConfirmReque
     long? poiId = null;
     if (TryParsePoiId(code, out var p)) poiId = p;
     
+    var lang = context.Request.Query["lang"].FirstOrDefault()
+               ?? context.Request.Headers["Accept-Language"].ToString()?.Split(',').FirstOrDefault()?.Split(';').FirstOrDefault()
+               ?? "vi";
+    lang = NormalizeAppLanguageCode(lang);
+
     var sid = string.IsNullOrWhiteSpace(req.SessionId) ? ($"anon_{Guid.NewGuid():N}") : req.SessionId;
-    
     var ua = context.Request.Headers["User-Agent"].ToString();
     var ip = context.Connection.RemoteIpAddress?.ToString();
 
@@ -684,7 +688,7 @@ app.MapPost("/api/public/qr/confirm", async (HttpContext context, QrConfirmReque
         sid, 
         "web", 
         "scan_qr", 
-        "vi", 
+        lang, 
         deviceType, 
         poiId, 
         isReal ? 1 : 0, 
@@ -695,7 +699,7 @@ app.MapPost("/api/public/qr/confirm", async (HttpContext context, QrConfirmReque
         req.ScreenInfo);
     
     var (baseUrl, _) = await ResolvePublicBaseUrlForRequestAsync(context);
-    var url = BuildPublicPoiUrl(baseUrl ?? "", poiId ?? 0, "vi");
+    var url = BuildPublicPoiUrl(baseUrl ?? "", poiId ?? 0, lang);
     return Results.Ok(new { url });
 });
 
@@ -1038,7 +1042,10 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         cmd.Parameters.AddWithValue("$startUtc", startUtc.ToString("O"));
         cmd.Parameters.AddWithValue("$endUtc", endUtc.ToString("O"));
         if (isOwner) cmd.Parameters.AddWithValue("$ownerId", actor.Id);
-        var reader = await cmd.ExecuteReaderAsync();
+        if (!string.IsNullOrEmpty(platformFilter)) cmd.Parameters.AddWithValue("$platform", platform);
+        if (!string.IsNullOrEmpty(langFilter)) cmd.Parameters.AddWithValue("$lang", lang);
+        
+        await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync()) browserStats.Add(new { label = reader.IsDBNull(0) ? "Unknown" : reader.GetString(0), count = reader.GetInt32(1) });
     }
 
@@ -1054,7 +1061,10 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         cmd.Parameters.AddWithValue("$startUtc", startUtc.ToString("O"));
         cmd.Parameters.AddWithValue("$endUtc", endUtc.ToString("O"));
         if (isOwner) cmd.Parameters.AddWithValue("$ownerId", actor.Id);
-        var reader = await cmd.ExecuteReaderAsync();
+        if (!string.IsNullOrEmpty(platformFilter)) cmd.Parameters.AddWithValue("$platform", platform);
+        if (!string.IsNullOrEmpty(langFilter)) cmd.Parameters.AddWithValue("$lang", lang);
+
+        await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync()) osStats.Add(new { label = reader.IsDBNull(0) ? "Unknown" : reader.GetString(0), count = reader.GetInt32(1) });
     }
 
@@ -1078,6 +1088,9 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         cmd.Parameters.AddWithValue("$endUtc", endUtc.ToString("O"));
         if (isOwner) cmd.Parameters.AddWithValue("$ownerId", actor.Id);
         if (actionFilterValue is not null) cmd.Parameters.AddWithValue("$actionFilter", actionFilterValue);
+        if (!string.IsNullOrEmpty(platformFilter)) cmd.Parameters.AddWithValue("$platform", platform);
+        if (!string.IsNullOrEmpty(langFilter)) cmd.Parameters.AddWithValue("$lang", lang);
+
         totalLogCount = Convert.ToInt32(await cmd.ExecuteScalarAsync());
     }
 
