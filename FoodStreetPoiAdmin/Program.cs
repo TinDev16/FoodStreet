@@ -1248,6 +1248,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
                 os = osFamily,
                 proximityState, 
                 proximityText, 
+                nearbyPois = nearbyPois.Select(x => new { name = x.Name, distance = Math.Round(x.Distance) }).ToList(),
                 atPoiName,
                 lat, 
                 lon 

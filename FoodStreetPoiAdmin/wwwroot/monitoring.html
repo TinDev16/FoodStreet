@@ -9,10 +9,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="/styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     :root {
       --bg-card: #ffffff;
@@ -358,20 +356,6 @@
     .status-queued { background: #fee2e2; color: #b91c1c; }
     .status-processing { background: #dcfce7; color: #15803d; }
 
-    #liveMap {
-      height: 450px;
-      width: 100%;
-      border-radius: 12px;
-      overflow: hidden;
-      border: 1px solid var(--border-color);
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-      z-index: 1;
-    }
-    
-    [data-theme="dark"] .leaflet-tile {
-        filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
-    }
-    
     .visitor-item.clickable {
         cursor: pointer;
         transition: transform 0.2s, background-color 0.2s;
@@ -379,6 +363,49 @@
     .visitor-item.clickable:hover {
         background: rgba(99, 102, 241, 0.05);
         transform: translateX(4px);
+    }
+
+    /* Modal Styles */
+    .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        backdrop-filter: blur(4px);
+    }
+    .modal-content {
+        background: var(--bg-card);
+        width: 450px;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        border: 1px solid var(--border-color);
+    }
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    .close-btn {
+        cursor: pointer;
+        font-size: 1.5rem;
+        color: var(--text-muted);
+    }
+    .vicinity-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .vicinity-row:last-child {
+        border-bottom: none;
     }
   </style>
 </head>
@@ -526,16 +553,6 @@
             </div>
           </div>
 
-          <section class="chart-container" style="margin-top: 24px;">
-              <header class="card-header" style="border-bottom: 1px solid var(--border-color); margin-bottom: 16px;">
-                  <div class="card-title" style="margin-bottom: 0;">
-                    <i class="fa-solid fa-map-marked-alt"></i>
-                    <h2 style="font-size: 1.25rem;">Bản đồ theo dõi thời gian thực (Live)</h2>
-                  </div>
-              </header>
-              <div id="liveMap"></div>
-          </section>
-
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 24px;">
               <section class="chart-container" style="margin-bottom: 0;">
                   <header class="card-header" style="border-bottom: 1px solid var(--border-color); margin-bottom: 16px;">
@@ -638,6 +655,25 @@
       </div>
     </div>
   </div>
+
+    <!-- Vicinity Modal -->
+    <div id="vicinityModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <header class="modal-header">
+                <h3 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+                    <i class="fa-solid fa-location-crosshairs" style="color: var(--accent-color);"></i>
+                    Phạm vi POI hiện tại
+                </h3>
+                <span class="close-btn" onclick="closeVicinityModal()">&times;</span>
+            </header>
+            <div id="vicinityDetailList">
+                <!-- Details injected here -->
+            </div>
+            <div style="margin-top: 20px; text-align: right;">
+                <button class="btn" style="padding: 8px 20px;" onclick="closeVicinityModal()">Đóng</button>
+            </div>
+        </div>
+    </div>
 
   <script src="/monitoring.js"></script>
 </body>

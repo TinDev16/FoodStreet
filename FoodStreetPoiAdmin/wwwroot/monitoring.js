@@ -59,10 +59,8 @@ let logPage = 0;
 let logPageSize = 10;
 let totalLogs = 0;
 
-// --- MAP STATE ---
-let liveMap = null;
-const poiMarkers = {};
-const visitorMarkers = {};
+// --- STATE ---
+let currentOnlineVisitors = [];
 
 const ACTION_META = {
   online: { label: 'User online', countHeader: 'Số user online', icon: 'fa-signal' },
@@ -216,9 +214,9 @@ async function loadDashboard() {
     renderDonutChart('browserChart', data.browserStats || []);
     renderDonutChart('osChart', data.osStats || []);
 
-    renderOnlineVisitors(data.onlineVisitors || []);
+    currentOnlineVisitors = data.onlineVisitors || [];
+    renderOnlineVisitors(currentOnlineVisitors);
     renderTtsQueue(data.ttsQueue || []);
-    updateMapMarkers(data.allPois || [], data.onlineVisitors || []);
 
     renderPoiRanking(data.topPois || [], selectedAction);
     renderDetailedLogs(data.recentLogs || []);
@@ -452,7 +450,7 @@ function renderOnlineVisitors(visitors) {
     const platformIcon = v.platform === 'app' ? '<i class="fa-solid fa-mobile-screen"></i>' : '<i class="fa-solid fa-globe"></i>';
 
     return `
-            <div class="visitor-item clickable" onclick="focusVisitor('${v.sessionId}')">
+            <div class="visitor-item clickable" onclick="showVicinity('${v.sessionId}')">
                 <div style="font-size: 1.2rem; color: var(--accent-color);">${platformIcon}</div>
                 <div style="flex: 1;">
                     <div style="font-weight: 600; font-size: 0.85rem;">ID: ${v.deviceId ? v.deviceId.substring(0, 8) : (v.sessionId ? v.sessionId.substring(0, 8) : 'Unknown')}...</div>
@@ -491,87 +489,34 @@ function renderTtsQueue(queue) {
   }).join('');
 }
 
-function initLiveMap() {
-    if (liveMap || !document.getElementById('liveMap')) return;
-    
-    // Default center (Saigon)
-    liveMap = L.map('liveMap').setView([10.776, 106.701], 15);
-  
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap'
-    }).addTo(liveMap);
-  }
-  
-  function updateMapMarkers(pois, visitors) {
-    if (!liveMap) initLiveMap();
-    if (!liveMap) return;
-  
-    // 1. POI Markers (Static)
-    pois.forEach(p => {
-      if (!p.lat || !p.lon) return;
-      if (poiMarkers[p.id]) return; 
-  
-      const icon = L.divIcon({
-        html: `<div style="background:#4f46e5; width:28px; height:28px; border-radius:50%; border:2px solid white; display:flex; align-items:center; justify-content:center; color:white; font-size:12px; box-shadow: 0 2px 10px rgba(0,0,0,0.2);"><i class="fa-solid fa-shop"></i></div>`,
-        className: '',
-        iconSize: [28, 28],
-        iconAnchor: [14, 14]
-      });
-  
-      poiMarkers[p.id] = L.marker([p.lat, p.lon], { icon }).addTo(liveMap)
-        .bindPopup(`<div style="font-family: Outfit, sans-serif;"><b>${p.name}</b><br><span class="muted small">ID: ${p.id}</span></div>`);
-    });
-  
-    // 2. Visitor Markers (Dynamic)
-    const currentSids = new Set(visitors.map(v => v.sessionId));
-    
-    // Remove gone visitors
-    Object.keys(visitorMarkers).forEach(sid => {
-      if (!currentSids.has(sid)) {
-        liveMap.removeLayer(visitorMarkers[sid]);
-        delete visitorMarkers[sid];
-      }
-    });
-  
-    // Add/Update current visitors
-    visitors.forEach(v => {
-      if (!v.lat || !v.lon) return;
-  
-      const icon = L.divIcon({
-        html: `<div style="background:#10b981; width:22px; height:22px; border-radius:50%; border:2px solid white; display:flex; align-items:center; justify-content:center; color:white; font-size:10px; box-shadow: 0 0 15px rgba(16,185,129,0.4);"><i class="fa-solid fa-user-large"></i></div>`,
-        className: '',
-        iconSize: [22, 22],
-        iconAnchor: [11, 11]
-      });
-  
-      const popupHtml = `<div style="font-family: Outfit, sans-serif;"><b>ID: ${v.deviceId?.substring(0, 8) || 'Unknown'}</b><br>${v.proximityText}</div>`;
-  
-      if (visitorMarkers[v.sessionId]) {
-        visitorMarkers[v.sessionId].setLatLng([v.lat, v.lon]);
-        visitorMarkers[v.sessionId].getPopup().setContent(popupHtml);
-      } else {
-        visitorMarkers[v.sessionId] = L.marker([v.lat, v.lon], { icon }).addTo(liveMap)
-          .bindPopup(popupHtml);
-      }
-    });
-  
-    // Auto-fit bounds on first poi load
-    const pIds = Object.keys(poiMarkers);
-    if (pIds.length > 0 && !liveMap._initialFit) {
-      const group = new L.featureGroup(Object.values(poiMarkers));
-      liveMap.fitBounds(group.getBounds().pad(0.2));
-      liveMap._initialFit = true;
-    }
-  }
+window.showVicinity = function(sid) {
+    const visitor = currentOnlineVisitors.find(v => v.sessionId === sid);
+    if (!visitor) return;
 
-window.focusVisitor = function(sid) {
-    const marker = visitorMarkers[sid];
-    if (marker && liveMap) {
-        liveMap.setView(marker.getLatLng(), 18);
-        marker.openPopup();
-        
-        // Scroll to map if needed
-        document.getElementById('liveMap').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const listContainer = document.getElementById('vicinityDetailList');
+    if (!visitor.nearbyPois || visitor.nearbyPois.length === 0) {
+        listContainer.innerHTML = '<div class="muted small text-center" style="padding: 20px;">Không có POI nào trong phạm vi gần ( < 3x bán kính ).</div>';
+    } else {
+        listContainer.innerHTML = visitor.nearbyPois.map(np => `
+            <div class="vicinity-row">
+                <div style="font-weight: 500;">${np.name}</div>
+                <div class="muted small">${np.distance} mét</div>
+            </div>
+        `).join('');
+    }
+
+    document.getElementById('vicinityModal').style.display = 'flex';
+};
+
+window.closeVicinityModal = function() {
+    document.getElementById('vicinityModal').style.display = 'none';
+};
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById('vicinityModal');
+    if (event.target == modal) {
+        modal.style.display = "none";
     }
 };
 
