@@ -1255,6 +1255,8 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         }
     }
 
+    var allPoisSimple = allPois.Select(p => new { id = p.Id.ToString(), name = p.Name, lat = p.Lat, lon = p.Lon, radius = p.RadiusMeters }).ToList();
+
     return Results.Ok(new {
         onlineNow,
         periodAudioPlays,
@@ -1265,6 +1267,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         chartData,
         hourlyData,
         topPois,
+        allPois = allPoisSimple, // Added for map rendering
         totalUniqueDevices,
         langStats,
         browserStats,
