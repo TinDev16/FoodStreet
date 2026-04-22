@@ -1194,7 +1194,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
     // 12. Advanced Online Visitors with "Pro" Proximity Logic
     var onlineVisitors = new List<object>();
     var allPois = new List<(long Id, string Name, double Lat, double Lon, double RadiusMeters)>();
-    const string allPoisSql = "SELECT p.id, pt.name, p.latitude, p.longitude, p.radius_meters FROM pois p JOIN poi_translations pt ON pt.poi_id = p.id WHERE pt.lang_code = 'vi' AND p.is_deleted = 0;";
+    const string allPoisSql = "SELECT p.id, COALESCE(pt.name, 'POI ' || p.id), p.latitude, p.longitude, p.radius_meters FROM pois p LEFT JOIN poi_translations pt ON pt.poi_id = p.id AND pt.lang_code = 'vi' WHERE p.is_deleted = 0;";
     await using (var cmd = new SqliteCommand(allPoisSql, conn)) {
         await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync()) allPois.Add((reader.GetInt64(0), reader.GetString(1), reader.GetDouble(2), reader.GetDouble(3), reader.GetDouble(4)));
@@ -1228,18 +1228,26 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
                     if (d <= p.RadiusMeters + 25.0) nearbyPois.Add(new { p.Id, p.Name, Distance = d, p.RadiusMeters });
                 }
                 var sorted = nearbyPois.OrderBy(x => x.Distance).ToList();
-                if (sorted.Count > 0) {
-                    if (sorted[0].Distance <= sorted[0].RadiusMeters) {
-                        proximityState = "At";
-                        atPoiName = sorted[0].Name;
-                        proximityText = $"Tại {sorted[0].Name}";
-                    } else if (sorted.Count >= 2) {
-                        proximityState = "Between";
-                        proximityText = $"Giữa {sorted[0].Name} và {sorted[1].Name}";
-                    } else {
-                        proximityState = "Near";
-                        proximityText = $"Tiến gần {sorted[0].Name} ({Math.Round(sorted[0].Distance)}m)";
-                    }
+                var buffer = 25.0;
+                var insidePois = sorted.Where(p => p.Distance <= p.RadiusMeters).ToList();
+                var bufferPois = sorted.Where(p => p.Distance <= p.RadiusMeters + buffer).ToList();
+
+                if (insidePois.Count >= 2) {
+                    proximityState = "Between";
+                    proximityText = $"Giữa {insidePois[0].Name} và {insidePois[1].Name}";
+                } else if (insidePois.Count == 1) {
+                    proximityState = "At";
+                    atPoiName = insidePois[0].Name;
+                    proximityText = $"Tại {insidePois[0].Name}";
+                } else if (bufferPois.Count >= 2) {
+                    proximityState = "Between";
+                    proximityText = $"Giữa {bufferPois[0].Name} và {bufferPois[1].Name}";
+                } else if (bufferPois.Count == 1) {
+                    proximityState = "Near";
+                    proximityText = $"Tiến gần {bufferPois[0].Name} ({Math.Round(bufferPois[0].Distance)}m)";
+                } else {
+                    proximityState = "Exploring";
+                    proximityText = "Đang di chuyển";
                 }
             }
 
