@@ -1225,7 +1225,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
                     var dLon = (p.Lon - lon.Value) * Math.PI / 180;
                     var a = Math.Sin(dLat/2) * Math.Sin(dLat/2) + Math.Cos(lat.Value*Math.PI/180) * Math.Cos(p.Lat*Math.PI/180) * Math.Sin(dLon/2) * Math.Sin(dLon/2);
                     var d = 6371000 * 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1-a));
-                    if (d <= p.RadiusMeters + 15.0) nearbyPois.Add(new { p.Id, p.Name, Distance = d, p.RadiusMeters });
+                    if (d <= p.RadiusMeters + 25.0) nearbyPois.Add(new { p.Id, p.Name, Distance = d, p.RadiusMeters });
                 }
                 var sorted = nearbyPois.OrderBy(x => x.Distance).ToList();
                 if (sorted.Count > 0) {
