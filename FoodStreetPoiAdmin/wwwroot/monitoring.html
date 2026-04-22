@@ -322,14 +322,14 @@
     }
 
     /* Live Visitors List */
-    .visitor-list, .queue-list {
+    .visitor-list {
       max-height: 400px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
       gap: 12px;
     }
-    .visitor-item, .queue-item {
+    .visitor-item {
       padding: 12px;
       border-radius: 12px;
       background: var(--bg-input);
@@ -348,13 +348,6 @@
     .between-pois { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
     .exploring { background: rgba(99, 102, 241, 0.1); color: #6366f1; }
     
-    .tts-status {
-      font-size: 0.7rem;
-      padding: 2px 8px;
-      border-radius: 4px;
-    }
-    .status-queued { background: #fee2e2; color: #b91c1c; }
-    .status-processing { background: #dcfce7; color: #15803d; }
 
     .visitor-item.clickable {
         cursor: pointer;
@@ -553,7 +546,7 @@
             </div>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 24px;">
+          <div id="liveVisitorSection" style="display: grid; grid-template-columns: 1fr; gap: 24px; margin-top: 24px;">
               <section class="chart-container" style="margin-bottom: 0;">
                   <header class="card-header" style="border-bottom: 1px solid var(--border-color); margin-bottom: 16px;">
                       <div class="card-title" style="margin-bottom: 0;">
@@ -563,18 +556,6 @@
                   </header>
                   <div class="visitor-list" id="liveVisitorList">
                       <div class="muted small text-center" style="padding: 20px;">Đang theo dõi...</div>
-                  </div>
-              </section>
-
-              <section class="chart-container" style="margin-bottom: 0;">
-                  <header class="card-header" style="border-bottom: 1px solid var(--border-color); margin-bottom: 16px;">
-                      <div class="card-title" style="margin-bottom: 0;">
-                        <i class="fa-solid fa-list-check"></i>
-                        <h2 style="font-size: 1.25rem;">Xử lý Audio Queue (TTS)</h2>
-                      </div>
-                  </header>
-                  <div class="queue-list" id="ttsQueueList">
-                      <div class="muted small text-center" style="padding: 20px;">Trống</div>
                   </div>
               </section>
           </div>

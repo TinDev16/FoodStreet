@@ -50,6 +50,11 @@ if (payload) {
   if (isSuper || isOwner) document.getElementById('qrManageNav').hidden = false;
   if (document.getElementById('monitoringNav')) document.getElementById('monitoringNav').hidden = !(isSuper || isOwner);
   if (isOwner) document.getElementById('sidebarUserRole').textContent = 'Chủ sở hữu';
+  
+  if (!isSuper) {
+    const liveSection = document.getElementById('liveVisitorSection');
+    if (liveSection) liveSection.style.display = 'none';
+  }
 }
 
 // --- STATE ---
@@ -216,7 +221,6 @@ async function loadDashboard() {
 
     currentOnlineVisitors = data.onlineVisitors || [];
     renderOnlineVisitors(currentOnlineVisitors);
-    renderTtsQueue(data.ttsQueue || []);
 
     renderPoiRanking(data.topPois || [], selectedAction);
     renderDetailedLogs(data.recentLogs || []);
@@ -462,32 +466,6 @@ function renderOnlineVisitors(visitors) {
   }).join('');
 }
 
-function renderTtsQueue(queue) {
-  const container = document.getElementById('ttsQueueList');
-  if (!container) return;
-  if (queue.length === 0) {
-    container.innerHTML = '<div class="muted small text-center" style="padding: 20px;">Trống</div>';
-    return;
-  }
-
-  container.innerHTML = queue.map(item => {
-    const statusClass = item.status === 'processing' ? 'status-processing' : 'status-queued';
-    const statusText = item.status === 'processing' ? 'Đang đọc...' : 'Chờ xử lý';
-
-    return `
-            <div class="queue-item">
-                <div style="font-size: 1.2rem; color: #f59e0b;"><i class="fa-solid fa-headphones"></i></div>
-                <div style="flex: 1;">
-                    <div style="font-weight: 600; font-size: 0.85rem;">POI ID: ${item.poi_id}</div>
-                    <div class="muted" style="font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;">
-                        ${item.text}
-                    </div>
-                </div>
-                <div class="tts-status ${statusClass}">${statusText}</div>
-            </div>
-        `;
-  }).join('');
-}
 
 window.showVicinity = function(sid) {
     const visitor = currentOnlineVisitors.find(v => v.sessionId === sid);
