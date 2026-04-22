@@ -154,7 +154,9 @@ public sealed class PoiViewHistoryViewModel : INotifyPropertyChanged
     {
         if (IsEmpty) return;
 
-        bool confirm = await Microsoft.Maui.Controls.Application.Current.MainPage.DisplayAlert(
+        if (Shell.Current == null) return;
+
+        bool confirm = await Shell.Current.DisplayAlert(
             LocalizationResourceManager.Instance["PoiHistory_Clear"],
             LocalizationResourceManager.Instance["PoiHistory_ClearConfirm"],
             LocalizationResourceManager.Instance["General_Yes"],

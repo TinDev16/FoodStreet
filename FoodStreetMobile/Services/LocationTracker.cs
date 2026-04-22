@@ -3,6 +3,8 @@ using Microsoft.Maui.Devices.Sensors;
 
 namespace FoodStreetMobile.Services;
 
+public class LocationTracker
+{
     private Location? _lastReportedLocation;
     private readonly SemaphoreSlim _updateLock = new(1, 1);
     private IDispatcherTimer? _timer;
@@ -85,10 +87,10 @@ namespace FoodStreetMobile.Services;
                 double distance = 999;
                 if (_lastReportedLocation != null)
                 {
-                    distance = Location.CalculateDistance(_lastReportedLocation, location, DistanceUnits.Meters);
+                    distance = Location.CalculateDistance(_lastReportedLocation, location, DistanceUnits.Kilometers);
                 }
 
-                if (distance >= 5)
+                if (distance >= 0.005) // 5 meters
                 {
                     _lastReportedLocation = location;
                     LocationUpdated?.Invoke(this, location);

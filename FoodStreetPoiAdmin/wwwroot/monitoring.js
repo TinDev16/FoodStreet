@@ -12,19 +12,19 @@ const themeToggleBtn = document.getElementById('themeToggleBtn');
 if (themeToggleBtn) {
   const currentTheme = localStorage.getItem('poi_theme') || 'light';
   document.documentElement.setAttribute('data-theme', currentTheme);
-  
+
   themeToggleBtn.addEventListener('click', () => {
     const newTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', newTheme);
     localStorage.setItem('poi_theme', newTheme);
-    
+
     // Update all charts in the registry
     Object.values(charts).forEach(c => {
-        if (c) c.updateOptions({ theme: { mode: newTheme } });
+      if (c) c.updateOptions({ theme: { mode: newTheme } });
     });
     // Legacy support for vars not in registry yet
     ['activityChartVar', 'hourlyChartVar'].forEach(key => {
-        if (window[key]) window[key].updateOptions({ theme: { mode: newTheme } });
+      if (window[key]) window[key].updateOptions({ theme: { mode: newTheme } });
     });
   });
 }
@@ -33,7 +33,7 @@ function parseJwt(token) {
   try {
     const base64Url = token.split('.')[1];
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
       return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
     }).join(''));
     return JSON.parse(jsonPayload);
@@ -60,10 +60,10 @@ let logPageSize = 10;
 let totalLogs = 0;
 
 const ACTION_META = {
-  online: { label: 'User online',     countHeader: 'Số user online', icon: 'fa-signal' },
-  audio:  { label: 'Lượt nghe Audio', countHeader: 'Lượt nghe',      icon: 'fa-headphones' },
-  qr:     { label: 'Lượt quét QR',    countHeader: 'Lượt quét',      icon: 'fa-qrcode' },
-  view:   { label: 'Lượt xem POI',    countHeader: 'Lượt xem',       icon: 'fa-eye' },
+  online: { label: 'User online', countHeader: 'Số user online', icon: 'fa-signal' },
+  audio: { label: 'Lượt nghe Audio', countHeader: 'Lượt nghe', icon: 'fa-headphones' },
+  qr: { label: 'Lượt quét QR', countHeader: 'Lượt quét', icon: 'fa-qrcode' },
+  view: { label: 'Lượt xem POI', countHeader: 'Lượt xem', icon: 'fa-eye' },
 };
 
 // --- DOM ELEMENTS ---
@@ -85,36 +85,36 @@ filterPeriod?.addEventListener('change', () => {
 });
 
 btnRefresh?.addEventListener('click', () => {
-    logPage = 0;
-    loadDashboard();
+  logPage = 0;
+  loadDashboard();
 });
 
 btnPrevLog?.addEventListener('click', () => {
-    if (logPage > 0) {
-        logPage--;
-        loadDashboard();
-    }
+  if (logPage > 0) {
+    logPage--;
+    loadDashboard();
+  }
 });
 
 btnNextLog?.addEventListener('click', () => {
-    if ((logPage + 1) * logPageSize < totalLogs) {
-        logPage++;
-        loadDashboard();
-    }
+  if ((logPage + 1) * logPageSize < totalLogs) {
+    logPage++;
+    loadDashboard();
+  }
 });
 
 document.getElementById('btnExportLogs')?.addEventListener('click', () => exportToCsv());
 
 document.getElementById('btnToggleLogCollapse')?.addEventListener('click', () => {
-    const content = document.getElementById('logCollapsibleContent');
-    const icon = document.querySelector('#btnToggleLogCollapse i.fa-chevron-down');
-    if (content.style.display === 'none') {
-        content.style.display = 'block';
-        icon.style.transform = 'rotate(0deg)';
-    } else {
-        content.style.display = 'none';
-        icon.style.transform = 'rotate(-90deg)';
-    }
+  const content = document.getElementById('logCollapsibleContent');
+  const icon = document.querySelector('#btnToggleLogCollapse i.fa-chevron-down');
+  if (content.style.display === 'none') {
+    content.style.display = 'block';
+    icon.style.transform = 'rotate(0deg)';
+  } else {
+    content.style.display = 'none';
+    icon.style.transform = 'rotate(-90deg)';
+  }
 });
 
 document.querySelectorAll('.stat-card.clickable').forEach(card => {
@@ -177,7 +177,7 @@ async function loadDashboard() {
     }
     if (filterPoiSort.value) params.set('poiSort', filterPoiSort.value);
     if (selectedAction && selectedAction !== 'all') params.set('action', selectedAction);
-    
+
     // Pagination params
     params.set('page', logPage);
     params.set('pageSize', logPageSize);
@@ -185,7 +185,7 @@ async function loadDashboard() {
     const res = await fetch('/api/admin/reports/user-activities?' + params.toString(), {
       headers: { 'Authorization': 'Bearer ' + token }
     });
-    
+
     if (res.status === 401 || res.status === 403) {
       localStorage.removeItem('adminToken');
       window.location.replace('/');
@@ -194,19 +194,19 @@ async function loadDashboard() {
 
     if (!res.ok) throw new Error('Failed to load dashboard data');
     const data = await res.json();
-    
+
     // Summary Cards
     document.getElementById('valOnlineNow').textContent = data.onlineNow || 0;
     document.getElementById('valPeriodAudioPlays').textContent = data.periodAudioPlays || 0;
     document.getElementById('valPeriodQrScans').textContent = data.periodQrScans || 0;
     document.getElementById('valPeriodViews').textContent = data.periodViews || 0;
-    
+
     totalLogs = data.totalLogCount || 0;
-    
+
     updateChartLabels();
     renderMainChart(data.chartData || [], data.startDate, data.endDate);
     renderHourlyChart(data.hourlyData || [], selectedAction);
-    
+
     renderDonutChart('langChart', data.langStats || []);
     renderDonutChart('browserChart', data.browserStats || []);
     renderDonutChart('osChart', data.osStats || []);
@@ -216,21 +216,21 @@ async function loadDashboard() {
 
     renderPoiRanking(data.topPois || [], selectedAction);
     renderDetailedLogs(data.recentLogs || []);
-    
+
     // Pagination UI
     const totalPages = Math.ceil(totalLogs / logPageSize);
     logPaginationInfo.textContent = totalLogs > 0 ? `Trang ${logPage + 1} / ${totalPages} (Tổng ${totalLogs} lượt)` : 'Không có dữ liệu';
     btnPrevLog.disabled = logPage <= 0;
     btnNextLog.disabled = (logPage + 1) >= totalPages;
 
-  } catch(e) { console.error(e); }
+  } catch (e) { console.error(e); }
 }
 
 function renderMainChart(chartData, startDate, endDate) {
-  const dates = (startDate && endDate) 
+  const dates = (startDate && endDate)
     ? generateDateRange(startDate, endDate)
     : [...new Set(chartData.map(d => d.date))].sort();
-  
+
   const audioPlays = dates.map(dt => chartData.filter(d => d.date === dt && d.action === 'play_audio').reduce((s, d) => s + d.count, 0));
   const qrScans = dates.map(dt => chartData.filter(d => d.date === dt && d.action === 'scan_qr').reduce((s, d) => s + d.count, 0));
   const views = dates.map(dt => chartData.filter(d => d.date === dt && d.action === 'view_poi').reduce((s, d) => s + d.count, 0));
@@ -289,74 +289,81 @@ function renderHourlyChart(hourlyData, action) {
 }
 
 function renderDonutChart(id, stats) {
-    const el = document.getElementById(id);
-    if (!el) return;
+  const el = document.getElementById(id);
+  if (!el) return;
 
-    if (!stats || stats.length === 0) {
-        el.innerHTML = '<div style="height:250px; display:flex; align-items:center; justify-content:center;" class="muted small text-center">Chưa có dữ liệu</div>';
-        if (charts[id]) {
-            charts[id].destroy();
-            charts[id] = null;
-        }
-        return;
-    }
-
-    const labels = stats.map(s => s.label);
-    const series = stats.map(s => s.count);
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-
+  if (!stats || stats.length === 0) {
+    el.innerHTML = '<div style="height:250px; display:flex; align-items:center; justify-content:center;" class="muted small text-center">Chưa có dữ liệu</div>';
     if (charts[id]) {
-        charts[id].updateOptions({ labels, series });
-        return;
+      charts[id].destroy();
+      charts[id] = null;
     }
+    return;
+  }
 
-    const options = {
-        series,
-        labels,
-        chart: { type: 'donut', height: 250, fontFamily: 'Outfit, sans-serif', background: 'transparent' },
-        stroke: { show: false },
-        legend: { 
-            position: 'bottom', 
-            labels: { colors: isDark ? '#94a3b8' : '#334155' } 
-        },
-        dataLabels: { enabled: false },
-        theme: { mode: isDark ? 'dark' : 'light' },
-        colors: ['#6366f1', '#10b981', '#f59e0b', '#0ea5e9', '#ef4444'],
-        plotOptions: { pie: { donut: { size: '75%' } } }
-    };
+  const labels = stats.map(s => s.label);
+  const series = stats.map(s => s.count);
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
-    charts[id] = new ApexCharts(el, options);
-    charts[id].render();
+  if (charts[id]) {
+    charts[id].updateOptions({ labels, series });
+    return;
+  }
+
+  const options = {
+    series,
+    labels,
+    chart: { type: 'donut', height: 250, fontFamily: 'Outfit, sans-serif', background: 'transparent' },
+    stroke: { show: false },
+    legend: {
+      position: 'bottom',
+      labels: { colors: isDark ? '#94a3b8' : '#334155' }
+    },
+    dataLabels: { enabled: false },
+    theme: { mode: isDark ? 'dark' : 'light' },
+    colors: ['#6366f1', '#10b981', '#f59e0b', '#0ea5e9', '#ef4444'],
+    plotOptions: { pie: { donut: { size: '75%' } } }
+  };
+
+  charts[id] = new ApexCharts(el, options);
+  charts[id].render();
 }
 
 function renderDetailedLogs(logs) {
-    const container = document.getElementById('logRows');
-    if (!container) return;
-    if (logs.length === 0) {
-        container.innerHTML = '<tr><td colspan="4" class="text-center muted" style="padding: 40px;">Không tìm thấy nhật ký tương tác phù hợp</td></tr>';
-        return;
-    }
+  const container = document.getElementById('logRows');
+  if (!container) return;
+  if (logs.length === 0) {
+    container.innerHTML = '<tr><td colspan="4" class="text-center muted" style="padding: 40px;">Không tìm thấy nhật ký tương tác phù hợp</td></tr>';
+    return;
+  }
 
-    container.innerHTML = logs.map(log => {
+  container.innerHTML = logs.map(log => {
+    let timeStr = 'N/A';
+    try {
+      if (log.createdAt) {
         const time = new Date(log.createdAt);
-        const vnTime = new Date(time.getTime() + (7 * 3600 * 1000));
-        const timeStr = vnTime.toISOString().replace('T', ' ').substring(0, 19);
-        
-        const actionInfo = ACTION_META[log.action] || { label: log.action, icon: 'fa-circle-dot' };
-        
-        // Parse Screen Info if available
-        let screenText = 'N/A';
-        try {
-            if (log.screenInfo) {
-                const s = typeof log.screenInfo === 'string' ? JSON.parse(log.screenInfo) : log.screenInfo;
-                screenText = `${s.w}x${s.h} (@${s.dpr}x)`;
-            }
-        } catch (e) {}
+        if (!isNaN(time.getTime())) {
+          const vnTime = new Date(time.getTime() + (7 * 3600 * 1000));
+          timeStr = vnTime.toISOString().replace('T', ' ').substring(0, 19);
+        }
+      }
+    } catch (e) { }
 
-        const platformIcon = log.platform === 'app' ? '<i class="fa-solid fa-mobile-screen"></i> App' : '<i class="fa-solid fa-globe"></i> Web';
-        
-        // Comprehensive Device Info
-        const deviceHtml = `
+    const actionInfo = ACTION_META[log.action] || { label: log.action, icon: 'fa-circle-dot' };
+
+    // Parse Screen Info if available
+    let screenText = 'N/A';
+    try {
+      if (log.screenInfo) {
+        const s = typeof log.screenInfo === 'string' ? JSON.parse(log.screenInfo) : log.screenInfo;
+        screenText = `${s.w}x${s.h} (@${s.dpr}x)`;
+      }
+    } catch (e) { }
+
+    const platformIcon = log.platform === 'app' ? '<i class="fa-solid fa-mobile-screen"></i> App' : '<i class="fa-solid fa-globe"></i> Web';
+
+    // Comprehensive Device Info
+    const deviceHtml = `
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
                 <div>
                     <div style="font-weight:600; color:var(--accent-color); font-size:0.9rem;">${log.os || 'Unknown OS'}</div>
@@ -373,9 +380,9 @@ function renderDetailedLogs(logs) {
             </div>
         `;
 
-        return `
+    return `
             <tr>
-                <td class="small">${timeStr}</td>
+                <td style="color: var(--text-color) !important; font-weight: 600; font-size: 0.85rem;">${timeStr}</td>
                 <td>
                     <div style="font-weight:600; color:var(--text-color);">${log.poiName || 'N/A'}</div>
                     <div class="muted small">ID: ${log.poiId || '-'}</div>
@@ -384,7 +391,7 @@ function renderDetailedLogs(logs) {
                 <td class="muted small">${log.ip || '-'}</td>
             </tr>
         `;
-    }).join('');
+  }).join('');
 }
 
 function renderPoiRanking(topPois, action) {
@@ -417,53 +424,53 @@ function renderPoiRanking(topPois, action) {
 }
 
 function renderOnlineVisitors(visitors) {
-    const container = document.getElementById('liveVisitorList');
-    if (!container) return;
-    if (visitors.length === 0) {
-        container.innerHTML = '<div class="muted small text-center" style="padding: 20px;">Không có ai online</div>';
-        return;
+  const container = document.getElementById('liveVisitorList');
+  if (!container) return;
+  if (visitors.length === 0) {
+    container.innerHTML = '<div class="muted small text-center" style="padding: 20px;">Không có ai online</div>';
+    return;
+  }
+
+  container.innerHTML = visitors.map(v => {
+    let statusClass = 'exploring';
+    let statusText = 'Đang khám phá';
+
+    if (v.proximityState === 'At') {
+      statusClass = 'at-poi';
+      statusText = `Tại ${v.atPoiName}`;
+    } else if (v.proximityState === 'Between') {
+      statusClass = 'between-pois';
+      statusText = `${v.proximityText}`;
     }
 
-    container.innerHTML = visitors.map(v => {
-        let statusClass = 'exploring';
-        let statusText = 'Đang khám phá';
-        
-        if (v.proximityState === 'At') {
-            statusClass = 'at-poi';
-            statusText = `Tại ${v.atPoiName}`;
-        } else if (v.proximityState === 'Between') {
-            statusClass = 'between-pois';
-            statusText = `${v.proximityText}`;
-        }
+    const platformIcon = v.platform === 'app' ? '<i class="fa-solid fa-mobile-screen"></i>' : '<i class="fa-solid fa-globe"></i>';
 
-        const platformIcon = v.platform === 'app' ? '<i class="fa-solid fa-mobile-screen"></i>' : '<i class="fa-solid fa-globe"></i>';
-
-        return `
+    return `
             <div class="visitor-item">
                 <div style="font-size: 1.2rem; color: var(--accent-color);">${platformIcon}</div>
                 <div style="flex: 1;">
-                    <div style="font-weight: 600; font-size: 0.85rem;">Device: ${v.deviceId?.substring(0,8) || 'Unknown'}...</div>
+                    <div style="font-weight: 600; font-size: 0.85rem;">ID: ${v.deviceId ? v.deviceId.substring(0, 8) : (v.sessionId ? v.sessionId.substring(0, 8) : 'Unknown')}...</div>
                     <div class="muted" style="font-size: 0.75rem;">${v.os || 'N/A'} • ${v.browser || 'N/A'}</div>
                 </div>
                 <div class="proximity-badge ${statusClass}">${statusText}</div>
             </div>
         `;
-    }).join('');
+  }).join('');
 }
 
 function renderTtsQueue(queue) {
-    const container = document.getElementById('ttsQueueList');
-    if (!container) return;
-    if (queue.length === 0) {
-        container.innerHTML = '<div class="muted small text-center" style="padding: 20px;">Trống</div>';
-        return;
-    }
+  const container = document.getElementById('ttsQueueList');
+  if (!container) return;
+  if (queue.length === 0) {
+    container.innerHTML = '<div class="muted small text-center" style="padding: 20px;">Trống</div>';
+    return;
+  }
 
-    container.innerHTML = queue.map(item => {
-        const statusClass = item.status === 'processing' ? 'status-processing' : 'status-queued';
-        const statusText = item.status === 'processing' ? 'Đang đọc...' : 'Chờ xử lý';
+  container.innerHTML = queue.map(item => {
+    const statusClass = item.status === 'processing' ? 'status-processing' : 'status-queued';
+    const statusText = item.status === 'processing' ? 'Đang đọc...' : 'Chờ xử lý';
 
-        return `
+    return `
             <div class="queue-item">
                 <div style="font-size: 1.2rem; color: #f59e0b;"><i class="fa-solid fa-headphones"></i></div>
                 <div style="flex: 1;">
@@ -475,22 +482,22 @@ function renderTtsQueue(queue) {
                 <div class="tts-status ${statusClass}">${statusText}</div>
             </div>
         `;
-    }).join('');
+  }).join('');
 }
 
 loadDashboard();
 
 setInterval(async () => {
-    try {
-        const res = await fetch('/api/admin/reports/user-activities?fields=onlineNow', { headers: { 'Authorization': 'Bearer ' + token } });
-        if (res.ok) {
-            const data = await res.json();
-            const el = document.getElementById('valOnlineNow');
-            if (el) el.textContent = data.onlineNow || 0;
-            // Also refresh live segments if we are on monitoring
-            if (window.location.pathname.includes('monitoring')) {
-                loadDashboard(); // Refresh UI more frequently for live tracking
-            }
-        }
-    } catch(e) {}
+  try {
+    const res = await fetch('/api/admin/reports/user-activities?fields=onlineNow', { headers: { 'Authorization': 'Bearer ' + token } });
+    if (res.ok) {
+      const data = await res.json();
+      const el = document.getElementById('valOnlineNow');
+      if (el) el.textContent = data.onlineNow || 0;
+      // Also refresh live segments if we are on monitoring
+      if (window.location.pathname.includes('monitoring')) {
+        loadDashboard(); // Refresh UI more frequently for live tracking
+      }
+    }
+  } catch (e) { }
 }, 15000); // 15s refresh for admin live view

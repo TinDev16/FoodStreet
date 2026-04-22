@@ -1197,7 +1197,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         while (await reader.ReadAsync()) allPois.Add((reader.GetInt64(0), reader.GetString(1), reader.GetDouble(2), reader.GetDouble(3), reader.GetDouble(4)));
     }
 
-    string visitorsSql = "SELECT session_id, platform, latitude, longitude, last_ping_at FROM active_sessions WHERE datetime(last_ping_at) >= datetime('now', '-30 seconds')";
+    string visitorsSql = "SELECT session_id, platform, latitude, longitude, last_ping_at, device_id, browser_family, os_family FROM active_sessions WHERE datetime(last_ping_at) >= datetime('now', '-30 seconds')";
     if (!string.IsNullOrEmpty(platform) && platform != "all") visitorsSql += " AND platform = $platform";
     await using (var cmd = new SqliteCommand(visitorsSql, conn)) {
         if (!string.IsNullOrEmpty(platform) && platform != "all") cmd.Parameters.AddWithValue("$platform", platform);
@@ -1207,6 +1207,9 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
             var plt = reader.GetString(1);
             var lat = reader.IsDBNull(2) ? (double?)null : reader.GetDouble(2);
             var lon = reader.IsDBNull(3) ? (double?)null : reader.GetDouble(3);
+            var deviceId = reader.IsDBNull(5) ? null : reader.GetString(5);
+            var browserFamily = reader.IsDBNull(6) ? "N/A" : reader.GetString(6);
+            var osFamily = reader.IsDBNull(7) ? "N/A" : reader.GetString(7);
             
             string proximityState = "Exploring";
             string proximityText = "Đang di chuyển";
@@ -1229,7 +1232,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
                         proximityText = $"Tại {sorted[0].Name}";
                     } else if (sorted.Count >= 2) {
                         proximityState = "Between";
-                        proximityText = $"Gần {sorted[0].Name} ({Math.Round(sorted[0].Distance)}m) hơn {sorted[1].Name} ({Math.Round(sorted[1].Distance)}m)";
+                        proximityText = $"Giữa {sorted[0].Name} và {sorted[1].Name}";
                     } else {
                         proximityState = "Near";
                         proximityText = $"Tiến gần {sorted[0].Name} ({Math.Round(sorted[0].Distance)}m)";
@@ -1240,6 +1243,9 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
             onlineVisitors.Add(new { 
                 sessionId = sid, 
                 platform = plt, 
+                deviceId,
+                browser = browserFamily,
+                os = osFamily,
                 proximityState, 
                 proximityText, 
                 atPoiName,
@@ -2098,6 +2104,9 @@ static async Task InitializeDatabaseAsync(string connectionString)
             session_id TEXT PRIMARY KEY,
             last_ping_at TEXT NOT NULL,
             platform TEXT NOT NULL,
+            device_id TEXT,
+            browser_family TEXT,
+            os_family TEXT,
             latitude REAL,
             longitude REAL
         );
@@ -2154,6 +2163,9 @@ static async Task InitializeDatabaseAsync(string connectionString)
     }
 
     // New Columns Migrations
+    await AddColumnIfNotExists(connection, "active_sessions", "device_id", "TEXT");
+    await AddColumnIfNotExists(connection, "active_sessions", "browser_family", "TEXT");
+    await AddColumnIfNotExists(connection, "active_sessions", "os_family", "TEXT");
     await AddColumnIfNotExists(connection, "active_sessions", "latitude", "REAL");
     await AddColumnIfNotExists(connection, "active_sessions", "longitude", "REAL");
     await AddColumnIfNotExists(connection, "user_activity_events", "latitude", "REAL");
@@ -3206,14 +3218,24 @@ static async Task<bool> RecordUserActivityAsync(
 
     // 1. Maintain Real-time Session Status
     await using (var upsertSession = new SqliteCommand("""
-        INSERT INTO active_sessions (session_id, last_ping_at, platform, latitude, longitude)
-        VALUES ($sid, $now, $platform, $lat, $lon)
-        ON CONFLICT(session_id) DO UPDATE SET last_ping_at = excluded.last_ping_at, platform = excluded.platform, latitude = excluded.latitude, longitude = excluded.longitude;
+        INSERT INTO active_sessions (session_id, last_ping_at, platform, device_id, browser_family, os_family, latitude, longitude)
+        VALUES ($sid, $now, $platform, $did, $browser, $os, $lat, $lon)
+        ON CONFLICT(session_id) DO UPDATE SET 
+            last_ping_at = excluded.last_ping_at, 
+            platform = excluded.platform, 
+            device_id = excluded.device_id, 
+            browser_family = excluded.browser_family,
+            os_family = excluded.os_family,
+            latitude = excluded.latitude, 
+            longitude = excluded.longitude;
         """, connection, (SqliteTransaction)transaction))
     {
         upsertSession.Parameters.AddWithValue("$sid", sessionId);
         upsertSession.Parameters.AddWithValue("$now", nowUtc);
         upsertSession.Parameters.AddWithValue("$platform", platform);
+        upsertSession.Parameters.AddWithValue("$did", (object?)deviceId ?? DBNull.Value);
+        upsertSession.Parameters.AddWithValue("$browser", (object?)browser ?? DBNull.Value);
+        upsertSession.Parameters.AddWithValue("$os", (object?)os ?? DBNull.Value);
         upsertSession.Parameters.AddWithValue("$lat", (object?)latitude ?? DBNull.Value);
         upsertSession.Parameters.AddWithValue("$lon", (object?)longitude ?? DBNull.Value);
         await upsertSession.ExecuteNonQueryAsync();
