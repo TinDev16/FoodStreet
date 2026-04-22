@@ -63,7 +63,10 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.KnownProxies.Clear();
 });
 
+builder.Services.AddHostedService<TtsQueueWorker>();
+
 var app = builder.Build();
+
 app.UseForwardedHeaders();
 
 var dataDirectory = Path.Combine(app.Environment.ContentRootPath, "App_Data");
@@ -751,39 +754,23 @@ app.MapPost("/api/public/tts/request", async (TtsRequest req) =>
         return Results.BadRequest(new { error = "Missing text or poiId." });
     }
 
-    if (!TryParsePoiId(req.PoiId, out var poiId))
-    {
-        return Results.BadRequest(new { error = "Invalid poiId." });
-    }
+    var jobId = Guid.NewGuid().ToString();
 
     await using var connection = await OpenConnectionAsync(connectionString);
-    
-    // 1. Check Cache
-    var textHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(req.Text)));
-    const string checkCacheSql = "SELECT audio_url FROM poi_audio_cache WHERE poi_id = $pid AND lang_code = $lang AND text_hash = $hash LIMIT 1;";
-    await using var cacheCmd = new SqliteCommand(checkCacheSql, connection);
-    cacheCmd.Parameters.AddWithValue("$pid", poiId);
-    cacheCmd.Parameters.AddWithValue("$lang", req.LangCode ?? "vi");
-    cacheCmd.Parameters.AddWithValue("$hash", textHash);
-    var cachedUrl = await cacheCmd.ExecuteScalarAsync();
-    
-    if (cachedUrl != null)
-    {
-        return Results.Ok(new { status = "done", audioUrl = cachedUrl.ToString() });
-    }
-
-    // 2. Add to Queue
-    const string queueSql = "INSERT INTO audio_tts_queue (user_id, poi_id, text, lang_code, status, created_at) VALUES ($uid, $pid, $txt, $lang, 'waiting', $now);";
+    const string queueSql = @"
+        INSERT INTO audio_tts_queue (id, poi_id, text, status, created_at)
+        VALUES ($id, $pid, $txt, 'waiting', $now);
+    ";
     await using var queueCmd = new SqliteCommand(queueSql, connection);
-    queueCmd.Parameters.AddWithValue("$uid", req.UserId ?? "anon");
-    queueCmd.Parameters.AddWithValue("$pid", poiId);
+    queueCmd.Parameters.AddWithValue("$id", jobId);
+    queueCmd.Parameters.AddWithValue("$pid", req.PoiId);
     queueCmd.Parameters.AddWithValue("$txt", req.Text);
-    queueCmd.Parameters.AddWithValue("$lang", req.LangCode ?? "vi");
     queueCmd.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
     await queueCmd.ExecuteNonQueryAsync();
 
-    return Results.Accepted(null, new { status = "waiting", message = "TTS Job queued for background processing." });
+    return Results.Ok(new { jobId });
 });
+
 
 app.MapGet("/api/admin/reports/user-activities", async (HttpContext context, 
     string? platform, string? period, string? from, string? to, string? poiSort, string? fields, string? action) =>
@@ -2152,14 +2139,14 @@ static async Task InitializeDatabaseAsync(string connectionString)
         );
 
         CREATE TABLE IF NOT EXISTS audio_tts_queue (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT,
-            poi_id INTEGER,
+            id TEXT PRIMARY KEY,
+            poi_id TEXT,
             text TEXT,
-            lang_code TEXT,
-            status TEXT NOT NULL DEFAULT 'waiting',
-            created_at TEXT NOT NULL
+            status TEXT NOT NULL DEFAULT 'waiting', -- waiting | processing | done | error
+            created_at TEXT NOT NULL,
+            updated_at TEXT
         );
+
 
         CREATE TABLE IF NOT EXISTS poi_audio_cache (
             poi_id INTEGER,
@@ -2229,7 +2216,10 @@ static async Task InitializeDatabaseAsync(string connectionString)
         await using var dropCmd = new SqliteCommand($"DROP TABLE IF EXISTS {table};", connection);
         await dropCmd.ExecuteNonQueryAsync();
     }
+
+    await RenameTableIfExists(connection, "audio_tts_queue", "audio_tts_queue_old");
 }
+
 
 static async Task<SqliteConnection> OpenConnectionAsync(string connectionString)
 {
@@ -3326,6 +3316,178 @@ static async Task<bool> RecordUserActivityAsync(
 
     await transaction.CommitAsync();
     return true;
+}
+
+
+static async Task RenameTableIfExists(SqliteConnection connection, string oldName, string newName)
+{
+    bool exists = false;
+    await using (var cmd = new SqliteCommand("SELECT name FROM sqlite_master WHERE type='table' AND name=$name;", connection))
+    {
+        cmd.Parameters.AddWithValue("$name", oldName);
+        var res = await cmd.ExecuteScalarAsync();
+        exists = res != null;
+    }
+
+    if (exists)
+    {
+        // Simple check: if old table has 'user_id' (old schema), rename it
+        bool hasUserId = false;
+        await using (var cmd = new SqliteCommand($"PRAGMA table_info({oldName});", connection))
+        {
+            var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                if (reader.GetString(1) == "user_id") hasUserId = true;
+            }
+        }
+
+        if (hasUserId)
+        {
+            await using (var cmd = new SqliteCommand($"ALTER TABLE {oldName} RENAME TO {newName};", connection))
+            {
+                await cmd.ExecuteNonQueryAsync();
+            }
+        }
+    }
+}
+
+public class TtsJob
+{
+    public required string Id { get; set; }
+    public required string Text { get; set; }
+}
+
+public class TtsQueueWorker : BackgroundService
+{
+    private readonly SemaphoreSlim _semaphore = new(3);
+    private readonly string _connectionString;
+    private readonly ILogger<TtsQueueWorker> _logger;
+
+    public TtsQueueWorker(IHostEnvironment environment, ILogger<TtsQueueWorker> logger)
+    {
+        var dataDirectory = Path.Combine(environment.ContentRootPath, "App_Data");
+        var dbPath = Path.Combine(dataDirectory, "poi-admin.db3");
+        _connectionString = $"Data Source={dbPath}";
+        _logger = logger;
+    }
+
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("TTS Queue Worker started.");
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                var jobs = await GetWaitingJobsAsync(3);
+                foreach (var job in jobs)
+                {
+                    _ = ProcessJobAsync(job, stoppingToken);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error polling TTS queue.");
+            }
+
+            await Task.Delay(2000, stoppingToken);
+        }
+    }
+
+    private async Task<List<TtsJob>> GetWaitingJobsAsync(int limit)
+    {
+        var jobs = new List<TtsJob>();
+        await using var db = new SqliteConnection(_connectionString);
+        await db.OpenAsync();
+
+        await using var cmd = db.CreateCommand();
+        cmd.CommandText = @"
+            SELECT id, text FROM audio_tts_queue
+            WHERE status = 'waiting'
+            ORDER BY created_at
+            LIMIT $limit
+        ";
+        cmd.Parameters.AddWithValue("$limit", limit);
+
+        using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            jobs.Add(new TtsJob
+            {
+                Id = reader.GetString(0),
+                Text = reader.GetString(1)
+            });
+        }
+
+        foreach (var job in jobs)
+        {
+            await using var update = db.CreateCommand();
+            update.CommandText = @"
+                UPDATE audio_tts_queue
+                SET status = 'processing', updated_at = $now
+                WHERE id = $id AND status = 'waiting'
+            ";
+            update.Parameters.AddWithValue("$id", job.Id);
+            update.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
+            await update.ExecuteNonQueryAsync();
+        }
+
+        return jobs;
+    }
+
+    private async Task ProcessJobAsync(TtsJob job, CancellationToken token)
+    {
+        await _semaphore.WaitAsync(token);
+        _logger.LogInformation("Processing TTS Job {JobId}", job.Id);
+
+        try
+        {
+            // Simulate TTS generation
+            await Task.Delay(5000, token);
+
+            await using var db = new SqliteConnection(_connectionString);
+            await db.OpenAsync();
+
+            await using var cmd = db.CreateCommand();
+            cmd.CommandText = @"
+                UPDATE audio_tts_queue
+                SET status = 'done', updated_at = $now
+                WHERE id = $id
+            ";
+            cmd.Parameters.Clear();
+
+            cmd.Parameters.AddWithValue("$id", job.Id);
+            cmd.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
+            await cmd.ExecuteNonQueryAsync();
+            
+            _logger.LogInformation("TTS Job {JobId} completed.", job.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing TTS Job {JobId}", job.Id);
+            try
+            {
+                await using var db = new SqliteConnection(_connectionString);
+                await db.OpenAsync();
+
+                await using var cmd = db.CreateCommand();
+                cmd.CommandText = @"
+                    UPDATE audio_tts_queue
+                    SET status = 'error', updated_at = $now
+                    WHERE id = $id
+                ";
+                cmd.Parameters.AddWithValue("$id", job.Id);
+                cmd.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
+                await cmd.ExecuteNonQueryAsync();
+            }
+            catch { }
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
+    }
 }
 
 enum DeletePoiResult
