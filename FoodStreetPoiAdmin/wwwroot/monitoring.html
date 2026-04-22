@@ -11,6 +11,9 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="stylesheet" href="/styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
   <style>
     :root {
       --bg-card: #ffffff;
@@ -522,6 +525,7 @@
             </div>
           </div>
 
+
           <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px;">
             <section class="chart-container" style="margin-bottom: 0;">
               <header class="card-header" style="border: none; padding-bottom: 0;">
@@ -546,19 +550,6 @@
             </div>
           </div>
 
-          <div id="liveVisitorSection" style="display: grid; grid-template-columns: 1fr; gap: 24px; margin-top: 24px;">
-              <section class="chart-container" style="margin-bottom: 0;">
-                  <header class="card-header" style="border-bottom: 1px solid var(--border-color); margin-bottom: 16px;">
-                      <div class="card-title" style="margin-bottom: 0;">
-                        <i class="fa-solid fa-people-arrows"></i>
-                        <h2 style="font-size: 1.25rem;">Vị trí khách tham quan (Live)</h2>
-                      </div>
-                  </header>
-                  <div class="visitor-list" id="liveVisitorList">
-                      <div class="muted small text-center" style="padding: 20px;">Đang theo dõi...</div>
-                  </div>
-              </section>
-          </div>
 
           <section class="chart-container" style="margin-top: 24px;">
             <header class="card-header" style="border: none; padding-bottom: 0;">
@@ -569,6 +560,17 @@
               <div id="hourlyChartSubtitle" class="muted" style="font-size: 0.8rem; margin-top: 4px;">Tất cả tương tác</div>
             </header>
             <div id="hourlyChart" style="min-height: 250px;"></div>
+          </section>
+
+          <section class="chart-container" style="margin-top: 24px;">
+            <header class="card-header" style="border-bottom: 1px solid var(--border-color); margin-bottom: 16px;">
+              <div class="card-title" style="margin-bottom: 0;">
+                <i class="fa-solid fa-map-location-dot"></i>
+                <h2 style="font-size: 1.25rem;">Bản đồ Nhiệt Hoạt động (Heatmap)</h2>
+              </div>
+              <div id="heatmapSubtitle" class="muted" style="font-size: 0.8rem; margin-top: 4px;">Mật độ tương tác thực tế tại các điểm đến</div>
+            </header>
+            <div id="activityHeatmap" style="height: 450px; border-radius: 12px; z-index: 1; border: 1px solid var(--border-color);"></div>
           </section>
 
           <section class="chart-container">
@@ -594,6 +596,20 @@
               </table>
             </div>
           </section>
+
+          <div id="liveVisitorSection" style="display: grid; grid-template-columns: 1fr; gap: 24px; margin-top: 24px; margin-bottom: 24px;">
+              <section class="chart-container" style="margin-bottom: 0;">
+                  <header class="card-header" style="border-bottom: 1px solid var(--border-color); margin-bottom: 16px;">
+                      <div class="card-title" style="margin-bottom: 0;">
+                        <i class="fa-solid fa-people-arrows"></i>
+                        <h2 style="font-size: 1.25rem;">Vị trí khách tham quan (Live)</h2>
+                      </div>
+                  </header>
+                  <div class="visitor-list" id="liveVisitorList">
+                      <div class="muted small text-center" style="padding: 20px;">Đang theo dõi...</div>
+                  </div>
+              </section>
+          </div>
 
           <section class="chart-container">
             <header class="card-header" style="border-bottom: 1px solid var(--border-color); margin-bottom: 16px;">

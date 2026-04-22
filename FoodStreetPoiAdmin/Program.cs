@@ -1017,7 +1017,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
               {platformFilter} {ownerWhere}
             GROUP BY uae.poi_id
             ORDER BY score {sortDir}
-            LIMIT 15;";
+            LIMIT 50;";
         await using var cmd = new SqliteCommand(poiSql, conn);
         cmd.Parameters.AddWithValue("$startUtc", startUtc.ToString("O"));
         cmd.Parameters.AddWithValue("$endUtc", endUtc.ToString("O"));

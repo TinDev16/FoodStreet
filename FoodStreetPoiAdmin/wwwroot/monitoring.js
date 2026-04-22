@@ -22,6 +22,15 @@ if (themeToggleBtn) {
     Object.values(charts).forEach(c => {
       if (c) c.updateOptions({ theme: { mode: newTheme } });
     });
+    // Update map tiles
+    if (window.mapInstance && window.tileLayer) {
+        window.tileLayer.remove();
+        window.tileLayer = L.tileLayer(newTheme === 'dark' 
+            ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+            : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap &copy; CARTO'
+        }).addTo(window.mapInstance);
+    }
     // Legacy support for vars not in registry yet
     ['activityChartVar', 'hourlyChartVar'].forEach(key => {
       if (window[key]) window[key].updateOptions({ theme: { mode: newTheme } });
@@ -66,6 +75,11 @@ let totalLogs = 0;
 
 // --- STATE ---
 let currentOnlineVisitors = [];
+let mapInstance = null;
+let tileLayer = null;
+let heatLayer = null;
+let markerLayer = null;
+let staticPoiLayer = null;
 
 const ACTION_META = {
   online: { label: 'User online', countHeader: 'Số user online', icon: 'fa-signal' },
@@ -222,6 +236,7 @@ async function loadDashboard() {
     currentOnlineVisitors = data.onlineVisitors || [];
     renderOnlineVisitors(currentOnlineVisitors);
 
+    renderHeatmap(data.topPois || [], data.allPois || [], data.onlineVisitors || []);
     renderPoiRanking(data.topPois || [], selectedAction);
     renderDetailedLogs(data.recentLogs || []);
 
@@ -490,14 +505,109 @@ window.closeVicinityModal = function() {
     document.getElementById('vicinityModal').style.display = 'none';
 };
 
-// Close modal when clicking outside
-window.onclick = function(event) {
-    const modal = document.getElementById('vicinityModal');
-    if (event.target == modal) {
-        modal.style.display = "none";
-    }
-};
+// --- HEATMAP LOGIC ---
+function initMap() {
+    const el = document.getElementById('activityHeatmap');
+    if (!el || window.mapInstance) return;
 
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    
+    // Center on Vĩnh Khánh area (approx)
+    window.mapInstance = L.map('activityHeatmap').setView([10.7592, 106.7061], 16);
+    
+    window.tileLayer = L.tileLayer(isDark
+        ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+        : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap &copy; CARTO'
+    }).addTo(window.mapInstance);
+
+    window.heatLayer = L.heatLayer([], { radius: 35, blur: 20, maxZoom: 17 }).addTo(window.mapInstance);
+    window.markerLayer = L.layerGroup().addTo(window.mapInstance);
+    window.staticPoiLayer = L.layerGroup().addTo(window.mapInstance);
+}
+
+function renderHeatmap(topPois, allPois, onlineVisitors) {
+    if (!window.mapInstance) initMap();
+    if (!window.mapInstance) return;
+
+    // 1. Prepare Heatmap Points (Historical Ranking)
+    const heatPoints = [];
+    let maxWeight = 0;
+
+    topPois.forEach(tp => {
+        const poi = allPois.find(p => p.id == tp.poiId);
+        if (poi && poi.lat && poi.lon) {
+            heatPoints.push([poi.lat, poi.lon, tp.count]);
+            if (tp.count > maxWeight) maxWeight = tp.count;
+        }
+    });
+
+    if (window.heatLayer) {
+        window.heatLayer.setLatLngs(heatPoints);
+        if (maxWeight > 0) window.heatLayer.setOptions({ max: maxWeight });
+    }
+
+    // 2. Render Static POI markers (Subtle blue dots for all POIs)
+    if (window.staticPoiLayer) {
+        window.staticPoiLayer.clearLayers();
+        allPois.forEach(poi => {
+            if (poi.lat && poi.lon) {
+                const ranking = topPois.find(tp => tp.poiId == poi.id);
+                const score = ranking ? ranking.count : 0;
+                
+                L.circleMarker([poi.lat, poi.lon], {
+                    radius: 6,
+                    fillColor: '#3b82f6',
+                    color: '#ffffff',
+                    weight: 2,
+                    opacity: 0.8,
+                    fillOpacity: 0.6
+                })
+                .bindTooltip(`<b>${poi.name}</b><br>Điểm xếp hạng: ${score}`, { 
+                    direction: 'top', 
+                    offset: [0, -5],
+                    className: 'poi-tooltip'
+                })
+                .addTo(window.staticPoiLayer);
+            }
+        });
+    }
+
+    // 3. Prepare Markers for Live Visitors (Pulsing icons)
+    if (window.markerLayer) {
+        window.markerLayer.clearLayers();
+        onlineVisitors.forEach(v => {
+            if (v.lat && v.lon) {
+                const color = v.proximityState === 'At' ? '#10b981' : (v.proximityState === 'Between' ? '#f59e0b' : '#6366f1');
+                const pulseIcon = L.divIcon({
+                    className: 'custom-pulse-icon',
+                    html: `<div style="background-color: ${color}; width: 12px; height: 12px; border-radius: 50%; box-shadow: 0 0 0 4px ${color}33; animation: pulse 2s infinite;"></div>`,
+                    iconSize: [12, 12]
+                });
+                
+                L.marker([v.lat, v.lon], { icon: pulseIcon })
+                 .bindPopup(`<b>Visitor ID:</b> ${v.deviceId ? v.deviceId.substring(0,8) : 'Unknown'}<br><b>Status:</b> ${v.proximityText}`)
+                 .addTo(window.markerLayer);
+            }
+        });
+    }
+
+    // Add pulse animation style if not present
+    if (!document.getElementById('map-pulse-style')) {
+        const style = document.createElement('style');
+        style.id = 'map-pulse-style';
+        style.innerHTML = `
+            @keyframes pulse {
+                0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.7); }
+                70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(0, 0, 0, 0); }
+                100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
+initMap();
 loadDashboard();
 
 setInterval(async () => {
