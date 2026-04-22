@@ -1211,6 +1211,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
             string proximityState = "Exploring";
             string proximityText = "Đang di chuyển";
             string atPoiName = "";
+            var nearbyPois = new List<dynamic>();
 
             if (lat.HasValue && lon.HasValue) {
                 foreach (var p in allPois) {
