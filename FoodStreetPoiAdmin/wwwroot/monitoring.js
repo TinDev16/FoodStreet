@@ -495,7 +495,7 @@ window.showVicinity = function(sid) {
 
     const listContainer = document.getElementById('vicinityDetailList');
     if (!visitor.nearbyPois || visitor.nearbyPois.length === 0) {
-        listContainer.innerHTML = '<div class="muted small text-center" style="padding: 20px;">Không có POI nào trong phạm vi gần ( < 3x bán kính ).</div>';
+        listContainer.innerHTML = '<div class="muted small text-center" style="padding: 20px;">Khách tham quan hiện không nằm trong phạm vi (bán kính) của bất kỳ quán nào.</div>';
     } else {
         listContainer.innerHTML = visitor.nearbyPois.map(np => `
             <div class="vicinity-row">
