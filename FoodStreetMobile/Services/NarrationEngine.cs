@@ -8,12 +8,14 @@ namespace FoodStreetMobile.Services;
 public sealed class NarrationEngine
 {
     private readonly AppDatabase _database;
+    private readonly PoiSyncService _syncService;
     private readonly SemaphoreSlim _speakLock = new(1, 1);
     private readonly Dictionary<string, Locale?> _ttsLocaleCache = new(StringComparer.OrdinalIgnoreCase);
 
-    public NarrationEngine(AppDatabase database)
+    public NarrationEngine(AppDatabase database, PoiSyncService syncService)
     {
         _database = database;
+        _syncService = syncService;
     }
 
     public async Task<bool> TryPlayAsync(PoiViewModel poi, CancellationToken cancellationToken)
@@ -79,6 +81,9 @@ public sealed class NarrationEngine
 
         if (!string.IsNullOrWhiteSpace(poi.Narration))
         {
+            // Fire-and-forget background TTS processed request for system analytics/caching
+            _ = Task.Run(() => _syncService.RequestTtsJobAsync(poi.Id, poi.Narration, poi.Language), CancellationToken.None);
+
             var locale = await ResolveTtsLocaleAsync(poi.Language);
             var options = new SpeechOptions
             {

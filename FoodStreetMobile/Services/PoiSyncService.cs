@@ -499,7 +499,29 @@ public sealed class PoiSyncService
         return sid;
     }
 
-    public async Task TrackActivityAsync(string action, string? poiId = null, string? langCode = null, int? duration = null)
+    public async Task RequestTtsJobAsync(string poiId, string text, string? langCode = null)
+    {
+        var sid = GetSessionId();
+        foreach (var baseUrl in GetPreferredBaseUrls())
+        {
+            try
+            {
+                var endpoint = $"{baseUrl}/api/public/tts/request";
+                var payload = new
+                {
+                    userId = sid,
+                    poiId = poiId,
+                    text = text,
+                    langCode = langCode ?? "vi"
+                };
+                await _httpClient.PostAsJsonAsync(endpoint, payload);
+                return;
+            }
+            catch { }
+        }
+    }
+
+    public async Task TrackActivityAsync(string action, string? poiId = null, string? langCode = null, int? duration = null, double? latitude = null, double? longitude = null)
     {
         var sid = GetSessionId();
         foreach (var baseUrl in GetPreferredBaseUrls())
@@ -517,7 +539,9 @@ public sealed class PoiSyncService
                     language = requestedLang,
                     poiId = poiId,
                     deviceType = "mobile",
-                    duration = duration
+                    duration = duration,
+                    latitude = latitude,
+                    longitude = longitude
                 };
                 var response = await _httpClient.PostAsJsonAsync(endpoint, payload);
                 if (response.IsSuccessStatusCode)

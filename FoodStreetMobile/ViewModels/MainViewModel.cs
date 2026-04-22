@@ -359,6 +359,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         UserLocationChanged?.Invoke(location);
 
+        // Report location to server for mapping/monitoring
+        _ = _poiSyncService.TrackActivityAsync("ping", ActivePoi?.Id, _currentLanguage, null, location.Latitude, location.Longitude);
+
         await TryAutoSyncOnTrackingAsync();
 
         var newActive = _geofenceEngine.SelectActive(location, Pois);
@@ -371,7 +374,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             return;
         }
 
-            StatusText = $"Dang gan: {newActive.Name}.";
+        StatusText = $"Dang gan: {newActive.Name}.";
         if (string.Equals(_currentAutoNarrationPoiId, newActive.Id, StringComparison.Ordinal))
         {
             return;

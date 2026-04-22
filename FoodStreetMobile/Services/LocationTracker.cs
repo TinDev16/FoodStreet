@@ -3,8 +3,7 @@ using Microsoft.Maui.Devices.Sensors;
 
 namespace FoodStreetMobile.Services;
 
-public sealed class LocationTracker
-{
+    private Location? _lastReportedLocation;
     private readonly SemaphoreSlim _updateLock = new(1, 1);
     private IDispatcherTimer? _timer;
     private EventHandler? _tickHandler;
@@ -12,6 +11,7 @@ public sealed class LocationTracker
     public event EventHandler<Location>? LocationUpdated;
     public bool IsRunning { get; private set; }
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(5);
+    public Location? LastReportedLocation => _lastReportedLocation;
 
     public async Task StartAsync()
     {
@@ -81,7 +81,28 @@ public sealed class LocationTracker
 
             if (location is not null)
             {
-                LocationUpdated?.Invoke(this, location);
+                // Throttling logic: only report if moved > 5 meters or it's the first fix
+                double distance = 999;
+                if (_lastReportedLocation != null)
+                {
+                    distance = Location.CalculateDistance(_lastReportedLocation, location, DistanceUnits.Meters);
+                }
+
+                if (distance >= 5)
+                {
+                    _lastReportedLocation = location;
+                    LocationUpdated?.Invoke(this, location);
+                    
+                    // Adjust interval based on movement
+                    if (_timer != null)
+                    {
+                        var newInterval = distance > 10 ? TimeSpan.FromSeconds(5) : TimeSpan.FromSeconds(10);
+                        if (_timer.Interval != newInterval)
+                        {
+                            _timer.Interval = newInterval;
+                        }
+                    }
+                }
             }
         }
         catch

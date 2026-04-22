@@ -321,60 +321,40 @@
       border-radius: 4px;
     }
 
-    /* New Pagination Button Styles */
-    .pagination-btn {
-      background: rgba(99, 102, 241, 0.1) !important;
-      color: #818cf8 !important;
-      border: 1px solid rgba(99, 102, 241, 0.3) !important;
-      transition: all 0.25s ease !important;
-      width: 40px;
-      height: 40px;
+    /* Live Visitors List */
+    .visitor-list, .queue-list {
+      max-height: 400px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .visitor-item, .queue-item {
+      padding: 12px;
+      border-radius: 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
       display: flex;
       align-items: center;
-      justify-content: center;
+      gap: 12px;
+    }
+    .proximity-badge {
+      font-size: 0.7rem;
+      padding: 2px 8px;
       border-radius: 10px;
-      cursor: pointer;
+      font-weight: 600;
     }
-
-    [data-theme="dark"] .pagination-btn {
-      background: rgba(129, 140, 248, 0.15) !important;
-      border-color: rgba(129, 140, 248, 0.25) !important;
+    .at-poi { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+    .between-pois { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+    .exploring { background: rgba(99, 102, 241, 0.1); color: #6366f1; }
+    
+    .tts-status {
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 4px;
     }
-
-    .pagination-btn:hover:not(:disabled) {
-      background: #6366f1 !important;
-      color: white !important;
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-    }
-
-    .pagination-btn:disabled {
-      opacity: 0.3 !important;
-      cursor: not-allowed !important;
-      background: rgba(255, 255, 255, 0.05) !important;
-      color: var(--text-muted) !important;
-      border-color: transparent !important;
-      transform: none !important;
-      box-shadow: none !important;
-    }
-
-    /* Table Text Color Tuning */
-    #logTable tbody td, #logTable thead th {
-      color: #000000 !important;
-    }
-    #logTable td.muted, #logTable .muted {
-      color: #334155 !important;
-    }
-
-    [data-theme="dark"] #logTable tbody td {
-      color: #f8fafc !important;
-    }
-    [data-theme="dark"] #logTable thead th {
-      color: #94a3b8 !important;
-    }
-    [data-theme="dark"] #logTable td.muted, [data-theme="dark"] #logTable .muted {
-      color: #94a3b8 !important;
-    }
+    .status-queued { background: #fee2e2; color: #b91c1c; }
+    .status-processing { background: #dcfce7; color: #15803d; }
   </style>
 </head>
 
@@ -508,15 +488,61 @@
               <div id="activityChart" style="min-height: 350px;"></div>
             </section>
 
-            <section class="chart-container" style="margin-bottom: 0;">
-              <header class="card-header" style="border: none; padding-bottom: 0;">
-                <div class="card-title" style="margin-bottom: 0;">
-                  <i class="fa-solid fa-language"></i>
-                  <h2 style="font-size: 1.25rem;">Ngôn ngữ sử dụng</h2>
-                </div>
-              </header>
-              <div id="langChart" style="min-height: 350px;"></div>
-            </section>
+            <div style="display: flex; flex-direction: column; gap: 24px;">
+                <section class="chart-container" style="margin-bottom: 0; flex:1;">
+                  <header class="card-header" style="border: none; padding-bottom: 0;">
+                    <div class="card-title" style="margin-bottom: 0;">
+                      <i class="fa-solid fa-language"></i>
+                      <h2 style="font-size: 1.25rem;">Ngôn ngữ</h2>
+                    </div>
+                  </header>
+                  <div id="langChart" style="min-height: 200px;"></div>
+                </section>
+                <section class="chart-container" style="margin-bottom: 0; flex:1;">
+                  <header class="card-header" style="border: none; padding-bottom: 0;">
+                    <div class="card-title" style="margin-bottom: 0;">
+                      <i class="fa-solid fa-brands fa-chrome"></i>
+                      <h2 style="font-size: 1.25rem;">Trình duyệt</h2>
+                    </div>
+                  </header>
+                  <div id="browserChart" style="min-height: 200px;"></div>
+                </section>
+                <section class="chart-container" style="margin-bottom: 0; flex:1;">
+                  <header class="card-header" style="border: none; padding-bottom: 0;">
+                    <div class="card-title" style="margin-bottom: 0;">
+                      <i class="fa-solid fa-microchip"></i>
+                      <h2 style="font-size: 1.25rem;">Hệ điều hành</h2>
+                    </div>
+                  </header>
+                  <div id="osChart" style="min-height: 200px;"></div>
+                </section>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 24px;">
+              <section class="chart-container" style="margin-bottom: 0;">
+                  <header class="card-header" style="border-bottom: 1px solid var(--border-color); margin-bottom: 16px;">
+                      <div class="card-title" style="margin-bottom: 0;">
+                        <i class="fa-solid fa-people-arrows"></i>
+                        <h2 style="font-size: 1.25rem;">Vị trí khách tham quan (Live)</h2>
+                      </div>
+                  </header>
+                  <div class="visitor-list" id="liveVisitorList">
+                      <div class="muted small text-center" style="padding: 20px;">Đang theo dõi...</div>
+                  </div>
+              </section>
+
+              <section class="chart-container" style="margin-bottom: 0;">
+                  <header class="card-header" style="border-bottom: 1px solid var(--border-color); margin-bottom: 16px;">
+                      <div class="card-title" style="margin-bottom: 0;">
+                        <i class="fa-solid fa-list-check"></i>
+                        <h2 style="font-size: 1.25rem;">Xử lý Audio Queue (TTS)</h2>
+                      </div>
+                  </header>
+                  <div class="queue-list" id="ttsQueueList">
+                      <div class="muted small text-center" style="padding: 20px;">Trống</div>
+                  </div>
+              </section>
           </div>
 
           <section class="chart-container" style="margin-top: 24px;">

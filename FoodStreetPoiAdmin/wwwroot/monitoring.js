@@ -208,6 +208,11 @@ async function loadDashboard() {
     renderHourlyChart(data.hourlyData || [], selectedAction);
     
     renderDonutChart('langChart', data.langStats || []);
+    renderDonutChart('browserChart', data.browserStats || []);
+    renderDonutChart('osChart', data.osStats || []);
+
+    renderOnlineVisitors(data.onlineVisitors || []);
+    renderTtsQueue(data.ttsQueue || []);
 
     renderPoiRanking(data.topPois || [], selectedAction);
     renderDetailedLogs(data.recentLogs || []);
@@ -411,30 +416,66 @@ function renderPoiRanking(topPois, action) {
   }).join('');
 }
 
-async function exportToCsv() {
-    try {
-        const params = new URLSearchParams();
-        params.set('pageSize', 200); // Export more
-        const res = await fetch('/api/admin/reports/user-activities?' + params.toString(), {
-            headers: { 'Authorization': 'Bearer ' + token }
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        const logs = data.recentLogs || [];
+function renderOnlineVisitors(visitors) {
+    const container = document.getElementById('liveVisitorList');
+    if (!container) return;
+    if (visitors.length === 0) {
+        container.innerHTML = '<div class="muted small text-center" style="padding: 20px;">Không có ai online</div>';
+        return;
+    }
+
+    container.innerHTML = visitors.map(v => {
+        let statusClass = 'exploring';
+        let statusText = 'Đang khám phá';
         
-        const headers = ["ID", "Time", "Action", "POI", "Device", "OS", "IP", "Screen"];
-        const rows = logs.map(l => [l.id, l.createdAt, l.action, l.poiName, l.browser, l.os, l.ip, l.screenInfo]);
-        
-        let csvContent = "\uFEFF" + headers.join(",") + "\n" + rows.map(r => r.join(",")).join("\n");
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.setAttribute("href", url);
-        link.setAttribute("download", `foodstreet-logs-${new Date().toISOString().split('T')[0]}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    } catch(e) {}
+        if (v.proximityState === 'At') {
+            statusClass = 'at-poi';
+            statusText = `Tại ${v.atPoiName}`;
+        } else if (v.proximityState === 'Between') {
+            statusClass = 'between-pois';
+            statusText = `${v.proximityText}`;
+        }
+
+        const platformIcon = v.platform === 'app' ? '<i class="fa-solid fa-mobile-screen"></i>' : '<i class="fa-solid fa-globe"></i>';
+
+        return `
+            <div class="visitor-item">
+                <div style="font-size: 1.2rem; color: var(--accent-color);">${platformIcon}</div>
+                <div style="flex: 1;">
+                    <div style="font-weight: 600; font-size: 0.85rem;">Device: ${v.deviceId?.substring(0,8) || 'Unknown'}...</div>
+                    <div class="muted" style="font-size: 0.75rem;">${v.os || 'N/A'} • ${v.browser || 'N/A'}</div>
+                </div>
+                <div class="proximity-badge ${statusClass}">${statusText}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderTtsQueue(queue) {
+    const container = document.getElementById('ttsQueueList');
+    if (!container) return;
+    if (queue.length === 0) {
+        container.innerHTML = '<div class="muted small text-center" style="padding: 20px;">Trống</div>';
+        return;
+    }
+
+    container.innerHTML = queue.map(item => {
+        const statusClass = item.status === 'processing' ? 'status-processing' : 'status-queued';
+        const statusText = item.status === 'processing' ? 'Đang đọc...' : 'Chờ xử lý';
+
+        return `
+            <div class="queue-item">
+                <div style="font-size: 1.2rem; color: #f59e0b;"><i class="fa-solid fa-headphones"></i></div>
+                <div style="flex: 1;">
+                    <div style="font-weight: 600; font-size: 0.85rem;">POI ID: ${item.poi_id}</div>
+                    <div class="muted" style="font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;">
+                        ${item.text}
+                    </div>
+                </div>
+                <div class="tts-status ${statusClass}">${statusText}</div>
+            </div>
+        `;
+    }).join('');
 }
 
 loadDashboard();
@@ -446,6 +487,10 @@ setInterval(async () => {
             const data = await res.json();
             const el = document.getElementById('valOnlineNow');
             if (el) el.textContent = data.onlineNow || 0;
+            // Also refresh live segments if we are on monitoring
+            if (window.location.pathname.includes('monitoring')) {
+                loadDashboard(); // Refresh UI more frequently for live tracking
+            }
         }
     } catch(e) {}
-}, 30000);
+}, 15000); // 15s refresh for admin live view

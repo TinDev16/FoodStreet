@@ -696,7 +696,9 @@ app.MapPost("/api/public/qr/confirm", async (HttpContext context, QrConfirmReque
         req.DeviceId,
         ua,
         ip,
-        req.ScreenInfo);
+        req.ScreenInfo,
+        req.Latitude,
+        req.Longitude);
     
     var (baseUrl, _) = await ResolvePublicBaseUrlForRequestAsync(context);
     var url = BuildPublicPoiUrl(baseUrl ?? "", poiId ?? 0, lang);
@@ -732,9 +734,52 @@ app.MapPost("/api/public/pois/track-activity", async (HttpContext context, Track
         request.DeviceId,
         ua,
         ip,
-        request.ScreenInfo);
+        request.ScreenInfo,
+        request.Latitude,
+        request.Longitude);
 
     return recorded ? Results.Ok(new { recorded = true }) : Results.Problem("Cannot record activity.");
+});
+
+app.MapPost("/api/public/tts/request", async (TtsRequest req) =>
+{
+    if (string.IsNullOrWhiteSpace(req.Text) || string.IsNullOrWhiteSpace(req.PoiId))
+    {
+        return Results.BadRequest(new { error = "Missing text or poiId." });
+    }
+
+    if (!TryParsePoiId(req.PoiId, out var poiId))
+    {
+        return Results.BadRequest(new { error = "Invalid poiId." });
+    }
+
+    await using var connection = await OpenConnectionAsync(connectionString);
+    
+    // 1. Check Cache
+    var textHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(req.Text)));
+    const string checkCacheSql = "SELECT audio_url FROM poi_audio_cache WHERE poi_id = $pid AND lang_code = $lang AND text_hash = $hash LIMIT 1;";
+    await using var cacheCmd = new SqliteCommand(checkCacheSql, connection);
+    cacheCmd.Parameters.AddWithValue("$pid", poiId);
+    cacheCmd.Parameters.AddWithValue("$lang", req.LangCode ?? "vi");
+    cacheCmd.Parameters.AddWithValue("$hash", textHash);
+    var cachedUrl = await cacheCmd.ExecuteScalarAsync();
+    
+    if (cachedUrl != null)
+    {
+        return Results.Ok(new { status = "done", audioUrl = cachedUrl.ToString() });
+    }
+
+    // 2. Add to Queue
+    const string queueSql = "INSERT INTO audio_tts_queue (user_id, poi_id, text, lang_code, status, created_at) VALUES ($uid, $pid, $txt, $lang, 'waiting', $now);";
+    await using var queueCmd = new SqliteCommand(queueSql, connection);
+    queueCmd.Parameters.AddWithValue("$uid", req.UserId ?? "anon");
+    queueCmd.Parameters.AddWithValue("$pid", poiId);
+    queueCmd.Parameters.AddWithValue("$txt", req.Text);
+    queueCmd.Parameters.AddWithValue("$lang", req.LangCode ?? "vi");
+    queueCmd.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
+    await queueCmd.ExecuteNonQueryAsync();
+
+    return Results.Accepted(null, new { status = "waiting", message = "TTS Job queued for background processing." });
 });
 
 app.MapGet("/api/admin/reports/user-activities", async (HttpContext context, 
@@ -1107,6 +1152,102 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         }
     }
 
+    // 10. Breakdown Stats (Browser & OS)
+    var browserStats = new List<object>();
+    var osStats = new List<object>();
+
+    const string browserSql = "SELECT COALESCE(NULLIF(uae.browser_family, ''), 'unknown') as label, COUNT(1) as c FROM user_activity_events uae WHERE uae.created_at >= $startUtc AND uae.created_at < $endUtc GROUP BY label ORDER BY c DESC;";
+    await using (var cmd = new SqliteCommand(browserSql, conn)) {
+        cmd.Parameters.AddWithValue("$startUtc", startUtc.ToString("O"));
+        cmd.Parameters.AddWithValue("$endUtc", endUtc.ToString("O"));
+        var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync()) browserStats.Add(new { label = reader.GetString(0), count = reader.GetInt32(1) });
+    }
+
+    const string osSql = "SELECT COALESCE(NULLIF(uae.os_family, ''), 'unknown') as label, COUNT(1) as c FROM user_activity_events uae WHERE uae.created_at >= $startUtc AND uae.created_at < $endUtc GROUP BY label ORDER BY c DESC;";
+    await using (var cmd = new SqliteCommand(osSql, conn)) {
+        cmd.Parameters.AddWithValue("$startUtc", startUtc.ToString("O"));
+        cmd.Parameters.AddWithValue("$endUtc", endUtc.ToString("O"));
+        var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync()) osStats.Add(new { label = reader.GetString(0), count = reader.GetInt32(1) });
+    }
+
+    // 11. TTS Queue Status
+    var ttsQueue = new List<object>();
+    const string ttsSql = "SELECT id, poi_id, text, status, created_at FROM audio_tts_queue WHERE status != 'done' ORDER BY created_at ASC LIMIT 20;";
+    await using (var cmd = new SqliteCommand(ttsSql, conn)) {
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync()) {
+            ttsQueue.Add(new {
+                id = reader.GetInt64(0).ToString(),
+                poiId = reader.GetInt64(1).ToString(),
+                text = reader.GetString(2),
+                status = reader.GetString(3),
+                createdAt = reader.GetString(4)
+            });
+        }
+    }
+
+    // 12. Advanced Online Visitors with "Pro" Proximity Logic
+    var onlineVisitors = new List<object>();
+    var allPois = new List<(long Id, string Name, double Lat, double Lon, double RadiusMeters)>();
+    const string allPoisSql = "SELECT p.id, pt.name, p.latitude, p.longitude, p.radius_meters FROM pois p JOIN poi_translations pt ON pt.poi_id = p.id WHERE pt.lang_code = 'vi' AND p.is_deleted = 0;";
+    await using (var cmd = new SqliteCommand(allPoisSql, conn)) {
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync()) allPois.Add((reader.GetInt64(0), reader.GetString(1), reader.GetDouble(2), reader.GetDouble(3), reader.GetDouble(4)));
+    }
+
+    string visitorsSql = "SELECT session_id, platform, latitude, longitude, last_ping_at FROM active_sessions WHERE datetime(last_ping_at) >= datetime('now', '-30 seconds')";
+    if (!string.IsNullOrEmpty(platform) && platform != "all") visitorsSql += " AND platform = $platform";
+    await using (var cmd = new SqliteCommand(visitorsSql, conn)) {
+        if (!string.IsNullOrEmpty(platform) && platform != "all") cmd.Parameters.AddWithValue("$platform", platform);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync()) {
+            var sid = reader.GetString(0);
+            var plt = reader.GetString(1);
+            var lat = reader.IsDBNull(2) ? (double?)null : reader.GetDouble(2);
+            var lon = reader.IsDBNull(3) ? (double?)null : reader.GetDouble(3);
+            
+            string proximityState = "Exploring";
+            string proximityText = "Đang di chuyển";
+            string atPoiName = "";
+
+            if (lat.HasValue && lon.HasValue) {
+                foreach (var p in allPois) {
+                    var dLat = (p.Lat - lat.Value) * Math.PI / 180;
+                    var dLon = (p.Lon - lon.Value) * Math.PI / 180;
+                    var a = Math.Sin(dLat/2) * Math.Sin(dLat/2) + Math.Cos(lat.Value*Math.PI/180) * Math.Cos(p.Lat*Math.PI/180) * Math.Sin(dLon/2) * Math.Sin(dLon/2);
+                    var d = 6371000 * 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1-a));
+                    if (d < p.RadiusMeters * 3.0) nearbyPois.Add(new { p.Id, p.Name, Distance = d, p.RadiusMeters });
+                }
+                var sorted = nearbyPois.OrderBy(x => x.Distance).ToList();
+                if (sorted.Count > 0) {
+                    if (sorted[0].Distance <= sorted[0].RadiusMeters) {
+                        proximityState = "At";
+                        atPoiName = sorted[0].Name;
+                        proximityText = $"Tại {sorted[0].Name}";
+                    } else if (sorted.Count >= 2) {
+                        proximityState = "Between";
+                        proximityText = $"Gần {sorted[0].Name} ({Math.Round(sorted[0].Distance)}m) hơn {sorted[1].Name} ({Math.Round(sorted[1].Distance)}m)";
+                    } else {
+                        proximityState = "Near";
+                        proximityText = $"Tiến gần {sorted[0].Name} ({Math.Round(sorted[0].Distance)}m)";
+                    }
+                }
+            }
+
+            onlineVisitors.Add(new { 
+                sessionId = sid, 
+                platform = plt, 
+                proximityState, 
+                proximityText, 
+                atPoiName,
+                lat, 
+                lon 
+            });
+        }
+    }
+
     return Results.Ok(new {
         onlineNow,
         periodAudioPlays,
@@ -1119,8 +1260,12 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         topPois,
         totalUniqueDevices,
         langStats,
+        browserStats,
+        osStats,
         recentLogs,
-        totalLogCount
+        totalLogCount,
+        ttsQueue,
+        onlineVisitors
     });
 }).RequireAuthorization();
 
@@ -1951,7 +2096,9 @@ static async Task InitializeDatabaseAsync(string connectionString)
         CREATE TABLE IF NOT EXISTS active_sessions (
             session_id TEXT PRIMARY KEY,
             last_ping_at TEXT NOT NULL,
-            platform TEXT NOT NULL
+            platform TEXT NOT NULL,
+            latitude REAL,
+            longitude REAL
         );
 
         CREATE TABLE IF NOT EXISTS user_activity_events (
@@ -1970,8 +2117,29 @@ static async Task InitializeDatabaseAsync(string connectionString)
             is_real_scan INTEGER,
             duration INTEGER,
             created_at TEXT NOT NULL,
+            latitude REAL,
+            longitude REAL,
             FOREIGN KEY(poi_id) REFERENCES pois(id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS audio_tts_queue (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
+            poi_id INTEGER,
+            text TEXT,
+            lang_code TEXT,
+            status TEXT NOT NULL DEFAULT 'waiting',
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS poi_audio_cache (
+            poi_id INTEGER,
+            lang_code TEXT,
+            text_hash TEXT,
+            audio_url TEXT,
+            PRIMARY KEY(poi_id, lang_code, text_hash)
+        );
+
         CREATE INDEX IF NOT EXISTS ix_user_activity_events_created_at ON user_activity_events(created_at DESC);
         CREATE INDEX IF NOT EXISTS ix_user_activity_events_session_id ON user_activity_events(session_id);
         CREATE INDEX IF NOT EXISTS ix_user_activity_events_poi_id ON user_activity_events(poi_id);
@@ -1985,6 +2153,10 @@ static async Task InitializeDatabaseAsync(string connectionString)
     }
 
     // New Columns Migrations
+    await AddColumnIfNotExists(connection, "active_sessions", "latitude", "REAL");
+    await AddColumnIfNotExists(connection, "active_sessions", "longitude", "REAL");
+    await AddColumnIfNotExists(connection, "user_activity_events", "latitude", "REAL");
+    await AddColumnIfNotExists(connection, "user_activity_events", "longitude", "REAL");
     await AddColumnIfNotExists(connection, "user_activity_events", "device_id", "TEXT");
     await AddColumnIfNotExists(connection, "user_activity_events", "browser_family", "TEXT");
     await AddColumnIfNotExists(connection, "user_activity_events", "os_family", "TEXT");
@@ -2994,7 +3166,9 @@ static async Task<bool> RecordUserActivityAsync(
     string? deviceId = null,
     string? userAgent = null,
     string? ipAddress = null,
-    string? screenInfo = null)
+    string? screenInfo = null,
+    double? latitude = null,
+    double? longitude = null)
 {
     await using var connection = await OpenConnectionAsync(connectionString);
     var nowUtc = DateTimeOffset.UtcNow.ToString("O");
@@ -3031,20 +3205,20 @@ static async Task<bool> RecordUserActivityAsync(
 
     // 1. Maintain Real-time Session Status
     await using (var upsertSession = new SqliteCommand("""
-        INSERT INTO active_sessions (session_id, last_ping_at, platform)
-        VALUES ($sid, $now, $platform)
-        ON CONFLICT(session_id) DO UPDATE SET last_ping_at = excluded.last_ping_at, platform = excluded.platform;
+        INSERT INTO active_sessions (session_id, last_ping_at, platform, latitude, longitude)
+        VALUES ($sid, $now, $platform, $lat, $lon)
+        ON CONFLICT(session_id) DO UPDATE SET last_ping_at = excluded.last_ping_at, platform = excluded.platform, latitude = excluded.latitude, longitude = excluded.longitude;
         """, connection, (SqliteTransaction)transaction))
     {
         upsertSession.Parameters.AddWithValue("$sid", sessionId);
         upsertSession.Parameters.AddWithValue("$now", nowUtc);
         upsertSession.Parameters.AddWithValue("$platform", platform);
+        upsertSession.Parameters.AddWithValue("$lat", (object?)latitude ?? DBNull.Value);
+        upsertSession.Parameters.AddWithValue("$lon", (object?)longitude ?? DBNull.Value);
         await upsertSession.ExecuteNonQueryAsync();
     }
 
     // 2. Smart Logging for Historical/Live History
-    // Heartbeats (ping) are UPSERTED per session/device to prevent log table flooding.
-    // Meaningful interactions (Scan, Audio, View) always get new historical rows.
     bool wasUpserted = false;
     if (action == "ping")
     {
@@ -3056,7 +3230,9 @@ static async Task<bool> RecordUserActivityAsync(
                 ip_address = $ip, 
                 screen_info = $screen,
                 browser_family = $browser,
-                os_family = $os
+                os_family = $os,
+                latitude = $lat,
+                longitude = $lon
             WHERE action = 'ping' AND (
                 (device_id IS NOT NULL AND device_id = $did)
                 OR (device_id IS NULL AND session_id = $sid)
@@ -3071,6 +3247,8 @@ static async Task<bool> RecordUserActivityAsync(
             updatePing.Parameters.AddWithValue("$screen", (object?)screenInfo ?? DBNull.Value);
             updatePing.Parameters.AddWithValue("$browser", (object?)browser ?? DBNull.Value);
             updatePing.Parameters.AddWithValue("$os", (object?)os ?? DBNull.Value);
+            updatePing.Parameters.AddWithValue("$lat", (object?)latitude ?? DBNull.Value);
+            updatePing.Parameters.AddWithValue("$lon", (object?)longitude ?? DBNull.Value);
             
             var rowsAffected = await updatePing.ExecuteNonQueryAsync();
             if (rowsAffected > 0) wasUpserted = true;
@@ -3080,8 +3258,8 @@ static async Task<bool> RecordUserActivityAsync(
     if (!wasUpserted)
     {
         await using (var insertEvent = new SqliteCommand("""
-            INSERT INTO user_activity_events (poi_id, session_id, device_id, platform, action, language, device_type, browser_family, os_family, ip_address, screen_info, is_real_scan, duration, created_at)
-            VALUES ($poi, $sid, $did, $platform, $action, $lang, $device, $browser, $os, $ip, $screen, $isReal, $duration, $now);
+            INSERT INTO user_activity_events (poi_id, session_id, device_id, platform, action, language, device_type, browser_family, os_family, ip_address, screen_info, is_real_scan, duration, created_at, latitude, longitude)
+            VALUES ($poi, $sid, $did, $platform, $action, $lang, $device, $browser, $os, $ip, $screen, $isReal, $duration, $now, $lat, $lon);
             """, connection, (SqliteTransaction)transaction))
         {
             insertEvent.Parameters.AddWithValue("$poi", poiId.HasValue ? (object)poiId.Value : DBNull.Value);
@@ -3098,6 +3276,8 @@ static async Task<bool> RecordUserActivityAsync(
             insertEvent.Parameters.AddWithValue("$isReal", isRealScan.HasValue ? (object)isRealScan.Value : DBNull.Value);
             insertEvent.Parameters.AddWithValue("$duration", duration.HasValue ? (object)duration.Value : DBNull.Value);
             insertEvent.Parameters.AddWithValue("$now", nowUtc);
+            insertEvent.Parameters.AddWithValue("$lat", (object?)latitude ?? DBNull.Value);
+            insertEvent.Parameters.AddWithValue("$lon", (object?)longitude ?? DBNull.Value);
             await insertEvent.ExecuteNonQueryAsync();
         }
     }
@@ -3310,6 +3490,8 @@ sealed class TrackActivityRequest
     public string? DeviceType { get; set; }
     public int? Duration { get; set; }
     public string? ScreenInfo { get; set; }
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
 }
 
 sealed class QrConfirmRequest
@@ -3320,6 +3502,16 @@ sealed class QrConfirmRequest
     public string? SessionId { get; set; }
     public string? DeviceId { get; set; }
     public string? ScreenInfo { get; set; }
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+}
+
+sealed class TtsRequest
+{
+    public string? UserId { get; set; }
+    public string? PoiId { get; set; }
+    public string? Text { get; set; }
+    public string? LangCode { get; set; }
 }
 
 sealed class UserActivityLogDto
@@ -3351,10 +3543,14 @@ sealed class DashboardReportsResponse
     
     // New analytics fields
     public long TotalUniqueDevices { get; set; }
+    public List<StatBreakdownDto> LangStats { get; set; } = [];
     public List<StatBreakdownDto> BrowserStats { get; set; } = [];
     public List<StatBreakdownDto> OsStats { get; set; } = [];
     public List<UserActivityLogDto> RecentLogs { get; set; } = [];
     public int TotalLogCount { get; set; }
+    
+    public List<object> OnlineVisitors { get; set; } = [];
+    public List<object> TtsQueue { get; set; } = [];
 }
 
 sealed class ChartPointDto { public string Date { get; set; } = ""; public string Action { get; set; } = ""; public int Count { get; set; } }
