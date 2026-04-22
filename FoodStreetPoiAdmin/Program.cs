@@ -1218,6 +1218,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
             string proximityText = "Đang di chuyển";
             string atPoiName = "";
             var nearbyPois = new List<dynamic>();
+            var proximityNearbyList = new List<object>();
 
             if (lat.HasValue && lon.HasValue) {
                 foreach (var p in allPois) {
@@ -1249,6 +1250,9 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
                     proximityState = "Exploring";
                     proximityText = "Đang di chuyển";
                 }
+
+                var displayNearby = (insidePois.Count > 0 ? insidePois : bufferPois);
+                proximityNearbyList = displayNearby.Select(x => new { name = (string)x.Name, distance = Math.Round((double)x.Distance) }).ToList<object>();
             }
 
             onlineVisitors.Add(new { 
@@ -1259,7 +1263,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
                 os = osFamily,
                 proximityState, 
                 proximityText, 
-                nearbyPois = nearbyPois.Select(x => new { name = x.Name, distance = Math.Round(x.Distance) }).ToList(),
+                nearbyPois = proximityNearbyList,
                 atPoiName,
                 lat, 
                 lon 
@@ -3241,8 +3245,8 @@ static async Task<bool> RecordUserActivityAsync(
             device_id = excluded.device_id, 
             browser_family = excluded.browser_family,
             os_family = excluded.os_family,
-            latitude = excluded.latitude, 
-            longitude = excluded.longitude;
+            latitude = COALESCE(excluded.latitude, active_sessions.latitude), 
+            longitude = COALESCE(excluded.longitude, active_sessions.longitude);
         """, connection, (SqliteTransaction)transaction))
     {
         upsertSession.Parameters.AddWithValue("$sid", sessionId);
