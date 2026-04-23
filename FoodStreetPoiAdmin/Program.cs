@@ -863,7 +863,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         if (isOwner) cmd.Parameters.AddWithValue("$ownerId", actor.Id);
         if (!string.IsNullOrEmpty(platform) && platform != "all") cmd.Parameters.AddWithValue("$platform", platform);
         var res = await cmd.ExecuteScalarAsync();
-        if (res != null) onlineNow = Convert.ToInt64(res, CultureInfo.InvariantCulture) * 2;
+        if (res != null) onlineNow = Convert.ToInt64(res, CultureInfo.InvariantCulture);
     }
 
     if (fields == "onlineNow") {
