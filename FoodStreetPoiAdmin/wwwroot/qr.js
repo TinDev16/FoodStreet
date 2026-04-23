@@ -436,6 +436,42 @@
       state.qr.previewBlobUrl = "";
       state.qr.downloadBlobUrl = "";
     });
+
+    $("#masterQrViewBtn")?.addEventListener("click", async () => {
+      try {
+        await openMasterQrPreview();
+      } catch (err) {
+        setStatus(err?.message || String(err), true);
+      }
+    });
+  };
+
+  const fetchMasterQrPngBlobUrl = async (download = false) => {
+    const qs = new URLSearchParams();
+    if (download) qs.set("download", "1");
+    const baseUrl = (state.qr.baseUrl || "").trim();
+    if (baseUrl) qs.set("baseUrl", baseUrl);
+    const url = `/api/admin/qr/master.png?${qs.toString()}`;
+    const res = await fetch(url, { headers: headers() });
+    if (!res.ok) throw new Error(await safeError(res));
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+  };
+
+  const openMasterQrPreview = async () => {
+    setStatus("Đang tải QR Tổng...");
+    const baseUrl = (state.qr.baseUrl || "").trim();
+    qrPublicUrlEl.value = `${baseUrl.trimEnd('/')}/list.html`;
+
+    if (state.qr.previewBlobUrl) URL.revokeObjectURL(state.qr.previewBlobUrl);
+    if (state.qr.downloadBlobUrl) URL.revokeObjectURL(state.qr.downloadBlobUrl);
+    state.qr.previewBlobUrl = await fetchMasterQrPngBlobUrl(false);
+    state.qr.downloadBlobUrl = await fetchMasterQrPngBlobUrl(true);
+    qrPreviewImageEl.src = state.qr.previewBlobUrl;
+    qrDownloadBtn.href = state.qr.downloadBlobUrl;
+    qrDownloadBtn.setAttribute("download", `foodstreet-master-qr.png`);
+    if (!qrDialogEl.open) qrDialogEl.showModal();
+    setStatus("");
   };
 
   const init = async () => {

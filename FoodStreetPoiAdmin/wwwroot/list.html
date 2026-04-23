@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>FoodStreet - Danh sách địa điểm</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    :root {
+      --card-bg: #ffffff;
+      --text-muted: #64748b;
+      --accent: #4f46e5;
+    }
+
+    body {
+      background-color: #f8fafc;
+      font-family: 'Outfit', sans-serif;
+      margin: 0;
+      padding-bottom: 40px;
+    }
+
+    .list-header {
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      color: white;
+      padding: 40px 20px;
+      text-align: center;
+      border-bottom-left-radius: 30px;
+      border-bottom-right-radius: 30px;
+      box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.2);
+      margin-bottom: 30px;
+    }
+
+    .list-header h1 {
+      margin: 0 0 15px 0;
+      font-weight: 700;
+      font-size: 1.8rem;
+    }
+
+    .search-container {
+      max-width: 500px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    .search-container i {
+      position: absolute;
+      left: 15px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 15px 15px 15px 45px;
+      border-radius: 15px;
+      border: none;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      font-family: inherit;
+      font-size: 1rem;
+      outline: none;
+      transition: box-shadow 0.2s;
+    }
+
+    .search-input:focus {
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+
+    .poi-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+      padding: 0 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .poi-item {
+      background: var(--card-bg);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+      transition: transform 0.2s, box-shadow 0.2s;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .poi-item:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+
+    .poi-img-wrap {
+      width: 100%;
+      height: 200px;
+      background: #e2e8f0;
+      position: relative;
+    }
+
+    .poi-img-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .poi-price-tag {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      background: rgba(0, 0, 0, 0.6);
+      color: white;
+      padding: 5px 12px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      backdrop-filter: blur(4px);
+    }
+
+    .poi-info {
+      padding: 20px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .poi-name {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin: 0 0 8px 0;
+      color: #1e293b;
+    }
+
+    .poi-desc {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      margin-bottom: 15px;
+    }
+
+    .poi-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: auto;
+    }
+
+    .view-btn {
+      background: #f1f5f9;
+      color: var(--accent);
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+
+    .poi-item:hover .view-btn {
+      background: var(--accent);
+      color: white;
+    }
+
+    .no-results {
+      text-align: center;
+      padding: 40px;
+      color: var(--text-muted);
+      grid-column: 1 / -1;
+    }
+
+    #loadingOverlay {
+      position: fixed;
+      inset: 0;
+      background: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+      transition: opacity 0.3s;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="loadingOverlay">
+    <div class="spinner"></div>
+  </div>
+
+  <header class="list-header">
+    <h1>Khám phá FoodStreet</h1>
+    <p style="margin-bottom: 25px; opacity: 0.9;">Tìm kiếm và khám phá các điểm đến hấp dẫn nhất khu phố</p>
+    <div class="search-container">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="text" id="searchInput" class="search-input" placeholder="Tìm tên quán, món ăn..." autocomplete="off">
+    </div>
+  </header>
+
+  <main>
+    <div class="poi-list" id="poiList">
+      <!-- POIs will be injected here -->
+    </div>
+  </main>
+
+  <script src="/list.js?v=20260423-init"></script>
+</body>
+
+</html>

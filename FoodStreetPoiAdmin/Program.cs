@@ -612,6 +612,39 @@ app.MapGet("/api/pois/{id}/qr.png", async (HttpContext context, string id) =>
     return Results.File(pngBytes, "image/png");
 }).RequireAuthorization();
 
+app.MapGet("/api/admin/qr/master.png", async (HttpContext context) =>
+{
+    if (!TryGetAdminActor(context.User, out var actor))
+    {
+        return Results.Unauthorized();
+    }
+
+    await TryEnsureAdbReverseAsync();
+    var (baseUrl, error) = await ResolvePublicBaseUrlForRequestAsync(context);
+    if (!string.IsNullOrWhiteSpace(error) || string.IsNullOrWhiteSpace(baseUrl))
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    var publicUrl = $"{baseUrl.TrimEnd('/')}/list.html";
+    var rawSize = context.Request.Query["size"].ToString();
+    var size = 512;
+    if (!string.IsNullOrWhiteSpace(rawSize) && int.TryParse(rawSize, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var parsedSize))
+    {
+        size = Math.Clamp(parsedSize, 256, 2048);
+    }
+
+    var download = string.Equals(context.Request.Query["download"], "1", StringComparison.OrdinalIgnoreCase);
+    var pngBytes = await RenderQrPngAsync(publicUrl, size, context.RequestAborted);
+
+    if (download)
+    {
+        return Results.File(pngBytes, "image/png", "foodstreet-master-qr.png");
+    }
+
+    return Results.File(pngBytes, "image/png");
+}).RequireAuthorization();
+
 app.MapGet("/qr/scan", (HttpContext context) =>
 {
     var code = context.Request.Query["code"].ToString();
