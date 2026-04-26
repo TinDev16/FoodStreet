@@ -664,7 +664,7 @@ app.MapGet("/api/admin/qr/master.png", async (HttpContext context) =>
         return Results.BadRequest(new { error });
     }
 
-    var publicUrl = $"{baseUrl.TrimEnd('/')}/list.html";
+    var publicUrl = BuildQrScanUrl(baseUrl, 0);
     var rawSize = context.Request.Query["size"].ToString();
     var size = 512;
     if (!string.IsNullOrWhiteSpace(rawSize) && int.TryParse(rawSize, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var parsedSize))
@@ -2457,11 +2457,19 @@ static string NormalizeSupabaseBaseUrl(string raw)
 
 static string BuildQrScanUrl(string publicBaseUrl, long poiId)
 {
+    if (poiId <= 0)
+    {
+        return $"{publicBaseUrl.TrimEnd('/')}/qr/scan?code=master";
+    }
     return $"{publicBaseUrl.TrimEnd('/')}/qr/scan?code={poiId}";
 }
 
 static string BuildPublicPoiUrl(string publicBaseUrl, long poiId, string? langCode)
 {
+    if (poiId <= 0)
+    {
+        return $"{publicBaseUrl.TrimEnd('/')}/list.html";
+    }
     var langSuffix = string.IsNullOrWhiteSpace(langCode) ? "" : $"&lang={langCode}";
     return $"{publicBaseUrl.TrimEnd('/')}/poi.html?id={poiId}{langSuffix}";
 }
