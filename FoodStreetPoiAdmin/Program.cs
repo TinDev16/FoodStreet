@@ -4942,7 +4942,8 @@ sealed class SupabaseDataService : IDataService
 
             await _supabase.PostAsync("/rest/v1/user_activity_events", payload, cancellationToken: cancellationToken);
 
-            if (string.Equals(action, "ping", StringComparison.OrdinalIgnoreCase))
+            // Update online status (active_sessions) for any interactive action
+            if (action == "ping" || action == "scan_qr" || action == "view_poi" || action == "play_audio")
             {
                 var sessionPayload = new Dictionary<string, object?>
                 {

@@ -83,12 +83,41 @@
     renderList();
   };
 
+  const getOrCreateDeviceId = () => {
+    let id = localStorage.getItem("device_id");
+    if (!id) {
+        try { id = crypto.randomUUID(); } catch(e) { id = 'dev_' + Date.now() + '_' + Math.random().toString(36).substring(2); }
+        localStorage.setItem("device_id", id);
+    }
+    return id;
+  };
+
+  const trackActivity = async (action) => {
+    try {
+        const sid = localStorage.getItem('session_id') || ('web_' + Date.now() + '_' + Math.random().toString(36).substring(2));
+        localStorage.setItem('session_id', sid);
+        const did = getOrCreateDeviceId();
+        const payload = {
+            action, platform: 'web', sessionId: sid, deviceId: did, language: state.lang,
+            poiId: null, deviceType: 'web'
+        };
+        await fetch('/api/public/pois/track-activity', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+    } catch(e) {}
+  };
+
   const init = () => {
     const params = new URLSearchParams(window.location.search);
     state.lang = params.get("lang") || "vi";
 
     searchInput.addEventListener("input", handleSearch);
     fetchData();
+
+    // Track initial view and start ping loop
+    trackActivity('view_list'); 
+    setInterval(() => trackActivity('ping'), 15000);
   };
 
   init();
