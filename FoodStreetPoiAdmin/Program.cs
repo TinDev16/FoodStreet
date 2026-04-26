@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.Data.Sqlite;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using FoodStreetPoiAdmin.Supabase;
 using Microsoft.IdentityModel.Tokens;
 using System.Diagnostics;
 using System.Globalization;
@@ -16,27 +16,29 @@ Environment.SetEnvironmentVariable("DOTNET_USE_POLLING_FILE_WATCHER", "true");
 
 var builder = WebApplication.CreateBuilder(args);
 
-var hasExplicitUrlsArg = args.Any(x => x.StartsWith("--urls", StringComparison.OrdinalIgnoreCase));
-if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("ASPNETCORE_URLS")) && !hasExplicitUrlsArg)
+var urls = builder.Configuration["urls"] ?? Environment.GetEnvironmentVariable("ASPNETCORE_URLS");
+if (string.IsNullOrEmpty(urls) || urls.Contains("localhost") || urls.Contains("127.0.0.1"))
 {
-    // Allow emulator/physical devices on same LAN to reach the admin API.
-    builder.WebHost.UseUrls("http://0.0.0.0:5187");
+    builder.WebHost.ConfigureKestrel(options =>
+    {
+        // Bind to all interfaces on port 5187 if running locally, 
+        // allowing physical devices on the same LAN to connect.
+        options.ListenAnyIP(5187);
+    });
 }
 
-var jwtSecret = Environment.GetEnvironmentVariable("FOODSTREET_JWT_SECRET")?.Trim();
+var jwtSecret = (Environment.GetEnvironmentVariable("FOODSTREET_JWT_SECRET") ?? builder.Configuration["Jwt:Secret"])?.Trim();
 if (string.IsNullOrWhiteSpace(jwtSecret) || jwtSecret.Length < 32)
 {
-    jwtSecret = "FoodStreetDevJwtSecretKey32CharsMin!!";
+    throw new InvalidOperationException("Missing/invalid FOODSTREET_JWT_SECRET (must be >= 32 chars). Set it as env var or in appsettings.json (Jwt:Secret).");
 }
-var bootstrapSuperAdminUser = Environment.GetEnvironmentVariable("FOODSTREET_SUPERADMIN_USER")?.Trim();
-if (string.IsNullOrWhiteSpace(bootstrapSuperAdminUser))
+
+var bootstrapSuperAdminUser = (Environment.GetEnvironmentVariable("FOODSTREET_SUPERADMIN_USER") ?? builder.Configuration["SuperAdmin:User"])?.Trim();
+var bootstrapSuperAdminPassword = (Environment.GetEnvironmentVariable("FOODSTREET_SUPERADMIN_PASSWORD") ?? builder.Configuration["SuperAdmin:Password"])?.Trim();
+var enableBootstrapSuperAdmin = !string.IsNullOrWhiteSpace(bootstrapSuperAdminUser) || !string.IsNullOrWhiteSpace(bootstrapSuperAdminPassword);
+if (enableBootstrapSuperAdmin && (string.IsNullOrWhiteSpace(bootstrapSuperAdminUser) || string.IsNullOrWhiteSpace(bootstrapSuperAdminPassword)))
 {
-    bootstrapSuperAdminUser = "admin";
-}
-var bootstrapSuperAdminPassword = Environment.GetEnvironmentVariable("FOODSTREET_SUPERADMIN_PASSWORD")?.Trim();
-if (string.IsNullOrWhiteSpace(bootstrapSuperAdminPassword))
-{
-    bootstrapSuperAdminPassword = "admin123";
+    throw new InvalidOperationException("To bootstrap superadmin, set both FOODSTREET_SUPERADMIN_USER and FOODSTREET_SUPERADMIN_PASSWORD.");
 }
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -64,6 +66,37 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 });
 
 builder.Services.AddHostedService<TtsQueueWorker>();
+builder.Services.AddHttpClient();
+
+var supabaseUrl = (Environment.GetEnvironmentVariable("SUPABASE_URL") ?? builder.Configuration["Supabase:Url"])?.Trim();
+if (string.IsNullOrWhiteSpace(supabaseUrl))
+{
+    throw new InvalidOperationException("Missing SUPABASE_URL (or appsettings Supabase:Url).");
+}
+supabaseUrl = NormalizeSupabaseBaseUrl(supabaseUrl);
+
+var supabaseServiceRoleKey = (Environment.GetEnvironmentVariable("SUPABASE_SERVICE_ROLE_KEY") ?? builder.Configuration["Supabase:ServiceRoleKey"])?.Trim();
+if (string.IsNullOrWhiteSpace(supabaseServiceRoleKey))
+{
+    // Back-compat for older deployments. Prefer SUPABASE_SERVICE_ROLE_KEY.
+    supabaseServiceRoleKey = (Environment.GetEnvironmentVariable("SUPABASE_KEY") ?? builder.Configuration["Supabase:Key"])?.Trim();
+}
+if (string.IsNullOrWhiteSpace(supabaseServiceRoleKey))
+{
+    throw new InvalidOperationException("Missing SUPABASE_SERVICE_ROLE_KEY (or appsettings Supabase:ServiceRoleKey).");
+}
+
+builder.Services.AddHttpClient<SupabaseRestClient>(client =>
+{
+    client.BaseAddress = new Uri(supabaseUrl, UriKind.Absolute);
+    client.DefaultRequestHeaders.Remove("apikey");
+    client.DefaultRequestHeaders.Remove("Authorization");
+    client.DefaultRequestHeaders.Add("apikey", supabaseServiceRoleKey);
+    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {supabaseServiceRoleKey}");
+    client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+    client.Timeout = TimeSpan.FromSeconds(20);
+});
+builder.Services.AddScoped<IDataService, SupabaseDataService>();
 
 var app = builder.Build();
 
@@ -73,9 +106,6 @@ var dataDirectory = Path.Combine(app.Environment.ContentRootPath, "App_Data");
 var uploadDirectory = Path.Combine(app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot"), "uploads");
 Directory.CreateDirectory(dataDirectory);
 Directory.CreateDirectory(uploadDirectory);
-
-var dbPath = Path.Combine(dataDirectory, "poi-admin.db3");
-var connectionString = $"Data Source={dbPath}";
 var adbReverseSync = new object();
 var lastAdbReverseAttemptUtc = DateTimeOffset.MinValue;
 
@@ -85,14 +115,28 @@ var configuredPublicBaseUrl = NormalizePublicBaseUrl(
     Environment.GetEnvironmentVariable("POI_PUBLIC_BASE_URL")
     ?? Environment.GetEnvironmentVariable("PUBLIC_BASE_URL")
     ?? app.Configuration["PublicBaseUrl"]);
-var translationApiKey = Environment.GetEnvironmentVariable("GOOGLE_TRANSLATE_API_KEY")?.Trim();
-if (string.IsNullOrWhiteSpace(translationApiKey))
-{
-    translationApiKey = "AIzaSyBe6oYZg8K70gk2HdDWo5n9UcqzIG2WqJo";
-}
+var translationApiKey = (Environment.GetEnvironmentVariable("GOOGLE_TRANSLATE_API_KEY") ?? builder.Configuration["GoogleTranslate:ApiKey"])?.Trim();
 
-await InitializeDatabaseAsync(connectionString);
-await EnsureBootstrapSuperAdminAsync(connectionString, bootstrapSuperAdminUser, bootstrapSuperAdminPassword);
+if (enableBootstrapSuperAdmin)
+{
+    using var scope = app.Services.CreateScope();
+    var dataService = scope.ServiceProvider.GetRequiredService<IDataService>();
+    try
+    {
+        if (supabaseServiceRoleKey != "YOUR_SUPABASE_SERVICE_ROLE_KEY_HERE" && !string.IsNullOrWhiteSpace(supabaseServiceRoleKey))
+        {
+            await dataService.EnsureBootstrapSuperAdminAsync(bootstrapSuperAdminUser!, bootstrapSuperAdminPassword!);
+        }
+        else
+        {
+            Console.WriteLine("WARNING: Supabase Service Role Key is not configured. Skipping superadmin bootstrap.");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"WARNING: Failed to bootstrap superadmin (Supabase might be unreachable): {ex.Message}");
+    }
+}
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
@@ -134,29 +178,29 @@ app.Use(async (context, next) =>
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapPost("/api/admin/auth/login", async (AdminLoginRequest? req) =>
+app.MapPost("/api/admin/auth/login", async (AdminLoginRequest? req, IDataService dataService) =>
 {
     if (req is null || string.IsNullOrWhiteSpace(req.Username) || string.IsNullOrWhiteSpace(req.Password))
     {
         return Results.BadRequest(new { error = "Thieu username hoac password." });
     }
 
-    var admin = await FindAdminForLoginAsync(connectionString, req.Username.Trim(), req.Password);
+    var admin = await dataService.FindAdminForLoginAsync(req.Username.Trim(), req.Password);
     if (admin is null)
     {
         return Results.Unauthorized();
     }
 
-    var token = CreateAdminJwt(admin.Value.Id, admin.Value.Username, admin.Value.Role, admin.Value.FullName, jwtSecret);
+    var token = CreateAdminJwt(admin.Id, admin.Username, admin.Role, admin.FullName, jwtSecret);
     return Results.Ok(new
     {
         token,
         user = new
         {
-            id = admin.Value.Id,
-            username = admin.Value.Username,
-            role = admin.Value.Role,
-            fullName = admin.Value.FullName
+            id = admin.Id,
+            username = admin.Username,
+            role = admin.Role,
+            fullName = admin.FullName
         }
     });
 });
@@ -178,8 +222,7 @@ app.MapGet("/api/admin/auth/me", (HttpContext context) =>
         fullName = actor.FullName
     });
 }).RequireAuthorization();
-
-app.MapGet("/api/admin/owners", async (HttpContext context) =>
+app.MapGet("/api/admin/owners", async (HttpContext context, IDataService dataService) =>
 {
     if (!TryGetAdminActor(context.User, out var actor))
     {
@@ -193,11 +236,11 @@ app.MapGet("/api/admin/owners", async (HttpContext context) =>
 
     var includeDeleted = string.Equals(context.Request.Query["includeDeleted"], "1", StringComparison.OrdinalIgnoreCase)
         || string.Equals(context.Request.Query["includeDeleted"], "true", StringComparison.OrdinalIgnoreCase);
-    var owners = await GetOwnerAccountsAsync(connectionString, includeDeleted);
+    var owners = await dataService.GetOwnerAccountsAsync(includeDeleted);
     return Results.Ok(owners);
 }).RequireAuthorization();
 
-app.MapPost("/api/admin/owners", async (HttpContext context, AdminCreateOwnerRequest? req) =>
+app.MapPost("/api/admin/owners", async (HttpContext context, AdminCreateOwnerRequest? req, IDataService dataService) =>
 {
     if (!TryGetAdminActor(context.User, out var actor))
     {
@@ -221,7 +264,7 @@ app.MapPost("/api/admin/owners", async (HttpContext context, AdminCreateOwnerReq
 
     try
     {
-        var ownerId = await CreateOwnerAccountAsync(connectionString, req.Username.Trim(), req.Password.Trim(), req.FullName?.Trim() ?? string.Empty);
+        var ownerId = await dataService.CreateOwnerAccountAsync(req.Username.Trim(), req.Password.Trim(), req.FullName?.Trim() ?? string.Empty);
         return Results.Ok(new { id = ownerId.ToString(CultureInfo.InvariantCulture) });
     }
     catch (InvalidOperationException ex)
@@ -230,7 +273,7 @@ app.MapPost("/api/admin/owners", async (HttpContext context, AdminCreateOwnerReq
     }
 }).RequireAuthorization();
 
-app.MapPut("/api/admin/owners/{id}", async (HttpContext context, string id, AdminUpdateOwnerRequest? req) =>
+app.MapPut("/api/admin/owners/{id}", async (HttpContext context, string id, AdminUpdateOwnerRequest? req, IDataService dataService) =>
 {
     if (!TryGetAdminActor(context.User, out var actor))
     {
@@ -259,7 +302,7 @@ app.MapPut("/api/admin/owners/{id}", async (HttpContext context, string id, Admi
 
     try
     {
-        var ok = await UpdateOwnerAccountAsync(connectionString, ownerId, req.Username?.Trim(), req.FullName?.Trim(), req.Password?.Trim());
+        var ok = await dataService.UpdateOwnerAccountAsync(ownerId, req.Username?.Trim(), req.FullName?.Trim(), req.Password?.Trim());
         return ok ? Results.Ok(new { id = ownerId.ToString(CultureInfo.InvariantCulture) }) : Results.NotFound();
     }
     catch (InvalidOperationException ex)
@@ -268,7 +311,7 @@ app.MapPut("/api/admin/owners/{id}", async (HttpContext context, string id, Admi
     }
 }).RequireAuthorization();
 
-app.MapDelete("/api/admin/owners/{id}", async (HttpContext context, string id) =>
+app.MapDelete("/api/admin/owners/{id}", async (HttpContext context, string id, IDataService dataService) =>
 {
     if (!TryGetAdminActor(context.User, out var actor))
     {
@@ -287,7 +330,7 @@ app.MapDelete("/api/admin/owners/{id}", async (HttpContext context, string id) =
 
     try
     {
-        var ok = await DeleteOwnerAccountAsync(connectionString, ownerId);
+        var ok = await dataService.DeleteOwnerAccountAsync(ownerId);
         return ok ? Results.Ok(new { id = ownerId.ToString(CultureInfo.InvariantCulture) }) : Results.NotFound();
     }
     catch (InvalidOperationException ex)
@@ -296,7 +339,7 @@ app.MapDelete("/api/admin/owners/{id}", async (HttpContext context, string id) =
     }
 }).RequireAuthorization();
 
-app.MapPost("/api/admin/owners/{id}/restore", async (HttpContext context, string id) =>
+app.MapPost("/api/admin/owners/{id}/restore", async (HttpContext context, string id, IDataService dataService) =>
 {
     if (!TryGetAdminActor(context.User, out var actor))
     {
@@ -313,11 +356,11 @@ app.MapPost("/api/admin/owners/{id}/restore", async (HttpContext context, string
         return Results.BadRequest(new { error = "owner id khong hop le." });
     }
 
-    var ok = await RestoreOwnerAccountAsync(connectionString, ownerId);
+    var ok = await dataService.RestoreOwnerAccountAsync(ownerId);
     return ok ? Results.Ok(new { id = ownerId.ToString(CultureInfo.InvariantCulture), restored = true }) : Results.NotFound();
 }).RequireAuthorization();
 
-app.MapPost("/api/admin/pois/{id}/assign-owner", async (HttpContext context, string id, AssignPoiOwnerRequest? req) =>
+app.MapPost("/api/admin/pois/{id}/assign-owner", async (HttpContext context, string id, AssignPoiOwnerRequest? req, IDataService dataService) =>
 {
     if (!TryGetAdminActor(context.User, out var actor))
     {
@@ -347,7 +390,7 @@ app.MapPost("/api/admin/pois/{id}/assign-owner", async (HttpContext context, str
 
     try
     {
-        var ok = await AssignOwnerToPoiAsync(connectionString, poiId, ownerId);
+        var ok = await dataService.AssignOwnerToPoiAsync(poiId, ownerId);
         return ok ? Results.Ok(new { id, ownerId = ownerId?.ToString(CultureInfo.InvariantCulture) }) : Results.NotFound();
     }
     catch (InvalidOperationException ex)
@@ -434,16 +477,16 @@ app.MapPost("/api/uploads", async (HttpContext context) =>
     return Results.Ok(new { url, kind, lang = safeLang, contentType, size = file.Length });
 }).RequireAuthorization();
 
-app.MapGet("/api/pois", async (HttpContext context) =>
+app.MapGet("/api/pois", async (HttpContext context, IDataService dataService) =>
 {
     await TryEnsureAdbReverseAsync();
     var requestedLang = NormalizeLanguageOrFallback(context.Request.Query["lang"].ToString(), supportedLanguageSet);
-    var items = await GetPoisForMobileAsync(connectionString, requestedLang);
+    var items = await dataService.GetPoisForMobileAsync(requestedLang);
     return Results.Ok(items);
 });
 
 // Admin list (includes inactive) with role-based ownership filter.
-app.MapGet("/api/pois/admin", async (HttpContext context) =>
+app.MapGet("/api/pois/admin", async (HttpContext context, IDataService dataService) =>
 {
     if (!TryGetAdminActor(context.User, out var actor))
     {
@@ -451,12 +494,12 @@ app.MapGet("/api/pois/admin", async (HttpContext context) =>
     }
 
     await TryEnsureAdbReverseAsync();
-    var items = await GetPoisForAdminListAsync(connectionString, actor);
+    var items = await dataService.GetPoisForAdminListAsync(actor);
     return Results.Ok(items);
 }).RequireAuthorization();
 
 // Admin: load core + all translations with ownership filter.
-app.MapGet("/api/pois/{id}", async (HttpContext context, string id) =>
+app.MapGet("/api/pois/{id}", async (HttpContext context, string id, IDataService dataService) =>
 {
     if (!TryGetAdminActor(context.User, out var actor))
     {
@@ -469,18 +512,17 @@ app.MapGet("/api/pois/{id}", async (HttpContext context, string id) =>
         return Results.BadRequest(new { error = "Missing id." });
     }
 
-    await using var connection = await OpenConnectionAsync(connectionString);
     if (!TryParsePoiId(id, out var poiId))
     {
         return Results.BadRequest(new { error = "Invalid id." });
     }
 
-    var core = await GetPoiAdminAsync(connection, poiId, actor);
+    var core = await dataService.GetPoiAdminAsync(poiId, actor);
     return core is null ? Results.NotFound() : Results.Ok(core);
 }).RequireAuthorization();
 
 // Mobile: load localized view (fallback to Vietnamese when missing).
-app.MapGet("/api/pois/{id}/localized", async (HttpContext context, string id) =>
+app.MapGet("/api/pois/{id}/localized", async (HttpContext context, string id, IDataService dataService) =>
 {
     await TryEnsureAdbReverseAsync();
     if (string.IsNullOrWhiteSpace(id))
@@ -489,17 +531,16 @@ app.MapGet("/api/pois/{id}/localized", async (HttpContext context, string id) =>
     }
 
     var requestedLang = NormalizeLanguageOrFallback(context.Request.Query["lang"].ToString(), supportedLanguageSet);
-    await using var connection = await OpenConnectionAsync(connectionString);
     if (!TryParsePoiId(id, out var poiId))
     {
         return Results.BadRequest(new { error = "Invalid id." });
     }
 
-    var item = await GetPoiForMobileAsync(connection, poiId, requestedLang);
+    var item = await dataService.GetPoiForMobileByIdAsync(poiId, requestedLang);
     return item is null ? Results.NotFound() : Results.Ok(item);
 });
 
-app.MapGet("/api/public/featured-pois", async (HttpContext context) =>
+app.MapGet("/api/public/featured-pois", async (HttpContext context, IDataService dataService) =>
 {
     await TryEnsureAdbReverseAsync();
     var requestedLang = NormalizeLanguageOrFallback(context.Request.Query["lang"].ToString(), supportedLanguageSet);
@@ -509,11 +550,11 @@ app.MapGet("/api/public/featured-pois", async (HttpContext context) =>
         limit = Math.Clamp(parsedLimit, 1, 20);
     }
 
-    var items = await GetFeaturedPoisForPublicAsync(connectionString, requestedLang, limit);
+    var items = await dataService.GetFeaturedPoisForPublicAsync(requestedLang, limit);
     return Results.Ok(items);
 });
 
-app.MapGet("/api/public/pois/{id}", async (HttpContext context, string id) =>
+app.MapGet("/api/public/pois/{id}", async (HttpContext context, string id, IDataService dataService) =>
 {
     await TryEnsureAdbReverseAsync();
     if (string.IsNullOrWhiteSpace(id))
@@ -522,17 +563,16 @@ app.MapGet("/api/public/pois/{id}", async (HttpContext context, string id) =>
     }
 
     var requestedLang = NormalizeLanguageOrFallback(context.Request.Query["lang"].ToString(), supportedLanguageSet);
-    await using var connection = await OpenConnectionAsync(connectionString);
     if (!TryParsePoiId(id, out var poiId))
     {
         return Results.BadRequest(new { error = "Invalid id." });
     }
 
-    var item = await GetPoiForPublicAsync(connection, poiId, requestedLang);
+    var item = await dataService.GetPoiForPublicByIdAsync(poiId, requestedLang);
     return item is null ? Results.NotFound() : Results.Ok(item);
 });
 
-app.MapGet("/api/pois/{id}/public-link", async (HttpContext context, string id) =>
+app.MapGet("/api/pois/{id}/public-link", async (HttpContext context, string id, IDataService dataService) =>
 {
     if (!TryGetAdminActor(context.User, out var actor))
     {
@@ -545,8 +585,7 @@ app.MapGet("/api/pois/{id}/public-link", async (HttpContext context, string id) 
         return Results.BadRequest(new { error = "Invalid id." });
     }
 
-    await using var connection = await OpenConnectionAsync(connectionString);
-    var core = await GetPoiAdminAsync(connection, poiId, actor);
+    var core = await dataService.GetPoiAdminAsync(poiId, actor);
     if (core is null)
     {
         return Results.NotFound();
@@ -563,7 +602,7 @@ app.MapGet("/api/pois/{id}/public-link", async (HttpContext context, string id) 
     return Results.Ok(new { id = poiId.ToString(CultureInfo.InvariantCulture), url = publicUrl, baseUrl });
 }).RequireAuthorization();
 
-app.MapGet("/api/pois/{id}/qr.png", async (HttpContext context, string id) =>
+app.MapGet("/api/pois/{id}/qr.png", async (HttpContext context, string id, IDataService dataService) =>
 {
     if (!TryGetAdminActor(context.User, out var actor))
     {
@@ -576,8 +615,7 @@ app.MapGet("/api/pois/{id}/qr.png", async (HttpContext context, string id) =>
         return Results.BadRequest(new { error = "Invalid id." });
     }
 
-    await using var connection = await OpenConnectionAsync(connectionString);
-    var core = await GetPoiAdminAsync(connection, poiId, actor);
+    var core = await dataService.GetPoiAdminAsync(poiId, actor);
     if (core is null)
     {
         return Results.NotFound();
@@ -703,7 +741,7 @@ app.MapGet("/qr/scan", (HttpContext context) =>
     return Results.Content(html, "text/html");
 });
 
-app.MapPost("/api/public/qr/confirm", async (HttpContext context, QrConfirmRequest req) =>
+app.MapPost("/api/public/qr/confirm", async (HttpContext context, QrConfirmRequest req, IDataService dataService) =>
 {
     await TryEnsureAdbReverseAsync();
     var code = req.Code ?? "";
@@ -722,8 +760,7 @@ app.MapPost("/api/public/qr/confirm", async (HttpContext context, QrConfirmReque
     var ua = context.Request.Headers["User-Agent"].ToString();
     var ip = context.Connection.RemoteIpAddress?.ToString();
 
-    await RecordUserActivityAsync(
-        connectionString, 
+    await dataService.RecordUserActivityAsync(
         sid, 
         "web", 
         "scan_qr", 
@@ -744,7 +781,7 @@ app.MapPost("/api/public/qr/confirm", async (HttpContext context, QrConfirmReque
     return Results.Ok(new { url });
 });
 
-app.MapPost("/api/public/pois/track-activity", async (HttpContext context, TrackActivityRequest request) =>
+app.MapPost("/api/public/pois/track-activity", async (HttpContext context, TrackActivityRequest request, IDataService dataService) =>
 {
     await TryEnsureAdbReverseAsync();
     
@@ -760,8 +797,7 @@ app.MapPost("/api/public/pois/track-activity", async (HttpContext context, Track
     var ua = context.Request.Headers["User-Agent"].ToString();
     var ip = context.Connection.RemoteIpAddress?.ToString();
     
-    var recorded = await RecordUserActivityAsync(
-        connectionString, 
+    var recorded = await dataService.RecordUserActivityAsync(
         request.SessionId, 
         request.Platform, 
         request.Action, 
@@ -780,7 +816,7 @@ app.MapPost("/api/public/pois/track-activity", async (HttpContext context, Track
     return recorded ? Results.Ok(new { recorded = true }) : Results.Problem("Cannot record activity.");
 });
 
-app.MapPost("/api/public/tts/request", async (TtsRequest req) =>
+app.MapPost("/api/public/tts/request", async (TtsRequest req, IDataService dataService) =>
 {
     if (string.IsNullOrWhiteSpace(req.Text) || string.IsNullOrWhiteSpace(req.PoiId))
     {
@@ -788,23 +824,13 @@ app.MapPost("/api/public/tts/request", async (TtsRequest req) =>
     }
 
     var jobId = Guid.NewGuid().ToString();
-
-    await using var connection = await OpenConnectionAsync(connectionString);
-    const string queueSql = @"
-        INSERT INTO audio_tts_queue (id, poi_id, text, status, created_at)
-        VALUES ($id, $pid, $txt, 'waiting', $now);
-    ";
-    await using var queueCmd = new SqliteCommand(queueSql, connection);
-    queueCmd.Parameters.AddWithValue("$id", jobId);
-    queueCmd.Parameters.AddWithValue("$pid", req.PoiId);
-    queueCmd.Parameters.AddWithValue("$txt", req.Text);
-    queueCmd.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
-    await queueCmd.ExecuteNonQueryAsync();
+    await dataService.EnqueueTtsJobAsync(jobId, req.PoiId.Trim(), req.Text.Trim());
 
     return Results.Ok(new { jobId });
 });
 
 
+#if false
 app.MapGet("/api/admin/reports/user-activities", async (HttpContext context, 
     string? platform, string? period, string? from, string? to, string? poiSort, string? fields, string? action) =>
 {
@@ -1314,8 +1340,580 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         onlineVisitors
     });
 }).RequireAuthorization();
+#endif
 
-app.MapPost("/api/pois", async (HttpContext context, PoiAdminUpsertRequest request) =>
+app.MapGet("/api/admin/reports/user-activities", async (
+    HttpContext context,
+    SupabaseRestClient supabase,
+    string? platform,
+    string? period,
+    string? from,
+    string? to,
+    string? poiSort,
+    string? fields,
+    string? action) =>
+{
+    if (!TryGetAdminActor(context.User, out var actor)) return Results.Unauthorized();
+    await TryEnsureAdbReverseAsync();
+
+    var ct = context.RequestAborted;
+    bool isOwner = IsOwner(actor);
+
+    static string Esc(DateTimeOffset value) => Uri.EscapeDataString(value.ToString("O"));
+
+    // Normalize optional single-action filter for Hourly + Ranking charts.
+    // Accept both short aliases (online/audio/qr/view) and raw action names.
+    string? actionFilterValue = null;
+    if (!string.IsNullOrWhiteSpace(action))
+    {
+        var a = action.Trim().ToLowerInvariant();
+        actionFilterValue = a switch
+        {
+            "online" or "ping" => "ping",
+            "audio" or "play_audio" => "play_audio",
+            "qr" or "scan_qr" => "scan_qr",
+            "view" or "view_poi" => "view_poi",
+            _ => null
+        };
+    }
+
+    // 1) Online now (last 20s based on UTC)
+    var onlineCutoffUtc = DateTimeOffset.UtcNow.AddSeconds(-20);
+    var onlineQuery = $"/rest/v1/active_sessions?select=session_id,last_ping_at,platform&last_ping_at=gte.{Esc(onlineCutoffUtc)}";
+    if (!string.IsNullOrEmpty(platform) && platform != "all")
+    {
+        onlineQuery += $"&platform=eq.{Uri.EscapeDataString(platform)}";
+    }
+    var onlineSessions = await supabase.GetListAsync<SupabaseActiveSessionRow>(onlineQuery, ct);
+    var onlineSessionIds = onlineSessions
+        .Select(x => (x.session_id ?? string.Empty).Trim())
+        .Where(x => !string.IsNullOrWhiteSpace(x))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    long onlineNow;
+    if (!isOwner)
+    {
+        onlineNow = onlineSessionIds.Count;
+    }
+    else
+    {
+        var ownerPoiIds = await supabase.GetListAsync<SupabasePoiIdRow>(
+            $"/rest/v1/pois?select=id,owner_admin_id,is_deleted&owner_admin_id=eq.{actor.Id}",
+            ct);
+        var ownerPoiIdSet = ownerPoiIds
+            .Where(x => x.id > 0 && !SupabasePoi.ParseBoolish(x.is_deleted, defaultValue: false))
+            .Select(x => x.id)
+            .ToHashSet();
+
+        if (onlineSessionIds.Count == 0 || ownerPoiIdSet.Count == 0)
+        {
+            onlineNow = 0;
+        }
+        else
+        {
+            var ownerLookbackUtc = DateTimeOffset.UtcNow.AddMinutes(-10);
+            var ownerActivityQuery = $"/rest/v1/user_activity_events?select=session_id,poi_id,created_at&created_at=gte.{Esc(ownerLookbackUtc)}&poi_id=in.({string.Join(",", ownerPoiIdSet)})";
+            var ownerRecent = await supabase.GetListAsync<SupabaseOwnerSessionRow>(ownerActivityQuery, ct);
+            onlineNow = ownerRecent
+                .Select(x => (x.session_id ?? string.Empty).Trim())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Where(sid => onlineSessionIds.Contains(sid))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .LongCount();
+        }
+    }
+
+    if (fields == "onlineNow")
+    {
+        return Results.Ok(new { onlineNow });
+    }
+
+    var vnTz = GetVnTimeZone();
+    var nowUtc = DateTimeOffset.UtcNow;
+    var nowVn = TimeZoneInfo.ConvertTime(nowUtc, vnTz);
+
+    // 2) Filter logic for historical data (Index-friendly UTC boundaries)
+    DateTimeOffset startUtc = DateTimeOffset.MinValue;
+    DateTimeOffset endUtc = DateTimeOffset.MaxValue;
+    string startDateStr = "";
+    string endDateStr = nowVn.ToString("yyyy-MM-dd");
+
+    if (period == "today")
+    {
+        var startVn = new DateTimeOffset(nowVn.Year, nowVn.Month, nowVn.Day, 0, 0, 0, vnTz.GetUtcOffset(nowVn));
+        startUtc = startVn.ToUniversalTime();
+        endUtc = startUtc.AddDays(1);
+        startDateStr = endDateStr;
+    }
+    else if (period == "week")
+    {
+        var startVn = new DateTimeOffset(nowVn.Year, nowVn.Month, nowVn.Day, 0, 0, 0, vnTz.GetUtcOffset(nowVn)).AddDays(-6);
+        startUtc = startVn.ToUniversalTime();
+        startDateStr = startVn.ToString("yyyy-MM-dd");
+    }
+    else if (period == "month")
+    {
+        var startVn = new DateTimeOffset(nowVn.Year, nowVn.Month, nowVn.Day, 0, 0, 0, vnTz.GetUtcOffset(nowVn)).AddDays(-29);
+        startUtc = startVn.ToUniversalTime();
+        startDateStr = startVn.ToString("yyyy-MM-dd");
+    }
+    else if (period == "year")
+    {
+        var startVn = new DateTimeOffset(nowVn.Year, nowVn.Month, nowVn.Day, 0, 0, 0, vnTz.GetUtcOffset(nowVn)).AddDays(-364);
+        startUtc = startVn.ToUniversalTime();
+        startDateStr = startVn.ToString("yyyy-MM-dd");
+    }
+    else if (period == "custom" && !string.IsNullOrEmpty(from) && !string.IsNullOrEmpty(to))
+    {
+        var f = ParseDateOnlyFilter(from);
+        var t = ParseDateOnlyFilter(to);
+        if (f.HasValue && t.HasValue)
+        {
+            var startVn = new DateTimeOffset(f.Value.Year, f.Value.Month, f.Value.Day, 0, 0, 0, vnTz.GetUtcOffset(nowVn));
+            startUtc = startVn.ToUniversalTime();
+            var endVn = new DateTimeOffset(t.Value.Year, t.Value.Month, t.Value.Day, 23, 59, 59, 999, vnTz.GetUtcOffset(nowVn));
+            endUtc = endVn.ToUniversalTime();
+            startDateStr = f.Value.ToString("yyyy-MM-dd");
+            endDateStr = t.Value.ToString("yyyy-MM-dd");
+        }
+    }
+
+    // When a specific action is selected we lock charts to that action only;
+    // otherwise keep the default (exclude 'ping' heartbeats so interactions are clean).
+    Func<SupabaseUserActivityReportRow, bool> actionPredicate = actionFilterValue is null
+        ? (e => !string.Equals(e.action, "ping", StringComparison.OrdinalIgnoreCase))
+        : (e => string.Equals(e.action, actionFilterValue, StringComparison.OrdinalIgnoreCase));
+
+    // Load POIs for naming + proximity map (Owners: only their POIs)
+    var poisQuery = "/rest/v1/pois?select=id,latitude,longitude,radius_meters,is_deleted,owner_admin_id,poi_translations(lang_code,name)&order=id.asc";
+    if (isOwner)
+    {
+        poisQuery += $"&owner_admin_id=eq.{actor.Id}";
+    }
+    var pois = await supabase.GetListAsync<SupabasePoiReportRow>(poisQuery, ct);
+    var allPois = pois
+        .Where(p => p.id > 0 && !SupabasePoi.ParseBoolish(p.is_deleted, defaultValue: false))
+        .Select(p =>
+        {
+            var vi = p.poi_translations.FirstOrDefault(t => string.Equals(t.lang_code, "vi", StringComparison.OrdinalIgnoreCase));
+            var name = (vi?.name ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                name = $"POI {p.id.ToString(CultureInfo.InvariantCulture)}";
+            }
+            return (Id: p.id, Name: name, Lat: p.latitude, Lon: p.longitude, RadiusMeters: p.radius_meters);
+        })
+        .ToList();
+    var poiNameById = allPois.ToDictionary(x => x.Id, x => x.Name);
+
+    // 3) Fetch activity events in range (paged)
+    static async Task<List<T>> FetchAllAsync<T>(SupabaseRestClient supabase, string baseQuery, CancellationToken ct)
+    {
+        const int batchSize = 1000;
+        var all = new List<T>(capacity: batchSize);
+        for (var offset = 0; offset <= 200_000; offset += batchSize)
+        {
+            var page = await supabase.GetListAsync<T>($"{baseQuery}&limit={batchSize}&offset={offset}", ct);
+            if (page.Count == 0) break;
+            all.AddRange(page);
+            if (page.Count < batchSize) break;
+        }
+
+        return all;
+    }
+
+    var eventsQuery = "/rest/v1/user_activity_events?select=id,session_id,poi_id,action,platform,language,device_id,browser_family,os_family,ip_address,screen_info,created_at"
+                      + $"&created_at=gte.{Esc(startUtc)}&created_at=lt.{Esc(endUtc)}"
+                      + "&order=created_at.asc,id.asc";
+    if (!string.IsNullOrEmpty(platform) && platform != "all")
+    {
+        eventsQuery += $"&platform=eq.{Uri.EscapeDataString(platform)}";
+    }
+
+    var events = await FetchAllAsync<SupabaseUserActivityReportRow>(supabase, eventsQuery, ct);
+
+    if (isOwner)
+    {
+        var ownerPoiSet = allPois.Select(x => x.Id).ToHashSet();
+        events = events
+            .Where(e => e.poi_id.HasValue && ownerPoiSet.Contains(e.poi_id.Value))
+            .ToList();
+    }
+
+    // 4) Summary stats for select period
+    long periodAudioPlays = 0;
+    long periodQrScans = 0;
+    long periodViews = 0;
+    foreach (var g in events.Where(e => !string.IsNullOrWhiteSpace(e.action)).GroupBy(e => e.action!, StringComparer.OrdinalIgnoreCase))
+    {
+        var count = g.LongCount();
+        if (string.Equals(g.Key, "play_audio", StringComparison.OrdinalIgnoreCase)) periodAudioPlays = count;
+        else if (string.Equals(g.Key, "scan_qr", StringComparison.OrdinalIgnoreCase)) periodQrScans = count;
+        else if (string.Equals(g.Key, "view_poi", StringComparison.OrdinalIgnoreCase)) periodViews = count;
+    }
+
+    // 5) Chart Data (Grouped by Date in VN Time)
+    var chartData = events
+        .Where(e => e.created_at != default && !string.IsNullOrWhiteSpace(e.action))
+        .GroupBy(e =>
+        {
+            var vn = TimeZoneInfo.ConvertTime(e.created_at, vnTz);
+            return new
+            {
+                Dt = vn.ToString("yyyy-MM-dd"),
+                Action = e.action!,
+                Platform = (e.platform ?? string.Empty).Trim()
+            };
+        })
+        .OrderBy(g => g.Key.Dt, StringComparer.Ordinal)
+        .Select(g => new
+        {
+            date = g.Key.Dt,
+            action = g.Key.Action,
+            count = g.LongCount(),
+            platform = string.IsNullOrWhiteSpace(g.Key.Platform) ? "unknown" : g.Key.Platform
+        })
+        .Cast<object>()
+        .ToList();
+
+    // 6) Hourly Activity (0-23 in VN Time)
+    var hourlySource = events.Where(actionPredicate);
+    var hourlyData = hourlySource
+        .Where(e => e.created_at != default)
+        .GroupBy(e => TimeZoneInfo.ConvertTime(e.created_at, vnTz).Hour)
+        .OrderBy(g => g.Key)
+        .Select(g =>
+        {
+            long c = actionFilterValue == "ping"
+                ? g.Select(x => (x.session_id ?? string.Empty).Trim()).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).LongCount()
+                : g.LongCount();
+            return new { hour = g.Key.ToString("D2"), count = c };
+        })
+        .Cast<object>()
+        .ToList();
+
+    // 7) Top POI Ranking
+    var topPois = new List<object>();
+    if (actionFilterValue != "ping")
+    {
+        var sortAsc = poiSort == "asc";
+        if (actionFilterValue is null)
+        {
+            Func<SupabaseUserActivityReportRow, long> weight = e => (e.action ?? string.Empty).ToLowerInvariant() switch
+            {
+                "scan_qr" => 3,
+                "play_audio" => 2,
+                "view_poi" => 1,
+                _ => 0
+            };
+
+            var ranked = events
+                .Where(e => e.poi_id.HasValue && !string.Equals(e.action, "ping", StringComparison.OrdinalIgnoreCase))
+                .GroupBy(e => e.poi_id!.Value)
+                .Select(g => new { PoiId = g.Key, Score = g.Sum(weight) })
+                .OrderBy(x => sortAsc ? x.Score : -x.Score)
+                .ThenBy(x => x.PoiId)
+                .Take(50)
+                .ToList();
+
+            foreach (var r in ranked)
+            {
+                topPois.Add(new
+                {
+                    poiId = r.PoiId,
+                    name = poiNameById.TryGetValue(r.PoiId, out var name) ? name : "Unknown POI",
+                    count = r.Score
+                });
+            }
+        }
+        else
+        {
+            var ranked = events
+                .Where(e => e.poi_id.HasValue && string.Equals(e.action, actionFilterValue, StringComparison.OrdinalIgnoreCase))
+                .GroupBy(e => e.poi_id!.Value)
+                .Select(g => new { PoiId = g.Key, Score = g.LongCount() })
+                .OrderBy(x => sortAsc ? x.Score : -x.Score)
+                .ThenBy(x => x.PoiId)
+                .Take(50)
+                .ToList();
+
+            foreach (var r in ranked)
+            {
+                topPois.Add(new
+                {
+                    poiId = r.PoiId,
+                    name = poiNameById.TryGetValue(r.PoiId, out var name) ? name : "Unknown POI",
+                    count = r.Score
+                });
+            }
+        }
+    }
+
+    // 8) Unique Devices Count
+    long totalUniqueDevices = events
+        .Select(e => (e.device_id ?? string.Empty).Trim())
+        .Where(x => !string.IsNullOrWhiteSpace(x))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .LongCount();
+
+    // 9) Breakdown Stats (Language) - Consolidated by session for meaningful demographics
+    IEnumerable<SupabaseUserActivityReportRow> breakdownSource;
+    if (actionFilterValue == "ping")
+    {
+        breakdownSource = events
+            .Where(e => string.Equals(e.action, "ping", StringComparison.OrdinalIgnoreCase))
+            .GroupBy(e => e.session_id ?? string.Empty)
+            .Select(g => g.First());
+    }
+    else if (actionFilterValue == null)
+    {
+        // Default: Count each session once, regardless of how many heartbeats or interactions it had.
+        breakdownSource = events
+            .GroupBy(e => e.session_id ?? string.Empty)
+            .Select(g => g.First());
+    }
+    else
+    {
+        breakdownSource = events.Where(e => string.Equals(e.action, actionFilterValue, StringComparison.OrdinalIgnoreCase));
+    }
+
+    var langStats = breakdownSource
+        .GroupBy(e => string.IsNullOrWhiteSpace(e.language) ? "unknown" : e.language!.Trim())
+        .Select(g => new { label = g.Key, count = g.Count() })
+        .OrderByDescending(x => x.count)
+        .Cast<object>()
+        .ToList();
+
+    // 10) Paginated Detailed Logs - Consolidate 'ping' entries to avoid cluttering.
+    // For logs, we include pings but only one (the latest) per session.
+    int pageIndex = 0;
+    int pageSize = 50;
+    if (int.TryParse(context.Request.Query["page"], out var pIdx)) pageIndex = Math.Max(0, pIdx);
+    if (int.TryParse(context.Request.Query["pageSize"], out var pSize)) pageSize = Math.Clamp(pSize, 10, 200);
+
+    IEnumerable<SupabaseUserActivityReportRow> filteredLogEvents;
+    if (actionFilterValue == "ping")
+    {
+        // When strictly viewing pings, show one per session.
+        filteredLogEvents = events
+            .Where(e => string.Equals(e.action, "ping", StringComparison.OrdinalIgnoreCase))
+            .GroupBy(e => e.session_id ?? string.Empty)
+            .Select(g => g.OrderByDescending(x => x.created_at).First());
+    }
+    else if (actionFilterValue == null)
+    {
+        // Default view: include interactions + one consolidated ping per session to show presence
+        var interactions = events.Where(e => !string.Equals(e.action, "ping", StringComparison.OrdinalIgnoreCase));
+        var pings = events
+            .Where(e => string.Equals(e.action, "ping", StringComparison.OrdinalIgnoreCase))
+            .GroupBy(e => e.session_id ?? string.Empty)
+            .Select(g => g.OrderByDescending(x => x.created_at).First());
+        
+        filteredLogEvents = interactions.Concat(pings);
+    }
+    else
+    {
+        // Other specific filters (audio, qr, view)
+        filteredLogEvents = events.Where(e => string.Equals(e.action, actionFilterValue, StringComparison.OrdinalIgnoreCase));
+    }
+
+    var logSource = filteredLogEvents.OrderByDescending(e => e.created_at).ToList();
+    var totalLogCount = logSource.Count;
+
+    var recentLogs = logSource
+        .Skip(pageIndex * pageSize)
+        .Take(pageSize)
+        .Select(e => new
+        {
+            id = e.id,
+            poiId = e.poi_id.HasValue ? (object)e.poi_id.Value.ToString(CultureInfo.InvariantCulture) : null,
+            poiName = e.poi_id.HasValue && poiNameById.TryGetValue(e.poi_id.Value, out var name) ? name : null,
+            action = e.action ?? string.Empty,
+            platform = e.platform ?? string.Empty,
+            deviceId = e.device_id,
+            browser = e.browser_family,
+            os = e.os_family,
+            ip = e.ip_address,
+            screenInfo = e.screen_info,
+            createdAt = e.created_at == default ? string.Empty : e.created_at.ToString("O")
+        })
+        .Cast<object>()
+        .ToList();
+
+    // 11) Breakdown Stats (Browser & OS) - Using the same consolidated source
+    var browserStats = breakdownSource
+        .GroupBy(e => string.IsNullOrWhiteSpace(e.browser_family) ? "unknown" : e.browser_family!.Trim())
+        .Select(g => new { label = g.Key, count = g.Count() })
+        .OrderByDescending(x => x.count)
+        .Cast<object>()
+        .ToList();
+
+    var osStats = breakdownSource
+        .GroupBy(e => string.IsNullOrWhiteSpace(e.os_family) ? "unknown" : e.os_family!.Trim())
+        .Select(g => new { label = g.Key, count = g.Count() })
+        .OrderByDescending(x => x.count)
+        .Cast<object>()
+        .ToList();
+
+    // 12) TTS Queue Status
+    var ttsQueueRows = await supabase.GetListAsync<SupabaseTtsQueueReportRow>(
+        "/rest/v1/audio_tts_queue?select=id,poi_id,text,status,created_at&status=neq.done&order=created_at.asc&limit=20",
+        ct);
+    var ttsQueue = ttsQueueRows
+        .Select(r => new
+        {
+            id = (r.id ?? string.Empty).Trim(),
+            poiId = r.poi_id.ToString(),
+            text = r.text ?? string.Empty,
+            status = r.status ?? string.Empty,
+            createdAt = r.created_at ?? string.Empty
+        })
+        .Cast<object>()
+        .ToList();
+
+    // 13) Advanced Online Visitors with proximity logic
+    var onlineVisitors = new List<object>();
+    var visitorCutoffUtc = DateTimeOffset.UtcNow.AddSeconds(-30);
+    var visitorsQuery = $"/rest/v1/active_sessions?select=session_id,platform,latitude,longitude,last_ping_at,device_id,browser_family,os_family&last_ping_at=gte.{Esc(visitorCutoffUtc)}";
+    if (!string.IsNullOrEmpty(platform) && platform != "all")
+    {
+        visitorsQuery += $"&platform=eq.{Uri.EscapeDataString(platform)}";
+    }
+    var visitors = await supabase.GetListAsync<SupabaseActiveSessionDetailsRow>(visitorsQuery, ct);
+
+    if (isOwner && visitors.Count > 0)
+    {
+        var ownerPoiSet = allPois.Select(x => x.Id).ToHashSet();
+        if (ownerPoiSet.Count > 0)
+        {
+            var ownerLookbackUtc = DateTimeOffset.UtcNow.AddMinutes(-10);
+            var ownerActivityQuery = $"/rest/v1/user_activity_events?select=session_id,poi_id,created_at&created_at=gte.{Esc(ownerLookbackUtc)}&poi_id=in.({string.Join(",", ownerPoiSet)})";
+            var ownerRecent = await supabase.GetListAsync<SupabaseOwnerSessionRow>(ownerActivityQuery, ct);
+            var allowedSessions = ownerRecent
+                .Select(x => (x.session_id ?? string.Empty).Trim())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            visitors = visitors.Where(v => !string.IsNullOrWhiteSpace(v.session_id) && allowedSessions.Contains(v.session_id.Trim())).ToList();
+        }
+        else
+        {
+            visitors = [];
+        }
+    }
+
+    foreach (var v in visitors)
+    {
+        var sid = (v.session_id ?? string.Empty).Trim();
+        var plt = (v.platform ?? string.Empty).Trim();
+        double? lat = v.latitude;
+        double? lon = v.longitude;
+        var deviceId = v.device_id;
+        var browserFamily = string.IsNullOrWhiteSpace(v.browser_family) ? "N/A" : v.browser_family!;
+        var osFamily = string.IsNullOrWhiteSpace(v.os_family) ? "N/A" : v.os_family!;
+
+        string proximityState = "Exploring";
+        string proximityText = "Ä ang di chuyá»ƒn";
+        string atPoiName = "";
+        var nearbyPois = new List<dynamic>();
+        var proximityNearbyList = new List<object>();
+
+        if (lat.HasValue && lon.HasValue)
+        {
+            foreach (var p in allPois)
+            {
+                var dLat = (p.Lat - lat.Value) * Math.PI / 180;
+                var dLon = (p.Lon - lon.Value) * Math.PI / 180;
+                var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) + Math.Cos(lat.Value * Math.PI / 180) * Math.Cos(p.Lat * Math.PI / 180) * Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+                var d = 6371000 * 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+                if (d <= p.RadiusMeters + 25.0) nearbyPois.Add(new { p.Id, p.Name, Distance = d, p.RadiusMeters });
+            }
+            var sorted = nearbyPois.OrderBy(x => x.Distance).ToList();
+            var buffer = 25.0;
+            var insidePois = sorted.Where(p => p.Distance <= p.RadiusMeters).ToList();
+            var bufferPois = sorted.Where(p => p.Distance <= p.RadiusMeters + buffer).ToList();
+
+            if (insidePois.Count >= 2)
+            {
+                proximityState = "Between";
+                proximityText = $"Giá»¯a {insidePois[0].Name} vÃ  {insidePois[1].Name}";
+            }
+            else if (insidePois.Count == 1)
+            {
+                proximityState = "At";
+                atPoiName = insidePois[0].Name;
+                proximityText = $"Táº¡i {insidePois[0].Name}";
+            }
+            else if (bufferPois.Count >= 2)
+            {
+                proximityState = "Between";
+                proximityText = $"Giá»¯a {bufferPois[0].Name} vÃ  {bufferPois[1].Name}";
+            }
+            else if (bufferPois.Count == 1)
+            {
+                proximityState = "Near";
+                proximityText = $"Tiáº¿n gáº§n {bufferPois[0].Name} ({Math.Round(bufferPois[0].Distance)}m)";
+            }
+            else
+            {
+                proximityState = "Exploring";
+                proximityText = "Ä ang di chuyá»ƒn";
+            }
+
+            var displayNearby = (insidePois.Count > 0 ? insidePois : bufferPois);
+            proximityNearbyList = displayNearby.Select(x => new { name = (string)x.Name, distance = Math.Round((double)x.Distance) }).ToList<object>();
+        }
+
+        onlineVisitors.Add(new
+        {
+            sessionId = sid,
+            platform = plt,
+            deviceId,
+            browser = browserFamily,
+            os = osFamily,
+            proximityState,
+            proximityText,
+            nearbyPois = proximityNearbyList,
+            atPoiName,
+            lat,
+            lon
+        });
+    }
+
+    var allPoisSimple = allPois.Select(p => new
+    {
+        id = p.Id.ToString(CultureInfo.InvariantCulture),
+        name = p.Name,
+        lat = p.Lat,
+        lon = p.Lon,
+        radius = p.RadiusMeters
+    }).ToList();
+
+    return Results.Ok(new
+    {
+        onlineNow,
+        periodAudioPlays,
+        periodQrScans,
+        periodViews,
+        startDate = startDateStr,
+        endDate = endDateStr,
+        chartData,
+        hourlyData,
+        topPois,
+        allPois = allPoisSimple,
+        totalUniqueDevices,
+        langStats,
+        browserStats,
+        osStats,
+        recentLogs,
+        totalLogCount,
+        ttsQueue,
+        onlineVisitors
+    });
+}).RequireAuthorization();
+
+app.MapPost("/api/pois", async (HttpContext context, PoiAdminUpsertRequest request, IDataService dataService) =>
 {
     if (!TryGetAdminActor(context.User, out var actor))
     {
@@ -1431,6 +2029,19 @@ app.MapPost("/api/pois", async (HttpContext context, PoiAdminUpsertRequest reque
             }
             catch (Exception ex)
             {
+                if (string.IsNullOrWhiteSpace(translationApiKey))
+                {
+                    // Fallback to source content if API key is missing
+                    generated.Add(new PoiTranslationDto
+                    {
+                        LangCode = lang.Code,
+                        Name = sourceName,
+                        Description = sourceDescription,
+                        TtsText = sourceTtsText,
+                        AudioUrl = audioUrl
+                    });
+                    continue;
+                }
                 return Results.BadRequest(new { error = $"Khong the dich sang '{lang.Code}'.", detail = ex.Message });
             }
         }
@@ -1463,53 +2074,22 @@ app.MapPost("/api/pois", async (HttpContext context, PoiAdminUpsertRequest reque
         ? $"https://maps.google.com/?q={request.Latitude.ToString(CultureInfo.InvariantCulture)},{request.Longitude.ToString(CultureInfo.InvariantCulture)}"
         : request.MapLink.Trim();
 
-    await using var connection = await OpenConnectionAsync(connectionString);
-
-    if (poiId is not null)
+    var savedId = await dataService.UpsertPoiAdminAsync(
+        poiId,
+        request,
+        actor,
+        mapLink,
+        normalizedTranslations,
+        context.RequestAborted);
+    if (savedId is null)
     {
-        var existsForActor = await HasPoiAccessAsync(connection, poiId.Value, actor);
-        if (!existsForActor)
-        {
-            return Results.NotFound();
-        }
+        return Results.NotFound();
     }
 
-    await using var transaction = await connection.BeginTransactionAsync();
-
-    var savedId = await UpsertPoiCoreAsync(connection, transaction, new PoiCoreUpsert
-    {
-        Id = poiId,
-        Latitude = request.Latitude,
-        Longitude = request.Longitude,
-        RadiusMeters = request.RadiusMeters,
-        Priority = request.Priority,
-        Price = request.Price,
-        MapLink = mapLink,
-        ImageUrl = (request.ImageUrl ?? string.Empty).Trim(),
-        AudioUrl = (request.AudioUrl ?? string.Empty).Trim(),
-        IsActive = request.IsActive,
-        OwnerAdminId = IsOwner(actor) ? actor.Id : null
-    });
-
-    foreach (var t in normalizedTranslations)
-    {
-        await UpsertTranslationAsync(
-            connection,
-            transaction,
-            savedId,
-            t.LangCode,
-            t.Name,
-            t.Description,
-            t.TtsText,
-            t.AudioUrl);
-    }
-
-    await transaction.CommitAsync();
-
-    return Results.Ok(new { id = savedId.ToString(CultureInfo.InvariantCulture) });
+    return Results.Ok(new { id = savedId.Value.ToString(CultureInfo.InvariantCulture) });
 }).RequireAuthorization();
 
-app.MapDelete("/api/pois/{id}", async (HttpContext context, string id) =>
+app.MapDelete("/api/pois/{id}", async (HttpContext context, string id, IDataService dataService) =>
 {
     if (!TryGetAdminActor(context.User, out var actor))
     {
@@ -1527,7 +2107,7 @@ app.MapDelete("/api/pois/{id}", async (HttpContext context, string id) =>
         return Results.BadRequest(new { error = "Invalid id." });
     }
 
-    var result = await DeletePoiAsync(connectionString, uploadDirectory, poiId, actor);
+    var result = await dataService.DeletePoiAsync(poiId, actor, context.RequestAborted);
     return result switch
     {
         DeletePoiResult.Deleted => Results.Ok(new { id }),
@@ -1536,7 +2116,7 @@ app.MapDelete("/api/pois/{id}", async (HttpContext context, string id) =>
     };
 }).RequireAuthorization();
 
-app.MapPost("/api/pois/{id}/restore", async (HttpContext context, string id) =>
+app.MapPost("/api/pois/{id}/restore", async (HttpContext context, string id, IDataService dataService) =>
 {
     if (!TryGetAdminActor(context.User, out var actor))
     {
@@ -1559,16 +2139,16 @@ app.MapPost("/api/pois/{id}/restore", async (HttpContext context, string id) =>
         return Results.BadRequest(new { error = "Invalid id." });
     }
 
-    var restored = await RestorePoiAsync(connectionString, poiId);
+    var restored = await dataService.RestorePoiAsync(poiId, actor, context.RequestAborted);
     return restored ? Results.Ok(new { id, restored = true }) : Results.NotFound();
 }).RequireAuthorization();
 
 // Legacy endpoints for older mobile build.
-app.MapGet("/api/shops", async (HttpContext context) =>
+app.MapGet("/api/shops", async (HttpContext context, IDataService dataService) =>
 {
     await TryEnsureAdbReverseAsync();
     var requestedLang = NormalizeLanguageOrFallback(context.Request.Query["lang"].ToString(), supportedLanguageSet);
-    var items = await GetPoisForMobileAsync(connectionString, requestedLang);
+    var items = await dataService.GetPoisForMobileAsync(requestedLang);
     var legacy = items.Select(x => new ShopDto
     {
         Id = x.Id,
@@ -1585,7 +2165,7 @@ app.MapGet("/api/shops", async (HttpContext context) =>
     return Results.Ok(legacy);
 });
 
-app.MapGet("/api/shops/{id}", async (HttpContext context, string id) =>
+app.MapGet("/api/shops/{id}", async (HttpContext context, string id, IDataService dataService) =>
 {
     await TryEnsureAdbReverseAsync();
     if (string.IsNullOrWhiteSpace(id))
@@ -1594,13 +2174,12 @@ app.MapGet("/api/shops/{id}", async (HttpContext context, string id) =>
     }
 
     var requestedLang = NormalizeLanguageOrFallback(context.Request.Query["lang"].ToString(), supportedLanguageSet);
-    await using var connection = await OpenConnectionAsync(connectionString);
     if (!TryParsePoiId(id, out var poiId))
     {
         return Results.BadRequest(new { error = "Invalid id." });
     }
 
-    var item = await GetPoiForMobileAsync(connection, poiId, requestedLang);
+    var item = await dataService.GetPoiForMobileByIdAsync(poiId, requestedLang, context.RequestAborted);
     if (item is null)
     {
         return Results.NotFound();
@@ -1621,7 +2200,7 @@ app.MapGet("/api/shops/{id}", async (HttpContext context, string id) =>
     });
 });
 
-app.MapPost("/api/shops/upsert", async (ShopUpsertJsonRequest request) =>
+app.MapPost("/api/shops/upsert", async (ShopUpsertJsonRequest request, IDataService dataService, HttpContext context) =>
 {
     await TryEnsureAdbReverseAsync();
     if (string.IsNullOrWhiteSpace(request.ShopName))
@@ -1654,59 +2233,19 @@ app.MapPost("/api/shops/upsert", async (ShopUpsertJsonRequest request) =>
         langCode = "vi";
     }
 
-    await using var connection = await OpenConnectionAsync(connectionString);
-
-    var currentAudioUrl = string.Empty;
-    var currentImageUrl = string.Empty;
-    if (poiId is not null)
-    {
-        await using var oldAudioCommand = new SqliteCommand("SELECT audio_url, image_url FROM pois WHERE id = $id;", connection);
-        oldAudioCommand.Parameters.AddWithValue("$id", poiId.Value);
-        await using var reader = await oldAudioCommand.ExecuteReaderAsync();
-        if (await reader.ReadAsync())
-        {
-            currentAudioUrl = reader.IsDBNull(0) ? string.Empty : reader.GetString(0);
-            currentImageUrl = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
-        }
-    }
-
-    var finalTtsText = request.TtsText?.Trim() ?? string.Empty;
-    if (!string.IsNullOrWhiteSpace(currentAudioUrl) && !string.IsNullOrWhiteSpace(finalTtsText))
-    {
-        return Results.BadRequest(new { error = "POI dang co audio file. Hay xoa audio truoc khi nhap TTS." });
-    }
-
     var mapLink = $"https://maps.google.com/?q={request.Latitude.ToString(CultureInfo.InvariantCulture)},{request.Longitude.ToString(CultureInfo.InvariantCulture)}";
-    await using var transaction = await connection.BeginTransactionAsync();
-    var savedId = await UpsertPoiCoreAsync(connection, transaction, new PoiCoreUpsert
+    try
     {
-        Id = poiId,
-        Latitude = request.Latitude,
-        Longitude = request.Longitude,
-        RadiusMeters = request.RadiusMeters,
-        Priority = 0,
-        Price = 0,
-        MapLink = mapLink,
-        ImageUrl = currentImageUrl,
-        AudioUrl = currentAudioUrl,
-        IsActive = true,
-        OwnerAdminId = null
-    });
-    await UpsertTranslationAsync(
-        connection,
-        transaction,
-        savedId,
-        langCode,
-        request.ShopName.Trim(),
-        request.Description?.Trim() ?? string.Empty,
-        finalTtsText,
-        audioUrl: string.Empty);
-    await transaction.CommitAsync();
-
-    return Results.Ok(new { id = savedId.ToString(CultureInfo.InvariantCulture) });
+        var savedId = await dataService.UpsertLegacyShopAsync(poiId, request, langCode, mapLink, context.RequestAborted);
+        return Results.Ok(new { id = savedId.ToString(CultureInfo.InvariantCulture) });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
 });
 
-app.MapDelete("/api/shops/{id}", async (string id) =>
+app.MapDelete("/api/shops/{id}", async (string id, IDataService dataService, HttpContext context) =>
 {
     await TryEnsureAdbReverseAsync();
     if (string.IsNullOrWhiteSpace(id))
@@ -1719,7 +2258,7 @@ app.MapDelete("/api/shops/{id}", async (string id) =>
         return Results.BadRequest(new { error = "Invalid id." });
     }
 
-    var result = await DeletePoiAsync(connectionString, uploadDirectory, poiId, new AdminActor(0, "system", "superadmin", "System"));
+    var result = await dataService.DeletePoiAsync(poiId, new AdminActor(0, "system", "superadmin", "System"), context.RequestAborted);
     return result switch
     {
         DeletePoiResult.Deleted => Results.Ok(new { id }),
@@ -1740,13 +2279,6 @@ static TimeZoneInfo GetVnTimeZone()
     {
         return TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh");
     }
-}
-
-static string GetSqliteOffset(TimeZoneInfo tz, DateTimeOffset nowUtc)
-{
-    var offset = tz.GetUtcOffset(nowUtc);
-    var hours = offset.TotalHours;
-    return $"{(hours >= 0 ? "+" : "-")}{Math.Abs(hours):0} hours";
 }
 
 async Task TryEnsureAdbReverseAsync()
@@ -1819,6 +2351,8 @@ static DateOnly? ParseDateOnlyFilter(string? raw)
 async Task<(string? BaseUrl, string? Error)> ResolvePublicBaseUrlForRequestAsync(HttpContext context)
 {
     var error = default(string);
+
+    // 1. Explicit Query Param (Force)
     var requestedBaseUrlRaw = context.Request.Query["baseUrl"].ToString();
     if (!string.IsNullOrWhiteSpace(requestedBaseUrlRaw))
     {
@@ -1828,22 +2362,35 @@ async Task<(string? BaseUrl, string? Error)> ResolvePublicBaseUrlForRequestAsync
             error = "Invalid baseUrl. Use full http(s) URL, for example: https://example.com";
             return (null, error);
         }
-
         return (requestedBaseUrl, null);
     }
 
+    // 2. ENV Priority (Render / Production)
     if (!string.IsNullOrWhiteSpace(configuredPublicBaseUrl))
     {
         return (configuredPublicBaseUrl, null);
     }
 
-    var fallback = $"{context.Request.Scheme}://{context.Request.Host.ToUriComponent()}{context.Request.PathBase.ToUriComponent()}".TrimEnd('/');
-    if (IsLocalUrl(fallback))
+    // 3. Detect localhost request -> Fallback to LAN IP
+    var host = context.Request.Host.Host;
+    if (host == "localhost" || host == "127.0.0.1" || host == "::1")
     {
-        error = "Public URL dang la localhost. Vui long nhap Public base URL trong hop thoai QR hoac cau hinh bien moi truong POI_PUBLIC_BASE_URL.";
+        var ip = GetLocalIpAddress();
+        if (!string.IsNullOrEmpty(ip))
+        {
+            var port = context.Request.Host.Port;
+            var scheme = context.Request.Scheme;
+            var result = $"{scheme}://{ip}{(port.HasValue ? ":" + port.Value : "")}";
+            Console.WriteLine($"[DEBUG] Resolved Local Public URL: {result}");
+            return (result, null);
+        }
+
+        error = "Public URL đang là localhost và không thể tự động xác định IP LAN. Vui lòng cấu hình POI_PUBLIC_BASE_URL.";
         return (null, error);
     }
 
+    // 4. Default Fallback (Production Domain from Host Header)
+    var fallback = $"{context.Request.Scheme}://{context.Request.Host.ToUriComponent()}{context.Request.PathBase.ToUriComponent()}".TrimEnd('/');
     return (fallback, null);
 }
 
@@ -1875,35 +2422,48 @@ static string? NormalizePublicBaseUrl(string? raw)
     return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
 }
 
-static string BuildPublicPoiUrl(string publicBaseUrl, long poiId, string? langCode)
+static string NormalizeSupabaseBaseUrl(string raw)
 {
-    var safeBase = (publicBaseUrl ?? string.Empty).TrimEnd('/');
-    if (string.IsNullOrWhiteSpace(safeBase))
+    if (string.IsNullOrWhiteSpace(raw))
     {
-        throw new InvalidOperationException("Public base URL is empty.");
+        throw new InvalidOperationException("Supabase base URL is empty.");
     }
 
-    var queryParts = new List<string>
+    if (!Uri.TryCreate(raw.Trim(), UriKind.Absolute, out var uri))
     {
-        $"id={Uri.EscapeDataString(poiId.ToString(CultureInfo.InvariantCulture))}"
-    };
-    if (!string.IsNullOrWhiteSpace(langCode))
-    {
-        queryParts.Add($"lang={Uri.EscapeDataString(langCode)}");
+        throw new InvalidOperationException($"Invalid Supabase URL: {raw}");
     }
 
-    return $"{safeBase}/poi.html?{string.Join("&", queryParts)}";
+    if (!string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException($"Supabase URL must be http(s): {raw}");
+    }
+
+    var normalized = new UriBuilder(uri)
+    {
+        Path = string.Empty,
+        Query = string.Empty,
+        Fragment = string.Empty
+    }.Uri.ToString().TrimEnd('/');
+
+    if (string.IsNullOrWhiteSpace(normalized))
+    {
+        throw new InvalidOperationException($"Invalid Supabase URL after normalization: {raw}");
+    }
+
+    return normalized;
 }
 
 static string BuildQrScanUrl(string publicBaseUrl, long poiId)
 {
-    var safeBase = (publicBaseUrl ?? string.Empty).TrimEnd('/');
-    if (string.IsNullOrWhiteSpace(safeBase))
-    {
-        throw new InvalidOperationException("Public base URL is empty.");
-    }
+    return $"{publicBaseUrl.TrimEnd('/')}/qr/scan?code={poiId}";
+}
 
-    return $"{safeBase}/qr/scan?code={Uri.EscapeDataString(poiId.ToString(CultureInfo.InvariantCulture))}";
+static string BuildPublicPoiUrl(string publicBaseUrl, long poiId, string? langCode)
+{
+    var langSuffix = string.IsNullOrWhiteSpace(langCode) ? "" : $"&lang={langCode}";
+    return $"{publicBaseUrl.TrimEnd('/')}/poi.html?id={poiId}{langSuffix}";
 }
 
 static bool IsLocalUrl(string? rawUrl)
@@ -1920,6 +2480,35 @@ static bool IsLocalUrl(string? rawUrl)
 
     var host = (uri.Host ?? string.Empty).Trim().ToLowerInvariant();
     return host is "localhost" or "127.0.0.1" or "::1";
+}
+
+static string? GetLocalIpAddress()
+{
+    try
+    {
+        var host = Dns.GetHostEntry(Dns.GetHostName());
+        foreach (var ip in host.AddressList)
+        {
+            if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork && !IPAddress.IsLoopback(ip))
+            {
+                return ip.ToString();
+            }
+        }
+    }
+    catch
+    {
+        try
+        {
+            using var socket = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork, System.Net.Sockets.SocketType.Dgram, 0);
+            socket.Connect("8.8.8.8", 65530);
+            if (socket.LocalEndPoint is IPEndPoint endPoint)
+            {
+                return endPoint.Address.ToString();
+            }
+        }
+        catch { }
+    }
+    return null;
 }
 
 static async Task<byte[]> RenderQrPngAsync(string content, int size, CancellationToken cancellationToken)
@@ -1945,6 +2534,7 @@ static async Task<byte[]> RenderQrPngAsync(string content, int size, Cancellatio
     return await response.Content.ReadAsByteArrayAsync(cancellationToken);
 }
 
+#if false
 static async Task AddColumnIfNotExists(SqliteConnection conn, string table, string column, string definition)
 {
     await using var checkCmd = new SqliteCommand($"PRAGMA table_info({table});", conn);
@@ -2263,6 +2853,8 @@ static async Task<SqliteConnection> OpenConnectionAsync(string connectionString)
     return connection;
 }
 
+#endif
+
 static bool TryGetAdminActor(ClaimsPrincipal user, out AdminActor actor)
 {
     actor = default!;
@@ -2290,6 +2882,7 @@ static bool TryGetAdminActor(ClaimsPrincipal user, out AdminActor actor)
 static bool IsSuperAdmin(AdminActor actor) => string.Equals(actor.Role, "superadmin", StringComparison.OrdinalIgnoreCase);
 static bool IsOwner(AdminActor actor) => string.Equals(actor.Role, "owner", StringComparison.OrdinalIgnoreCase);
 
+#if false
 static async Task EnsureBootstrapSuperAdminAsync(string connectionString, string username, string password)
 {
     await using var connection = await OpenConnectionAsync(connectionString);
@@ -2311,6 +2904,7 @@ static async Task EnsureBootstrapSuperAdminAsync(string connectionString, string
     insert.Parameters.AddWithValue("$createdAt", DateTimeOffset.UtcNow.ToString("O"));
     await insert.ExecuteNonQueryAsync();
 }
+#endif
 
 static string CreateAdminJwt(long adminId, string username, string role, string fullName, string secret)
 {
@@ -2334,74 +2928,13 @@ static string CreateAdminJwt(long adminId, string username, string role, string 
     return new JwtSecurityTokenHandler().WriteToken(token);
 }
 
-static async Task<(long Id, string Username, string Role, string FullName)?> FindAdminForLoginAsync(string connectionString, string username, string password)
-{
-    await using var connection = await OpenConnectionAsync(connectionString);
-    await using var cmd = new SqliteCommand("""
-        SELECT id, username, password_hash, role, full_name, is_active, is_deleted
-        FROM admin_accounts
-        WHERE lower(username) = lower($u)
-        LIMIT 1;
-        """, connection);
-    cmd.Parameters.AddWithValue("$u", username);
-    await using var reader = await cmd.ExecuteReaderAsync();
-    if (!await reader.ReadAsync())
-    {
-        return null;
-    }
 
-    var isActive = reader.IsDBNull(5) || reader.GetInt32(5) != 0;
-    var isDeleted = !reader.IsDBNull(6) && reader.GetInt32(6) != 0;
-    if (!isActive || isDeleted)
-    {
-        return null;
-    }
 
-    var hash = reader.IsDBNull(2) ? string.Empty : reader.GetString(2);
-    if (string.IsNullOrWhiteSpace(hash) || !BCrypt.Net.BCrypt.Verify(password, hash))
-    {
-        return null;
-    }
 
-    return (
-        reader.GetInt64(0),
-        reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
-        reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
-        reader.IsDBNull(4) ? string.Empty : reader.GetString(4));
-}
 
-static async Task<List<OwnerAccountDto>> GetOwnerAccountsAsync(string connectionString, bool includeDeleted = false)
-{
-    await using var connection = await OpenConnectionAsync(connectionString);
-    var sql = """
-        SELECT id, username, full_name, COALESCE(is_deleted, 0), deleted_at, COALESCE(delete_status, 'ACTIVE')
-        FROM admin_accounts
-        WHERE role = 'owner'
-        ORDER BY username ASC;
-        """;
-    if (!includeDeleted)
-    {
-        sql = sql.Replace("ORDER BY", "AND COALESCE(is_deleted, 0) = 0 ORDER BY", StringComparison.Ordinal);
-    }
-    await using var cmd = new SqliteCommand(sql, connection);
-    await using var reader = await cmd.ExecuteReaderAsync();
-    var result = new List<OwnerAccountDto>();
-    while (await reader.ReadAsync())
-    {
-        result.Add(new OwnerAccountDto
-        {
-            Id = reader.GetInt64(0).ToString(CultureInfo.InvariantCulture),
-            Username = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
-            FullName = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
-            IsDeleted = !reader.IsDBNull(3) && reader.GetInt32(3) != 0,
-            DeletedAt = reader.IsDBNull(4) ? null : reader.GetString(4),
-            DeleteStatus = reader.IsDBNull(5) ? "ACTIVE" : reader.GetString(5),
-        });
-    }
 
-    return result;
-}
 
+#if false
 static async Task<long> CreateOwnerAccountAsync(string connectionString, string username, string password, string fullName)
 {
     await using var connection = await OpenConnectionAsync(connectionString);
@@ -2565,62 +3098,8 @@ static async Task<bool> AssignOwnerToPoiAsync(string connectionString, long poiI
     return affected > 0;
 }
 
-static async Task<List<PoiMobileDto>> GetPoisForMobileAsync(string connectionString, string requestedLang)
-{
-    await using var connection = await OpenConnectionAsync(connectionString);
 
-    const string sql = @"
-        SELECT
-            p.id,
-            p.latitude,
-            p.longitude,
-            p.radius_meters,
-            p.priority,
-            p.price,
-            p.map_link,
-            p.image_url,
-            p.audio_url,
-            COALESCE(NULLIF(t_req.name, ''), t_vi.name, '') AS name,
-            COALESCE(NULLIF(t_req.description, ''), t_vi.description, '') AS description,
-            COALESCE(NULLIF(t_req.tts_text, ''), NULLIF(t_req.description, ''), NULLIF(t_vi.tts_text, ''), t_vi.description, '') AS tts_text,
-            COALESCE(NULLIF(t_req.audio_url, ''), NULLIF(t_vi.audio_url, ''), '') AS audio_lang,
-            1 AS is_paid
-        FROM pois p
-        LEFT JOIN poi_translations t_req ON p.id = t_req.poi_id AND t_req.lang_code = $lang_code
-        LEFT JOIN poi_translations t_vi ON p.id = t_vi.poi_id AND t_vi.lang_code = 'vi'
-        WHERE p.is_active = 1 AND COALESCE(p.is_deleted, 0) = 0
-        ORDER BY p.priority DESC, p.id ASC;
-        ";
 
-    var result = new List<PoiMobileDto>();
-    await using var command = new SqliteCommand(sql, connection);
-    command.Parameters.AddWithValue("$lang_code", requestedLang);
-    await using var reader = await command.ExecuteReaderAsync();
-    while (await reader.ReadAsync())
-    {
-        var coreAudioUrl = reader.IsDBNull(8) ? string.Empty : reader.GetString(8);
-        var translatedAudioUrl = reader.IsDBNull(12) ? string.Empty : reader.GetString(12);
-        result.Add(new PoiMobileDto
-        {
-            Id = reader.GetInt64(0).ToString(CultureInfo.InvariantCulture),
-            LangCode = requestedLang,
-            Latitude = reader.GetDouble(1),
-            Longitude = reader.GetDouble(2),
-            RadiusMeters = reader.GetDouble(3),
-            Priority = reader.GetInt32(4),
-            Price = reader.IsDBNull(5) ? 0 : reader.GetDouble(5),
-            MapLink = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
-            ImageUrl = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
-            AudioUrl = !string.IsNullOrWhiteSpace(translatedAudioUrl) ? translatedAudioUrl : coreAudioUrl,
-            Name = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
-            Description = reader.IsDBNull(10) ? string.Empty : reader.GetString(10),
-            TtsText = reader.IsDBNull(11) ? string.Empty : reader.GetString(11),
-            IsPaid = !reader.IsDBNull(13) && reader.GetInt32(13) != 0
-        });
-    }
-
-    return result;
-}
 
 static async Task<List<FeaturedPoiDto>> GetFeaturedPoisForPublicAsync(string connectionString, string requestedLang, int limit)
 {
@@ -3053,6 +3532,7 @@ static async Task<bool> RestorePoiAsync(string connectionString, long id)
     return affected > 0;
 }
 
+#endif
 static string? NormalizeAppLanguageCode(string? languageCode)
 {
     if (string.IsNullOrWhiteSpace(languageCode))
@@ -3172,6 +3652,7 @@ static async Task<List<string>> TranslateTextsAsync(
 }
 
 
+#if false
 static async Task CleanupOldLogsAsync(SqliteConnection conn)
 {
     try
@@ -3184,172 +3665,10 @@ static async Task CleanupOldLogsAsync(SqliteConnection conn)
     catch { }
 }
 
-static (string Browser, string OS) ParseUserAgent(string? ua)
-{
-    if (string.IsNullOrWhiteSpace(ua)) return ("Unknown", "Unknown");
 
-    var browser = "Other";
-    var os = "Other";
 
-    // Basic OS Detection
-    if (ua.Contains("Windows", StringComparison.OrdinalIgnoreCase)) os = "Windows";
-    else if (ua.Contains("Android", StringComparison.OrdinalIgnoreCase)) os = "Android";
-    else if (ua.Contains("iPhone", StringComparison.OrdinalIgnoreCase) || ua.Contains("iPad", StringComparison.OrdinalIgnoreCase)) os = "iOS";
-    else if (ua.Contains("Mac OS X", StringComparison.OrdinalIgnoreCase)) os = "macOS";
-    else if (ua.Contains("Linux", StringComparison.OrdinalIgnoreCase)) os = "Linux";
 
-    // Basic Browser Detection
-    if (ua.Contains("Edg/", StringComparison.OrdinalIgnoreCase)) browser = "Edge";
-    else if (ua.Contains("Chrome/", StringComparison.OrdinalIgnoreCase)) browser = "Chrome";
-    else if (ua.Contains("Safari/", StringComparison.OrdinalIgnoreCase) && !ua.Contains("Chrome/", StringComparison.OrdinalIgnoreCase)) browser = "Safari";
-    else if (ua.Contains("Firefox/", StringComparison.OrdinalIgnoreCase)) browser = "Firefox";
-    else if (ua.Contains("OPR/", StringComparison.OrdinalIgnoreCase) || ua.Contains("Opera/", StringComparison.OrdinalIgnoreCase)) browser = "Opera";
 
-    return (browser, os);
-}
-
-static async Task<bool> RecordUserActivityAsync(
-    string connectionString,
-    string sessionId,
-    string platform,
-    string action,
-    string? language,
-    string? deviceType,
-    long? poiId,
-    int? isRealScan,
-    int? duration,
-    string? deviceId = null,
-    string? userAgent = null,
-    string? ipAddress = null,
-    string? screenInfo = null,
-    double? latitude = null,
-    double? longitude = null)
-{
-    await using var connection = await OpenConnectionAsync(connectionString);
-    var nowUtc = DateTimeOffset.UtcNow.ToString("O");
-
-    // Spam/Rate Limiting: Max 40 events per minute per deviceId
-    if (!string.IsNullOrWhiteSpace(deviceId))
-    {
-        const string checkSpamSql = "SELECT COUNT(1) FROM user_activity_events WHERE device_id = $did AND datetime(created_at) > datetime('now', '-1 minute')";
-        await using var spamCmd = new SqliteCommand(checkSpamSql, connection);
-        spamCmd.Parameters.AddWithValue("$did", deviceId);
-        var recentCount = Convert.ToInt64(await spamCmd.ExecuteScalarAsync());
-        if (recentCount > 40) return true; // Silently ignore spam
-    }
-
-    // Throttling for 'ping' events: only update if last ping was more than 4 seconds ago
-    if (action == "ping")
-    {
-        await using var checkCmd = new SqliteCommand("SELECT last_ping_at FROM active_sessions WHERE session_id = $sid;", connection);
-        checkCmd.Parameters.AddWithValue("$sid", sessionId);
-        var lastPingRaw = await checkCmd.ExecuteScalarAsync();
-        if (lastPingRaw != null && DateTimeOffset.TryParse(lastPingRaw.ToString(), out var lastPing))
-        {
-            if (DateTimeOffset.UtcNow - lastPing < TimeSpan.FromSeconds(4))
-            {
-                return true; // Throttle: do not insert into DB
-            }
-        }
-    }
-
-    var (browser, os) = ParseUserAgent(userAgent);
-
-    // --- Database Persistence ---
-    await using var transaction = await connection.BeginTransactionAsync();
-
-    // 1. Maintain Real-time Session Status
-    await using (var upsertSession = new SqliteCommand("""
-        INSERT INTO active_sessions (session_id, last_ping_at, platform, device_id, browser_family, os_family, latitude, longitude)
-        VALUES ($sid, $now, $platform, $did, $browser, $os, $lat, $lon)
-        ON CONFLICT(session_id) DO UPDATE SET 
-            last_ping_at = excluded.last_ping_at, 
-            platform = excluded.platform, 
-            device_id = excluded.device_id, 
-            browser_family = excluded.browser_family,
-            os_family = excluded.os_family,
-            latitude = COALESCE(excluded.latitude, active_sessions.latitude), 
-            longitude = COALESCE(excluded.longitude, active_sessions.longitude);
-        """, connection, (SqliteTransaction)transaction))
-    {
-        upsertSession.Parameters.AddWithValue("$sid", sessionId);
-        upsertSession.Parameters.AddWithValue("$now", nowUtc);
-        upsertSession.Parameters.AddWithValue("$platform", platform);
-        upsertSession.Parameters.AddWithValue("$did", (object?)deviceId ?? DBNull.Value);
-        upsertSession.Parameters.AddWithValue("$browser", (object?)browser ?? DBNull.Value);
-        upsertSession.Parameters.AddWithValue("$os", (object?)os ?? DBNull.Value);
-        upsertSession.Parameters.AddWithValue("$lat", (object?)latitude ?? DBNull.Value);
-        upsertSession.Parameters.AddWithValue("$lon", (object?)longitude ?? DBNull.Value);
-        await upsertSession.ExecuteNonQueryAsync();
-    }
-
-    // 2. Smart Logging for Historical/Live History
-    bool wasUpserted = false;
-    if (action == "ping")
-    {
-        await using (var updatePing = new SqliteCommand("""
-            UPDATE user_activity_events 
-            SET created_at = $now, 
-                poi_id = $poi,
-                session_id = $sid,
-                ip_address = $ip, 
-                screen_info = $screen,
-                browser_family = $browser,
-                os_family = $os,
-                latitude = $lat,
-                longitude = $lon
-            WHERE action = 'ping' AND (
-                (device_id IS NOT NULL AND device_id = $did)
-                OR (device_id IS NULL AND session_id = $sid)
-            );
-            """, connection, (SqliteTransaction)transaction))
-        {
-            updatePing.Parameters.AddWithValue("$sid", sessionId);
-            updatePing.Parameters.AddWithValue("$did", (object?)deviceId ?? DBNull.Value);
-            updatePing.Parameters.AddWithValue("$poi", poiId.HasValue ? (object)poiId.Value : DBNull.Value);
-            updatePing.Parameters.AddWithValue("$now", nowUtc);
-            updatePing.Parameters.AddWithValue("$ip", (object?)ipAddress ?? DBNull.Value);
-            updatePing.Parameters.AddWithValue("$screen", (object?)screenInfo ?? DBNull.Value);
-            updatePing.Parameters.AddWithValue("$browser", (object?)browser ?? DBNull.Value);
-            updatePing.Parameters.AddWithValue("$os", (object?)os ?? DBNull.Value);
-            updatePing.Parameters.AddWithValue("$lat", (object?)latitude ?? DBNull.Value);
-            updatePing.Parameters.AddWithValue("$lon", (object?)longitude ?? DBNull.Value);
-            
-            var rowsAffected = await updatePing.ExecuteNonQueryAsync();
-            if (rowsAffected > 0) wasUpserted = true;
-        }
-    }
-
-    if (!wasUpserted)
-    {
-        await using (var insertEvent = new SqliteCommand("""
-            INSERT INTO user_activity_events (poi_id, session_id, device_id, platform, action, language, device_type, browser_family, os_family, ip_address, screen_info, is_real_scan, duration, created_at, latitude, longitude)
-            VALUES ($poi, $sid, $did, $platform, $action, $lang, $device, $browser, $os, $ip, $screen, $isReal, $duration, $now, $lat, $lon);
-            """, connection, (SqliteTransaction)transaction))
-        {
-            insertEvent.Parameters.AddWithValue("$poi", poiId.HasValue ? (object)poiId.Value : DBNull.Value);
-            insertEvent.Parameters.AddWithValue("$sid", sessionId);
-            insertEvent.Parameters.AddWithValue("$did", (object?)deviceId ?? DBNull.Value);
-            insertEvent.Parameters.AddWithValue("$platform", platform);
-            insertEvent.Parameters.AddWithValue("$action", action);
-            insertEvent.Parameters.AddWithValue("$lang", language ?? "vi");
-            insertEvent.Parameters.AddWithValue("$device", (object?)deviceType ?? DBNull.Value);
-            insertEvent.Parameters.AddWithValue("$browser", (object?)browser ?? DBNull.Value);
-            insertEvent.Parameters.AddWithValue("$os", (object?)os ?? DBNull.Value);
-            insertEvent.Parameters.AddWithValue("$ip", (object?)ipAddress ?? DBNull.Value);
-            insertEvent.Parameters.AddWithValue("$screen", (object?)screenInfo ?? DBNull.Value);
-            insertEvent.Parameters.AddWithValue("$isReal", isRealScan.HasValue ? (object)isRealScan.Value : DBNull.Value);
-            insertEvent.Parameters.AddWithValue("$duration", duration.HasValue ? (object)duration.Value : DBNull.Value);
-            insertEvent.Parameters.AddWithValue("$now", nowUtc);
-            insertEvent.Parameters.AddWithValue("$lat", (object?)latitude ?? DBNull.Value);
-            insertEvent.Parameters.AddWithValue("$lon", (object?)longitude ?? DBNull.Value);
-            await insertEvent.ExecuteNonQueryAsync();
-        }
-    }
-
-    await transaction.CommitAsync();
-    return true;
-}
 
 
 static async Task RenameTableIfExists(SqliteConnection connection, string oldName, string newName)
@@ -3385,23 +3704,55 @@ static async Task RenameTableIfExists(SqliteConnection connection, string oldNam
     }
 }
 
+#endif
+
+public static class LocalHelpers
+{
+    public static (string Browser, string OS) ParseUserAgent(string? userAgent)
+    {
+        if (string.IsNullOrWhiteSpace(userAgent)) return ("Unknown", "Unknown");
+        var ua = userAgent.ToLowerInvariant();
+        string browser = "Unknown";
+        if (ua.Contains("chrome") || ua.Contains("chromium")) browser = "Chrome";
+        else if (ua.Contains("safari") && !ua.Contains("chrome")) browser = "Safari";
+        else if (ua.Contains("firefox")) browser = "Firefox";
+        else if (ua.Contains("edge")) browser = "Edge";
+
+        string os = "Unknown";
+        if (ua.Contains("windows")) os = "Windows";
+        else if (ua.Contains("android")) os = "Android";
+        else if (ua.Contains("iphone") || ua.Contains("ipad")) os = "iOS";
+        else if (ua.Contains("mac os")) os = "macOS";
+        else if (ua.Contains("linux")) os = "Linux";
+        return (browser, os);
+    }
+}
+
 public class TtsJob
 {
     public required string Id { get; set; }
     public required string Text { get; set; }
 }
 
+sealed class SupabaseTtsQueueRow
+{
+    public string? id { get; set; }
+    public string? text { get; set; }
+    public string? status { get; set; }
+}
+
 public class TtsQueueWorker : BackgroundService
 {
     private readonly SemaphoreSlim _semaphore = new(3);
-    private readonly string _connectionString;
+    private static readonly IReadOnlyDictionary<string, string> PreferReturnRepresentation
+        = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Prefer"] = "return=representation" };
+
+    private readonly SupabaseRestClient _supabase;
     private readonly ILogger<TtsQueueWorker> _logger;
 
-    public TtsQueueWorker(IHostEnvironment environment, ILogger<TtsQueueWorker> logger)
+    public TtsQueueWorker(SupabaseRestClient supabase, ILogger<TtsQueueWorker> logger)
     {
-        var dataDirectory = Path.Combine(environment.ContentRootPath, "App_Data");
-        var dbPath = Path.Combine(dataDirectory, "poi-admin.db3");
-        _connectionString = $"Data Source={dbPath}";
+        _supabase = supabase;
         _logger = logger;
     }
 
@@ -3413,7 +3764,7 @@ public class TtsQueueWorker : BackgroundService
         {
             try
             {
-                var jobs = await GetWaitingJobsAsync(3);
+                var jobs = await ClaimWaitingJobsAsync(3, stoppingToken);
                 foreach (var job in jobs)
                 {
                     _ = ProcessJobAsync(job, stoppingToken);
@@ -3428,42 +3779,45 @@ public class TtsQueueWorker : BackgroundService
         }
     }
 
-    private async Task<List<TtsJob>> GetWaitingJobsAsync(int limit)
+    private async Task<List<TtsJob>> ClaimWaitingJobsAsync(int limit, CancellationToken cancellationToken)
     {
         var jobs = new List<TtsJob>();
-        await using var db = new SqliteConnection(_connectionString);
-        await db.OpenAsync();
+        var candidates = await _supabase.GetListAsync<SupabaseTtsQueueRow>(
+            $"/rest/v1/audio_tts_queue?select=id,text,status&status=eq.waiting&order=created_at.asc&limit={Math.Clamp(limit * 3, 3, 30)}",
+            cancellationToken);
 
-        await using var cmd = db.CreateCommand();
-        cmd.CommandText = @"
-            SELECT id, text FROM audio_tts_queue
-            WHERE status = 'waiting'
-            ORDER BY created_at
-            LIMIT $limit
-        ";
-        cmd.Parameters.AddWithValue("$limit", limit);
-
-        using var reader = await cmd.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
+        foreach (var c in candidates)
         {
-            jobs.Add(new TtsJob
+            if (jobs.Count >= limit)
             {
-                Id = reader.GetString(0),
-                Text = reader.GetString(1)
-            });
-        }
+                break;
+            }
 
-        foreach (var job in jobs)
-        {
-            await using var update = db.CreateCommand();
-            update.CommandText = @"
-                UPDATE audio_tts_queue
-                SET status = 'processing', updated_at = $now
-                WHERE id = $id AND status = 'waiting'
-            ";
-            update.Parameters.AddWithValue("$id", job.Id);
-            update.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
-            await update.ExecuteNonQueryAsync();
+            var id = (c.id ?? string.Empty).Trim();
+            var text = (c.text ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(text))
+            {
+                continue;
+            }
+
+            var claimPayload = new Dictionary<string, object?>
+            {
+                ["status"] = "processing",
+                ["updated_at"] = DateTimeOffset.UtcNow.ToString("O")
+            };
+
+            // Claim is conditional on the row still being 'waiting'.
+            var claimed = await _supabase.PatchAsync<Dictionary<string, object?>, List<SupabaseTtsQueueRow>>(
+                $"/rest/v1/audio_tts_queue?id=eq.{Uri.EscapeDataString(id)}&status=eq.waiting",
+                claimPayload,
+                headers: PreferReturnRepresentation,
+                cancellationToken: cancellationToken);
+            if (claimed is null || claimed.Count == 0)
+            {
+                continue;
+            }
+
+            jobs.Add(new TtsJob { Id = id, Text = text });
         }
 
         return jobs;
@@ -3479,21 +3833,15 @@ public class TtsQueueWorker : BackgroundService
             // Simulate TTS generation
             await Task.Delay(5000, token);
 
-            await using var db = new SqliteConnection(_connectionString);
-            await db.OpenAsync();
-
-            await using var cmd = db.CreateCommand();
-            cmd.CommandText = @"
-                UPDATE audio_tts_queue
-                SET status = 'done', updated_at = $now
-                WHERE id = $id
-            ";
-            cmd.Parameters.Clear();
-
-            cmd.Parameters.AddWithValue("$id", job.Id);
-            cmd.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
-            await cmd.ExecuteNonQueryAsync();
-            
+            await _supabase.PatchAsync(
+                $"/rest/v1/audio_tts_queue?id=eq.{Uri.EscapeDataString(job.Id)}",
+                new Dictionary<string, object?>
+                {
+                    ["status"] = "done",
+                    ["updated_at"] = DateTimeOffset.UtcNow.ToString("O")
+                },
+                cancellationToken: token);
+             
             _logger.LogInformation("TTS Job {JobId} completed.", job.Id);
         }
         catch (Exception ex)
@@ -3501,18 +3849,14 @@ public class TtsQueueWorker : BackgroundService
             _logger.LogError(ex, "Error processing TTS Job {JobId}", job.Id);
             try
             {
-                await using var db = new SqliteConnection(_connectionString);
-                await db.OpenAsync();
-
-                await using var cmd = db.CreateCommand();
-                cmd.CommandText = @"
-                    UPDATE audio_tts_queue
-                    SET status = 'error', updated_at = $now
-                    WHERE id = $id
-                ";
-                cmd.Parameters.AddWithValue("$id", job.Id);
-                cmd.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
-                await cmd.ExecuteNonQueryAsync();
+                await _supabase.PatchAsync(
+                    $"/rest/v1/audio_tts_queue?id=eq.{Uri.EscapeDataString(job.Id)}",
+                    new Dictionary<string, object?>
+                    {
+                        ["status"] = "error",
+                        ["updated_at"] = DateTimeOffset.UtcNow.ToString("O")
+                    },
+                    cancellationToken: token);
             }
             catch { }
         }
@@ -3523,6 +3867,8 @@ public class TtsQueueWorker : BackgroundService
     }
 }
 
+
+
 enum DeletePoiResult
 {
     Unknown = 0,
@@ -3530,7 +3876,7 @@ enum DeletePoiResult
     Deleted = 2
 }
 
-readonly record struct AdminActor(long Id, string Username, string Role, string FullName);
+public readonly record struct AdminActor(long Id, string Username, string Role, string FullName);
 
 sealed class SupportedLanguage
 {
@@ -3549,7 +3895,7 @@ sealed class SupportedLanguage
         ];
 }
 
-sealed class PoiMobileDto
+public sealed class PoiMobileDto
 {
     public string Id { get; set; } = string.Empty;
     public string LangCode { get; set; } = "vi";
@@ -3565,6 +3911,7 @@ sealed class PoiMobileDto
     public string MapLink { get; set; } = string.Empty;
     public string ImageUrl { get; set; } = string.Empty;
     public string AudioUrl { get; set; } = string.Empty;
+    public string AudioLang { get; set; } = string.Empty;
 }
 
 sealed class PoiAdminListItemDto
@@ -3621,7 +3968,7 @@ sealed class PoiAdminDto
     public List<PoiTranslationDto> Translations { get; set; } = [];
 }
 
-sealed class OwnerAccountDto
+public sealed class OwnerAccountDto
 {
     public string Id { get; set; } = string.Empty;
     public string Username { get; set; } = string.Empty;
@@ -3794,3 +4141,1047 @@ sealed class ChartPointDto { public string Date { get; set; } = ""; public strin
 sealed class HourlyPointDto { public int Hour { get; set; } public int Count { get; set; } }
 sealed class PoiRankingDto { public string PoiId { get; set; } = ""; public string Name { get; set; } = ""; public int Count { get; set; } }
 sealed class StatBreakdownDto { public string Label { get; set; } = ""; public int Count { get; set; } }
+
+
+
+interface IDataService
+{
+    Task EnsureBootstrapSuperAdminAsync(string username, string password, CancellationToken cancellationToken = default);
+    Task<List<PoiMobileDto>> GetPoisForMobileAsync(string lang_code);
+    Task<PoiMobileDto?> GetPoiForMobileByIdAsync(long poiId, string requestedLang, CancellationToken cancellationToken = default);
+    Task<PoiMobileDto?> GetPoiForPublicByIdAsync(long poiId, string requestedLang, CancellationToken cancellationToken = default);
+    Task<List<FeaturedPoiDto>> GetFeaturedPoisForPublicAsync(string requestedLang, int limit, CancellationToken cancellationToken = default);
+    Task<List<PoiAdminListItemDto>> GetPoisForAdminListAsync(AdminActor actor, CancellationToken cancellationToken = default);
+    Task<PoiAdminDto?> GetPoiAdminAsync(long poiId, AdminActor actor, CancellationToken cancellationToken = default);
+    Task<long?> UpsertPoiAdminAsync(
+        long? poiId,
+        PoiAdminUpsertRequest request,
+        AdminActor actor,
+        string mapLink,
+        IReadOnlyList<PoiTranslationDto> normalizedTranslations,
+        CancellationToken cancellationToken = default);
+    Task<DeletePoiResult> DeletePoiAsync(long poiId, AdminActor actor, CancellationToken cancellationToken = default);
+    Task<bool> RestorePoiAsync(long poiId, AdminActor actor, CancellationToken cancellationToken = default);
+    Task<AdminResult?> FindAdminForLoginAsync(string username, string password);
+    Task<List<OwnerAccountDto>> GetOwnerAccountsAsync(bool includeDeleted = false);
+    Task<long> CreateOwnerAccountAsync(string username, string password, string fullName, CancellationToken cancellationToken = default);
+    Task<bool> UpdateOwnerAccountAsync(long ownerId, string? username, string? fullName, string? password, CancellationToken cancellationToken = default);
+    Task<bool> DeleteOwnerAccountAsync(long ownerId, CancellationToken cancellationToken = default);
+    Task<bool> RestoreOwnerAccountAsync(long ownerId, CancellationToken cancellationToken = default);
+    Task<bool> AssignOwnerToPoiAsync(long poiId, long? ownerId, CancellationToken cancellationToken = default);
+    Task<bool> RecordUserActivityAsync(
+        string sessionId,
+        string platform,
+        string action,
+        string? language,
+        string? deviceType,
+        long? poiId,
+        int? isRealScan,
+        int? duration,
+        string? deviceId,
+        string? userAgent,
+        string? ipAddress,
+        string? screenInfo,
+        double? latitude = null,
+        double? longitude = null,
+        CancellationToken cancellationToken = default);
+    Task EnqueueTtsJobAsync(string jobId, string poiId, string text, CancellationToken cancellationToken = default);
+    Task<long> UpsertLegacyShopAsync(long? poiId, ShopUpsertJsonRequest request, string langCode, string mapLink, CancellationToken cancellationToken = default);
+}
+
+sealed class AdminResult
+{
+    public long Id { get; set; }
+    public string Username { get; set; } = "";
+    public string Role { get; set; } = "";
+    public string FullName { get; set; } = "";
+}
+
+sealed class SupabaseDataService : IDataService
+{
+    private static readonly IReadOnlyDictionary<string, string> PreferReturnRepresentation
+        = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Prefer"] = "return=representation" };
+
+    private static readonly IReadOnlyDictionary<string, string> PreferUpsertReturnRepresentation
+        = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Prefer"] = "resolution=merge-duplicates,return=representation" };
+
+    private readonly SupabaseRestClient _supabase;
+    private readonly ILogger<SupabaseDataService> _logger;
+
+    public SupabaseDataService(SupabaseRestClient supabase, ILogger<SupabaseDataService> logger)
+    {
+        _supabase = supabase;
+        _logger = logger;
+    }
+
+    public async Task EnsureBootstrapSuperAdminAsync(string username, string password, CancellationToken cancellationToken = default)
+    {
+        var existing = await _supabase.GetListAsync<SupabaseAdminAccount>(
+            "/rest/v1/admin_accounts?select=id&role=eq.superadmin&limit=1",
+            cancellationToken);
+        if (existing.Count > 0)
+        {
+            return;
+        }
+
+        var hash = BCrypt.Net.BCrypt.HashPassword(password);
+        var payload = new Dictionary<string, object?>
+        {
+            ["username"] = username,
+            ["password_hash"] = hash,
+            ["role"] = "superadmin",
+            ["full_name"] = "Super Admin",
+            ["is_active"] = true,
+            ["created_at"] = DateTimeOffset.UtcNow.ToString("O")
+        };
+        await _supabase.PostAsync("/rest/v1/admin_accounts", payload, headers: null, cancellationToken: cancellationToken);
+    }
+
+    public async Task<List<PoiMobileDto>> GetPoisForMobileAsync(string lang_code)
+    {
+        var pois = await _supabase.GetListAsync<SupabasePoi>(
+            "/rest/v1/pois?select=id,latitude,longitude,radius_meters,priority,price,map_link,image_url,audio_url,is_active,is_deleted,poi_translations(lang_code,name,description,tts_text,audio_url)&order=priority.desc,id.asc");
+
+        var result = new List<PoiMobileDto>();
+        foreach (var p in pois)
+        {
+            if (!p.IsActive || p.IsDeleted)
+            {
+                continue;
+            }
+
+            var t_req = p.poi_translations.FirstOrDefault(t => string.Equals(t.lang_code, lang_code, StringComparison.OrdinalIgnoreCase));
+            var t_vi = p.poi_translations.FirstOrDefault(t => string.Equals(t.lang_code, "vi", StringComparison.OrdinalIgnoreCase));
+            result.Add(ToMobileDto(p, lang_code, t_req, t_vi));
+        }
+        return result;
+    }
+
+    public async Task<PoiMobileDto?> GetPoiForMobileByIdAsync(long poiId, string requestedLang, CancellationToken cancellationToken = default)
+    {
+        var pois = await _supabase.GetListAsync<SupabasePoi>(
+            $"/rest/v1/pois?select=id,latitude,longitude,radius_meters,priority,price,map_link,image_url,audio_url,is_active,is_deleted,poi_translations(lang_code,name,description,tts_text,audio_url)&id=eq.{poiId}&limit=1",
+            cancellationToken);
+        var p = pois.FirstOrDefault();
+        if (p is null || !p.IsActive || p.IsDeleted)
+        {
+            return null;
+        }
+
+        var t_req = p.poi_translations.FirstOrDefault(t => string.Equals(t.lang_code, requestedLang, StringComparison.OrdinalIgnoreCase));
+        var t_vi = p.poi_translations.FirstOrDefault(t => string.Equals(t.lang_code, "vi", StringComparison.OrdinalIgnoreCase));
+        return ToMobileDto(p, requestedLang, t_req, t_vi);
+    }
+
+    public async Task<PoiMobileDto?> GetPoiForPublicByIdAsync(long poiId, string requestedLang, CancellationToken cancellationToken = default)
+        => await GetPoiForMobileByIdAsync(poiId, requestedLang, cancellationToken);
+
+    public async Task<List<FeaturedPoiDto>> GetFeaturedPoisForPublicAsync(string requestedLang, int limit, CancellationToken cancellationToken = default)
+    {
+        var lookbackUtc = DateTimeOffset.UtcNow.AddDays(-7).ToString("O");
+        var events = await _supabase.GetListAsync<SupabaseUserActivityEvent>(
+            $"/rest/v1/user_activity_events?select=poi_id,action&created_at=gte.{Uri.EscapeDataString(lookbackUtc)}&action=in.(scan_qr,play_audio,view_poi)",
+            cancellationToken);
+
+        var scoreByPoi = events
+            .Where(e => e.poi_id.HasValue)
+            .GroupBy(e => e.poi_id!.Value)
+            .ToDictionary(g => g.Key, g => g.LongCount());
+
+        var pois = await _supabase.GetListAsync<SupabasePoi>(
+            "/rest/v1/pois?select=id,priority,image_url,is_active,is_deleted,poi_translations(lang_code,name)&order=priority.desc,id.asc",
+            cancellationToken);
+
+        var featured = new List<FeaturedPoiDto>();
+        foreach (var p in pois)
+        {
+            if (!p.IsActive || p.IsDeleted)
+            {
+                continue;
+            }
+
+            var t_req = p.poi_translations.FirstOrDefault(t => string.Equals(t.lang_code, requestedLang, StringComparison.OrdinalIgnoreCase));
+            var t_vi = p.poi_translations.FirstOrDefault(t => string.Equals(t.lang_code, "vi", StringComparison.OrdinalIgnoreCase));
+            var name = !string.IsNullOrWhiteSpace(t_req?.name) ? t_req!.name! : (t_vi?.name ?? string.Empty);
+            scoreByPoi.TryGetValue(p.id, out var popularity);
+            featured.Add(new FeaturedPoiDto
+            {
+                Id = p.id.ToString(CultureInfo.InvariantCulture),
+                Name = name,
+                ImageUrl = p.image_url ?? string.Empty,
+                    PopularityScore = (int)Math.Min((long)int.MaxValue, popularity)
+                });
+            }
+
+        return featured
+            .OrderByDescending(x => x.PopularityScore)
+            .ThenByDescending(x => pois.FirstOrDefault(p => p.id.ToString(CultureInfo.InvariantCulture) == x.Id)?.priority ?? 0)
+            .ThenBy(x => long.TryParse(x.Id, NumberStyles.Integer, CultureInfo.InvariantCulture, out var pid) ? pid : long.MaxValue)
+            .Take(limit)
+            .ToList();
+    }
+
+    public async Task<List<PoiAdminListItemDto>> GetPoisForAdminListAsync(AdminActor actor, CancellationToken cancellationToken = default)
+    {
+        var pois = await _supabase.GetListAsync<SupabasePoiAdminRow>(
+            "/rest/v1/pois?select=id,latitude,longitude,radius_meters,priority,price,map_link,image_url,audio_url,is_active,is_deleted,deleted_at,delete_status,owner_admin_id&order=priority.desc,id.asc",
+            cancellationToken);
+
+        if (ActorIsOwner(actor))
+        {
+            pois = pois.Where(p => p.owner_admin_id.HasValue && p.owner_admin_id.Value == actor.Id).ToList();
+        }
+
+        var viTranslations = await _supabase.GetListAsync<SupabasePoiTranslationRow>(
+            "/rest/v1/poi_translations?select=poi_id,lang_code,name&lang_code=eq.vi",
+            cancellationToken);
+        var nameViByPoi = viTranslations
+            .GroupBy(t => t.poi_id)
+            .ToDictionary(g => g.Key, g => (g.FirstOrDefault()?.name ?? string.Empty).Trim());
+
+        var ownerIds = pois.Where(p => p.owner_admin_id.HasValue).Select(p => p.owner_admin_id!.Value).Distinct().ToList();
+        var ownersById = new Dictionary<long, (string Username, string FullName)>();
+        foreach (var chunk in ownerIds.Chunk(100))
+        {
+            var inClause = string.Join(',', chunk);
+            var owners = await _supabase.GetListAsync<SupabaseAdminAccount>(
+                $"/rest/v1/admin_accounts?select=id,username,full_name&id=in.({inClause})",
+                cancellationToken);
+            foreach (var o in owners)
+            {
+                ownersById[o.id] = (o.username ?? string.Empty, o.full_name ?? string.Empty);
+            }
+        }
+
+        return pois.Select(p =>
+        {
+            ownersById.TryGetValue(p.owner_admin_id ?? -1, out var owner);
+            nameViByPoi.TryGetValue(p.id, out var nameVi);
+            var isDeleted = p.IsDeleted;
+            var deleteStatus = string.IsNullOrWhiteSpace(p.delete_status)
+                ? (isDeleted ? "DELETED" : "ACTIVE")
+                : p.delete_status!;
+
+            return new PoiAdminListItemDto
+            {
+                Id = p.id.ToString(CultureInfo.InvariantCulture),
+                Latitude = p.latitude,
+                Longitude = p.longitude,
+                RadiusMeters = p.radius_meters,
+                Priority = p.priority,
+                Price = p.price,
+                MapLink = p.map_link ?? string.Empty,
+                ImageUrl = p.image_url ?? string.Empty,
+                AudioUrl = p.audio_url ?? string.Empty,
+                IsActive = p.IsActive,
+                NameVi = nameVi ?? string.Empty,
+                IsDeleted = isDeleted,
+                DeletedAt = p.deleted_at,
+                DeleteStatus = deleteStatus,
+                OwnerAdminId = p.owner_admin_id?.ToString(CultureInfo.InvariantCulture),
+                OwnerUsername = owner.Username ?? string.Empty,
+                OwnerFullName = owner.FullName ?? string.Empty
+            };
+        }).ToList();
+    }
+
+    public async Task<PoiAdminDto?> GetPoiAdminAsync(long poiId, AdminActor actor, CancellationToken cancellationToken = default)
+    {
+        var rows = await _supabase.GetListAsync<SupabasePoiAdminRow>(
+            $"/rest/v1/pois?select=id,latitude,longitude,radius_meters,priority,price,map_link,image_url,audio_url,is_active,owner_admin_id&id=eq.{poiId}&limit=1",
+            cancellationToken);
+        var row = rows.FirstOrDefault();
+        if (row is null)
+        {
+            return null;
+        }
+
+        if (ActorIsOwner(actor) && row.owner_admin_id != actor.Id)
+        {
+            return null;
+        }
+
+        var translations = await _supabase.GetListAsync<SupabasePoiTranslationFullRow>(
+            $"/rest/v1/poi_translations?select=lang_code,name,description,tts_text,audio_url&poi_id=eq.{poiId}&order=lang_code.asc",
+            cancellationToken);
+
+        return new PoiAdminDto
+        {
+            Id = row.id.ToString(CultureInfo.InvariantCulture),
+            Latitude = row.latitude,
+            Longitude = row.longitude,
+            RadiusMeters = row.radius_meters,
+            Priority = row.priority,
+            Price = row.price,
+            MapLink = row.map_link ?? string.Empty,
+            ImageUrl = row.image_url ?? string.Empty,
+            AudioUrl = row.audio_url ?? string.Empty,
+            IsActive = row.IsActive,
+            OwnerAdminId = row.owner_admin_id?.ToString(CultureInfo.InvariantCulture),
+            Translations = translations.Select(t => new PoiTranslationDto
+            {
+                LangCode = t.lang_code ?? "vi",
+                Name = t.name ?? string.Empty,
+                Description = t.description ?? string.Empty,
+                TtsText = t.tts_text ?? string.Empty,
+                AudioUrl = t.audio_url ?? string.Empty
+            }).ToList()
+        };
+    }
+
+    public async Task<long?> UpsertPoiAdminAsync(
+        long? poiId,
+        PoiAdminUpsertRequest request,
+        AdminActor actor,
+        string mapLink,
+        IReadOnlyList<PoiTranslationDto> normalizedTranslations,
+        CancellationToken cancellationToken = default)
+    {
+        SupabasePoiAdminRow? existing = null;
+        if (poiId is not null)
+        {
+            var rows = await _supabase.GetListAsync<SupabasePoiAdminRow>(
+                $"/rest/v1/pois?select=id,owner_admin_id,is_deleted,is_active&id=eq.{poiId.Value}&limit=1",
+                cancellationToken);
+            existing = rows.FirstOrDefault();
+            if (existing is null)
+            {
+                return null;
+            }
+
+            if (ActorIsOwner(actor) && existing.owner_admin_id != actor.Id)
+            {
+                return null;
+            }
+        }
+
+        var now = DateTimeOffset.UtcNow.ToString("O");
+        var corePayload = new Dictionary<string, object?>
+        {
+            ["latitude"] = request.Latitude,
+            ["longitude"] = request.Longitude,
+            ["radius_meters"] = request.RadiusMeters,
+            ["priority"] = request.Priority,
+            ["price"] = request.Price >= 0 ? request.Price : 0,
+            ["map_link"] = mapLink,
+            ["image_url"] = (request.ImageUrl ?? string.Empty).Trim(),
+            ["audio_url"] = (request.AudioUrl ?? string.Empty).Trim(),
+            ["is_active"] = request.IsActive,
+            ["updated_at"] = now,
+            ["deleted_at"] = null,
+            ["delete_status"] = "ACTIVE"
+        };
+
+        if (existing is not null)
+        {
+            corePayload["is_deleted"] = CoerceBoolStorageValue(existing.is_deleted, false);
+
+            // Preserve ownership unless it's currently NULL and the owner is saving.
+            if (existing.owner_admin_id is null && ActorIsOwner(actor))
+            {
+                corePayload["owner_admin_id"] = actor.Id;
+            }
+        }
+        else
+        {
+            corePayload["is_deleted"] = false;
+            corePayload["owner_admin_id"] = ActorIsOwner(actor) ? actor.Id : null;
+        }
+
+        long savedId;
+        if (poiId is null)
+        {
+            var inserted = await _supabase.PostAsync<Dictionary<string, object?>, List<SupabaseInsertId>>(
+                "/rest/v1/pois",
+                corePayload,
+                headers: PreferReturnRepresentation,
+                cancellationToken: cancellationToken);
+            savedId = inserted?.FirstOrDefault()?.id ?? 0;
+            if (savedId <= 0)
+            {
+                throw new InvalidOperationException("Cannot create POI (missing returned id).");
+            }
+        }
+        else
+        {
+            var updated = await _supabase.PatchAsync<Dictionary<string, object?>, List<SupabaseInsertId>>(
+                $"/rest/v1/pois?id=eq.{poiId.Value}",
+                corePayload,
+                headers: PreferReturnRepresentation,
+                cancellationToken: cancellationToken);
+            var id = updated?.FirstOrDefault()?.id ?? 0;
+            if (id <= 0)
+            {
+                return null;
+            }
+            savedId = id;
+        }
+
+        if (normalizedTranslations.Count > 0)
+        {
+            var translationRows = normalizedTranslations.Select(t => new Dictionary<string, object?>
+            {
+                ["poi_id"] = savedId,
+                ["lang_code"] = t.LangCode,
+                ["name"] = t.Name ?? string.Empty,
+                ["description"] = t.Description ?? string.Empty,
+                ["tts_text"] = t.TtsText ?? string.Empty,
+                ["audio_url"] = t.AudioUrl ?? string.Empty
+            }).ToList();
+
+            await _supabase.PostAsync(
+                "/rest/v1/poi_translations?on_conflict=poi_id,lang_code",
+                translationRows,
+                headers: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Prefer"] = "resolution=merge-duplicates" },
+                cancellationToken: cancellationToken);
+        }
+
+        return savedId;
+    }
+
+    public async Task<DeletePoiResult> DeletePoiAsync(long poiId, AdminActor actor, CancellationToken cancellationToken = default)
+    {
+        var rows = await _supabase.GetListAsync<SupabasePoiAdminRow>(
+            $"/rest/v1/pois?select=id,owner_admin_id,is_deleted&id=eq.{poiId}&limit=1",
+            cancellationToken);
+        var existing = rows.FirstOrDefault();
+        if (existing is null)
+        {
+            return DeletePoiResult.NotFound;
+        }
+
+        if (ActorIsOwner(actor) && existing.owner_admin_id != actor.Id)
+        {
+            return DeletePoiResult.NotFound;
+        }
+
+        if (existing.IsDeleted)
+        {
+            return DeletePoiResult.NotFound;
+        }
+
+        var payload = new Dictionary<string, object?>
+        {
+            ["is_deleted"] = CoerceBoolStorageValue(existing.is_deleted, true),
+            ["deleted_at"] = DateTimeOffset.UtcNow.ToString("O"),
+            ["delete_status"] = "DELETED"
+        };
+
+        var updated = await _supabase.PatchAsync<Dictionary<string, object?>, List<SupabaseInsertId>>(
+            $"/rest/v1/pois?id=eq.{poiId}",
+            payload,
+            headers: PreferReturnRepresentation,
+            cancellationToken: cancellationToken);
+        return (updated is not null && updated.Count > 0) ? DeletePoiResult.Deleted : DeletePoiResult.NotFound;
+    }
+
+    public async Task<bool> RestorePoiAsync(long poiId, AdminActor actor, CancellationToken cancellationToken = default)
+    {
+        var rows = await _supabase.GetListAsync<SupabasePoiAdminRow>(
+            $"/rest/v1/pois?select=id,is_deleted&id=eq.{poiId}&limit=1",
+            cancellationToken);
+        var existing = rows.FirstOrDefault();
+        if (existing is null || !existing.IsDeleted)
+        {
+            return false;
+        }
+
+        var payload = new Dictionary<string, object?>
+        {
+            ["is_deleted"] = CoerceBoolStorageValue(existing.is_deleted, false),
+            ["deleted_at"] = null,
+            ["delete_status"] = "ACTIVE"
+        };
+
+        var updated = await _supabase.PatchAsync<Dictionary<string, object?>, List<SupabaseInsertId>>(
+            $"/rest/v1/pois?id=eq.{poiId}",
+            payload,
+            headers: PreferReturnRepresentation,
+            cancellationToken: cancellationToken);
+        return updated is not null && updated.Count > 0;
+    }
+
+    public async Task<long> UpsertLegacyShopAsync(long? poiId, ShopUpsertJsonRequest request, string langCode, string mapLink, CancellationToken cancellationToken = default)
+    {
+        SupabasePoiAdminRow? existing = null;
+        if (poiId is not null)
+        {
+            var rows = await _supabase.GetListAsync<SupabasePoiAdminRow>(
+                $"/rest/v1/pois?select=id,image_url,audio_url,is_deleted&id=eq.{poiId.Value}&limit=1",
+                cancellationToken);
+            existing = rows.FirstOrDefault();
+            if (existing is null)
+            {
+                poiId = null;
+            }
+        }
+
+        var currentAudioUrl = existing?.audio_url ?? string.Empty;
+        var currentImageUrl = existing?.image_url ?? string.Empty;
+        var finalTtsText = request.TtsText?.Trim() ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(currentAudioUrl) && !string.IsNullOrWhiteSpace(finalTtsText))
+        {
+            throw new InvalidOperationException("POI dang co audio file. Hay xoa audio truoc khi nhap TTS.");
+        }
+
+        var now = DateTimeOffset.UtcNow.ToString("O");
+        var corePayload = new Dictionary<string, object?>
+        {
+            ["latitude"] = request.Latitude,
+            ["longitude"] = request.Longitude,
+            ["radius_meters"] = request.RadiusMeters,
+            ["priority"] = 0,
+            ["price"] = 0,
+            ["map_link"] = mapLink,
+            ["image_url"] = currentImageUrl,
+            ["audio_url"] = currentAudioUrl,
+            ["is_active"] = true,
+            ["updated_at"] = now,
+            ["deleted_at"] = null,
+            ["delete_status"] = "ACTIVE"
+        };
+
+        long savedId;
+        if (poiId is null)
+        {
+            corePayload["is_deleted"] = false;
+            corePayload["created_at"] = now;
+            var inserted = await _supabase.PostAsync<Dictionary<string, object?>, List<SupabaseInsertId>>(
+                "/rest/v1/pois",
+                corePayload,
+                headers: PreferReturnRepresentation,
+                cancellationToken: cancellationToken);
+            savedId = inserted?.FirstOrDefault()?.id ?? 0;
+            if (savedId <= 0)
+            {
+                throw new InvalidOperationException("Cannot create POI (missing returned id).");
+            }
+        }
+        else
+        {
+            if (existing is not null)
+            {
+                corePayload["is_deleted"] = CoerceBoolStorageValue(existing.is_deleted, false);
+            }
+            var updated = await _supabase.PatchAsync<Dictionary<string, object?>, List<SupabaseInsertId>>(
+                $"/rest/v1/pois?id=eq.{poiId.Value}",
+                corePayload,
+                headers: PreferReturnRepresentation,
+                cancellationToken: cancellationToken);
+            savedId = updated?.FirstOrDefault()?.id ?? 0;
+            if (savedId <= 0)
+            {
+                throw new InvalidOperationException("Cannot update POI.");
+            }
+        }
+
+        var translationPayload = new List<Dictionary<string, object?>>
+        {
+            new()
+            {
+                ["poi_id"] = savedId,
+                ["lang_code"] = langCode,
+                ["name"] = request.ShopName.Trim(),
+                ["description"] = request.Description?.Trim() ?? string.Empty,
+                ["tts_text"] = finalTtsText,
+                ["audio_url"] = string.Empty
+            }
+        };
+        await _supabase.PostAsync(
+            "/rest/v1/poi_translations?on_conflict=poi_id,lang_code",
+            translationPayload,
+            headers: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Prefer"] = "resolution=merge-duplicates" },
+            cancellationToken: cancellationToken);
+
+        return savedId;
+    }
+
+    public async Task<AdminResult?> FindAdminForLoginAsync(string username, string password)
+    {
+        var url = $"/rest/v1/admin_accounts?select=id,username,password_hash,role,full_name,is_active,is_deleted&username=ilike.{Uri.EscapeDataString(username)}&limit=1";
+        var accounts = await _supabase.GetListAsync<SupabaseAdminAccount>(url);
+        var account = accounts.FirstOrDefault();
+        if (account is null || !account.IsActive || account.IsDeleted)
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(account.password_hash) || !BCrypt.Net.BCrypt.Verify(password, account.password_hash))
+        {
+            return null;
+        }
+
+        return new AdminResult
+        {
+            Id = account.id,
+            Username = account.username ?? string.Empty,
+            Role = account.role ?? string.Empty,
+            FullName = account.full_name ?? string.Empty
+        };
+    }
+
+    public async Task<List<OwnerAccountDto>> GetOwnerAccountsAsync(bool includeDeleted = false)
+    {
+        var accounts = await _supabase.GetListAsync<SupabaseAdminAccount>(
+            "/rest/v1/admin_accounts?select=id,username,full_name,is_active,is_deleted,deleted_at,delete_status&role=eq.owner&order=username.asc");
+
+        var filtered = includeDeleted ? accounts : accounts.Where(a => !a.IsDeleted).ToList();
+        return filtered.Select(a => new OwnerAccountDto
+        {
+            Id = a.id.ToString(CultureInfo.InvariantCulture),
+            Username = a.username ?? string.Empty,
+            FullName = a.full_name ?? string.Empty,
+            IsDeleted = a.IsDeleted,
+            DeletedAt = a.deleted_at,
+            DeleteStatus = string.IsNullOrWhiteSpace(a.delete_status) ? (a.IsDeleted ? "DELETED" : "ACTIVE") : a.delete_status!
+        }).ToList();
+    }
+
+    public async Task<long> CreateOwnerAccountAsync(string username, string password, string fullName, CancellationToken cancellationToken = default)
+    {
+        var exists = await _supabase.GetListAsync<SupabaseAdminAccount>(
+            $"/rest/v1/admin_accounts?select=id&username=ilike.{Uri.EscapeDataString(username)}&limit=1",
+            cancellationToken);
+        if (exists.Count > 0)
+        {
+            throw new InvalidOperationException("Username da ton tai.");
+        }
+
+        var hash = BCrypt.Net.BCrypt.HashPassword(password);
+        var payload = new Dictionary<string, object?>
+        {
+            ["username"] = username,
+            ["password_hash"] = hash,
+            ["role"] = "owner",
+            ["full_name"] = fullName ?? string.Empty,
+            ["is_active"] = true,
+            ["is_deleted"] = false,
+            ["delete_status"] = "ACTIVE",
+            ["created_at"] = DateTimeOffset.UtcNow.ToString("O")
+        };
+
+        var inserted = await _supabase.PostAsync<Dictionary<string, object?>, List<SupabaseInsertId>>(
+            "/rest/v1/admin_accounts",
+            payload,
+            headers: PreferReturnRepresentation,
+            cancellationToken: cancellationToken);
+        var id = inserted?.FirstOrDefault()?.id ?? 0;
+        if (id <= 0)
+        {
+            throw new InvalidOperationException("Cannot create owner account (missing returned id).");
+        }
+
+        return id;
+    }
+
+    public async Task<bool> UpdateOwnerAccountAsync(long ownerId, string? username, string? fullName, string? password, CancellationToken cancellationToken = default)
+    {
+        var current = await _supabase.GetListAsync<SupabaseAdminAccount>(
+            $"/rest/v1/admin_accounts?select=id,username,is_deleted,role&role=eq.owner&id=eq.{ownerId}&limit=1",
+            cancellationToken);
+        var existing = current.FirstOrDefault();
+        if (existing is null || existing.IsDeleted)
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(username))
+        {
+            var dup = await _supabase.GetListAsync<SupabaseAdminAccount>(
+                $"/rest/v1/admin_accounts?select=id&username=ilike.{Uri.EscapeDataString(username)}&id=neq.{ownerId}&limit=1",
+                cancellationToken);
+            if (dup.Count > 0)
+            {
+                throw new InvalidOperationException("Username da ton tai.");
+            }
+        }
+
+        var payload = new Dictionary<string, object?>();
+        if (!string.IsNullOrWhiteSpace(username)) payload["username"] = username;
+        if (fullName is not null) payload["full_name"] = fullName;
+        if (!string.IsNullOrWhiteSpace(password)) payload["password_hash"] = BCrypt.Net.BCrypt.HashPassword(password);
+        if (payload.Count == 0) return true;
+
+        var updated = await _supabase.PatchAsync<Dictionary<string, object?>, List<SupabaseInsertId>>(
+            $"/rest/v1/admin_accounts?id=eq.{ownerId}&role=eq.owner",
+            payload,
+            headers: PreferReturnRepresentation,
+            cancellationToken: cancellationToken);
+        return updated is not null && updated.Count > 0;
+    }
+
+    public async Task<bool> DeleteOwnerAccountAsync(long ownerId, CancellationToken cancellationToken = default)
+    {
+        // Unassign POIs before deleting owner.
+        await _supabase.PatchAsync(
+            $"/rest/v1/pois?owner_admin_id=eq.{ownerId}",
+            new Dictionary<string, object?> { ["owner_admin_id"] = null },
+            cancellationToken: cancellationToken);
+
+        var existing = await _supabase.GetListAsync<SupabaseAdminAccount>(
+            $"/rest/v1/admin_accounts?select=id,is_deleted&role=eq.owner&id=eq.{ownerId}&limit=1",
+            cancellationToken);
+        var current = existing.FirstOrDefault();
+        if (current is null || current.IsDeleted)
+        {
+            return false;
+        }
+
+        var payload = new Dictionary<string, object?>
+        {
+            ["is_deleted"] = CoerceBoolStorageValue(current.is_deleted, true),
+            ["is_active"] = CoerceBoolStorageValue(current.is_active, false),
+            ["deleted_at"] = DateTimeOffset.UtcNow.ToString("O"),
+            ["delete_status"] = "DELETED"
+        };
+
+        var updated = await _supabase.PatchAsync<Dictionary<string, object?>, List<SupabaseInsertId>>(
+            $"/rest/v1/admin_accounts?id=eq.{ownerId}&role=eq.owner",
+            payload,
+            headers: PreferReturnRepresentation,
+            cancellationToken: cancellationToken);
+        return updated is not null && updated.Count > 0;
+    }
+
+    public async Task<bool> RestoreOwnerAccountAsync(long ownerId, CancellationToken cancellationToken = default)
+    {
+        var existing = await _supabase.GetListAsync<SupabaseAdminAccount>(
+            $"/rest/v1/admin_accounts?select=id,is_deleted,is_active&role=eq.owner&id=eq.{ownerId}&limit=1",
+            cancellationToken);
+        var current = existing.FirstOrDefault();
+        if (current is null || !current.IsDeleted)
+        {
+            return false;
+        }
+
+        var payload = new Dictionary<string, object?>
+        {
+            ["is_deleted"] = CoerceBoolStorageValue(current.is_deleted, false),
+            ["is_active"] = CoerceBoolStorageValue(current.is_active, true),
+            ["deleted_at"] = null,
+            ["delete_status"] = "ACTIVE"
+        };
+
+        var updated = await _supabase.PatchAsync<Dictionary<string, object?>, List<SupabaseInsertId>>(
+            $"/rest/v1/admin_accounts?id=eq.{ownerId}&role=eq.owner",
+            payload,
+            headers: PreferReturnRepresentation,
+            cancellationToken: cancellationToken);
+        return updated is not null && updated.Count > 0;
+    }
+
+    public async Task<bool> AssignOwnerToPoiAsync(long poiId, long? ownerId, CancellationToken cancellationToken = default)
+    {
+        if (ownerId is not null)
+        {
+            var owners = await _supabase.GetListAsync<SupabaseAdminAccount>(
+                $"/rest/v1/admin_accounts?select=id,is_active,is_deleted&role=eq.owner&id=eq.{ownerId.Value}&limit=1",
+                cancellationToken);
+            var owner = owners.FirstOrDefault();
+            if (owner is null || owner.IsDeleted || !owner.IsActive)
+            {
+                throw new InvalidOperationException("Owner khong ton tai hoac da bi khoa.");
+            }
+        }
+
+        var updated = await _supabase.PatchAsync<Dictionary<string, object?>, List<SupabaseInsertId>>(
+            $"/rest/v1/pois?id=eq.{poiId}",
+            new Dictionary<string, object?> { ["owner_admin_id"] = ownerId },
+            headers: PreferReturnRepresentation,
+            cancellationToken: cancellationToken);
+        return updated is not null && updated.Count > 0;
+    }
+
+    public async Task<bool> RecordUserActivityAsync(
+        string sessionId,
+        string platform,
+        string action,
+        string? language,
+        string? deviceType,
+        long? poiId,
+        int? isRealScan,
+        int? duration,
+        string? deviceId,
+        string? userAgent,
+        string? ipAddress,
+        string? screenInfo,
+        double? latitude = null,
+        double? longitude = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var (browser, os) = LocalHelpers.ParseUserAgent(userAgent);
+            var payload = new
+            {
+                session_id = sessionId,
+                platform = platform,
+                action = action,
+                language = language,
+                device_type = deviceType,
+                poi_id = poiId,
+                is_real_scan = isRealScan,
+                duration = duration,
+                device_id = deviceId,
+                browser_family = browser,
+                os_family = os,
+                ip_address = ipAddress,
+                screen_info = screenInfo,
+                latitude = latitude,
+                longitude = longitude,
+                created_at = DateTimeOffset.UtcNow.ToString("O")
+            };
+
+            await _supabase.PostAsync("/rest/v1/user_activity_events", payload, cancellationToken: cancellationToken);
+
+            if (string.Equals(action, "ping", StringComparison.OrdinalIgnoreCase))
+            {
+                var sessionPayload = new Dictionary<string, object?>
+                {
+                    ["session_id"] = sessionId,
+                    ["platform"] = platform,
+                    ["last_ping_at"] = DateTimeOffset.UtcNow.ToString("O"),
+                    ["device_id"] = deviceId,
+                    ["browser_family"] = browser,
+                    ["os_family"] = os,
+                    ["latitude"] = latitude,
+                    ["longitude"] = longitude
+                };
+                await _supabase.PostAsync(
+                    "/rest/v1/active_sessions?on_conflict=session_id",
+                    sessionPayload,
+                    headers: PreferUpsertReturnRepresentation,
+                    cancellationToken: cancellationToken);
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Supabase RecordUserActivityAsync failed.");
+            return false;
+        }
+    }
+
+    public async Task EnqueueTtsJobAsync(string jobId, string poiId, string text, CancellationToken cancellationToken = default)
+    {
+        var payload = new Dictionary<string, object?>
+        {
+            ["id"] = jobId,
+            ["poi_id"] = poiId,
+            ["text"] = text,
+            ["status"] = "waiting",
+            ["created_at"] = DateTimeOffset.UtcNow.ToString("O")
+        };
+        await _supabase.PostAsync("/rest/v1/audio_tts_queue", payload, cancellationToken: cancellationToken);
+    }
+
+    private static PoiMobileDto ToMobileDto(SupabasePoi p, string lang_code, SupabasePoiTranslation? t_req, SupabasePoiTranslation? t_vi)
+    {
+        var coreAudioUrl = (p.audio_url ?? string.Empty).Trim();
+        var translatedAudioUrl = ((t_req?.audio_url ?? string.Empty).Trim());
+        if (string.IsNullOrWhiteSpace(translatedAudioUrl))
+        {
+            translatedAudioUrl = ((t_vi?.audio_url ?? string.Empty).Trim());
+        }
+
+        return new PoiMobileDto
+        {
+            Id = p.id.ToString(CultureInfo.InvariantCulture),
+            Latitude = p.latitude,
+            Longitude = p.longitude,
+            RadiusMeters = p.radius_meters,
+            Priority = p.priority,
+            Price = p.price,
+            MapLink = (p.map_link ?? string.Empty).Trim(),
+            ImageUrl = (p.image_url ?? string.Empty).Trim(),
+            AudioUrl = coreAudioUrl,
+            Name = !string.IsNullOrWhiteSpace(t_req?.name) ? t_req!.name!.Trim() : (t_vi?.name ?? string.Empty).Trim(),
+            Description = !string.IsNullOrWhiteSpace(t_req?.description) ? t_req!.description!.Trim() : (t_vi?.description ?? string.Empty).Trim(),
+            TtsText = !string.IsNullOrWhiteSpace(t_req?.tts_text) ? t_req!.tts_text!.Trim()
+                       : (!string.IsNullOrWhiteSpace(t_req?.description) ? t_req!.description!.Trim()
+                       : (!string.IsNullOrWhiteSpace(t_vi?.tts_text) ? t_vi!.tts_text!.Trim()
+                       : (t_vi?.description ?? string.Empty).Trim())),
+            AudioLang = translatedAudioUrl,
+            LangCode = lang_code,
+            IsPaid = true
+        };
+    }
+
+    private static object CoerceBoolStorageValue(JsonElement kindProbe, bool desired)
+        => kindProbe.ValueKind == JsonValueKind.Number ? (desired ? 1 : 0) : desired;
+
+    private static bool ActorIsOwner(AdminActor actor)
+        => string.Equals(actor.Role, "owner", StringComparison.OrdinalIgnoreCase);
+}
+
+public class SupabasePoi
+{
+    public long id { get; set; }
+    public double latitude { get; set; }
+    public double longitude { get; set; }
+    public double radius_meters { get; set; }
+    public int priority { get; set; }
+    public double price { get; set; }
+    public string? map_link { get; set; }
+    public string? image_url { get; set; }
+    public string? audio_url { get; set; }
+    public JsonElement is_active { get; set; }
+    public JsonElement is_deleted { get; set; }
+    public List<SupabasePoiTranslation> poi_translations { get; set; } = [];
+
+    public bool IsActive => ParseBoolish(is_active, defaultValue: true);
+    public bool IsDeleted => ParseBoolish(is_deleted, defaultValue: false);
+
+    public static bool ParseBoolish(JsonElement value, bool defaultValue)
+    {
+        return value.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.Number => value.TryGetInt32(out var i) ? i != 0 : defaultValue,
+            JsonValueKind.String => bool.TryParse(value.GetString(), out var b) ? b : defaultValue,
+            _ => defaultValue
+        };
+    }
+}
+
+public class SupabasePoiTranslation
+{
+    public string lang_code { get; set; } = "";
+    public string? name { get; set; }
+    public string? description { get; set; }
+    public string? tts_text { get; set; }
+    public string? audio_url { get; set; }
+}
+
+public class SupabaseAdminAccount
+{
+    public long id { get; set; }
+    public string? username { get; set; }
+    public string? password_hash { get; set; }
+    public string? role { get; set; }
+    public string? full_name { get; set; }
+    public JsonElement is_active { get; set; }
+    public JsonElement is_deleted { get; set; }
+    public string? deleted_at { get; set; }
+    public string? delete_status { get; set; }
+
+    public bool IsActive => SupabasePoi.ParseBoolish(is_active, defaultValue: true);
+    public bool IsDeleted => SupabasePoi.ParseBoolish(is_deleted, defaultValue: false);
+}
+
+sealed class SupabaseInsertId { public long id { get; set; } }
+
+sealed class SupabasePoiAdminRow
+{
+    public long id { get; set; }
+    public double latitude { get; set; }
+    public double longitude { get; set; }
+    public double radius_meters { get; set; }
+    public int priority { get; set; }
+    public double price { get; set; }
+    public string? map_link { get; set; }
+    public string? image_url { get; set; }
+    public string? audio_url { get; set; }
+    public JsonElement is_active { get; set; }
+    public JsonElement is_deleted { get; set; }
+    public string? deleted_at { get; set; }
+    public string? delete_status { get; set; }
+    public long? owner_admin_id { get; set; }
+
+    public bool IsActive => SupabasePoi.ParseBoolish(is_active, defaultValue: true);
+    public bool IsDeleted => SupabasePoi.ParseBoolish(is_deleted, defaultValue: false);
+}
+
+sealed class SupabasePoiTranslationRow
+{
+    public long poi_id { get; set; }
+    public string? lang_code { get; set; }
+    public string? name { get; set; }
+}
+
+sealed class SupabasePoiTranslationFullRow
+{
+    public string? lang_code { get; set; }
+    public string? name { get; set; }
+    public string? description { get; set; }
+    public string? tts_text { get; set; }
+    public string? audio_url { get; set; }
+}
+
+sealed class SupabaseUserActivityEvent
+{
+    public long? poi_id { get; set; }
+    public string? action { get; set; }
+}
+
+sealed class SupabaseActiveSessionRow
+{
+    public string? session_id { get; set; }
+    public string? platform { get; set; }
+    public string? last_ping_at { get; set; }
+}
+
+sealed class SupabaseActiveSessionDetailsRow
+{
+    public string? session_id { get; set; }
+    public string? platform { get; set; }
+    public double? latitude { get; set; }
+    public double? longitude { get; set; }
+    public string? device_id { get; set; }
+    public string? browser_family { get; set; }
+    public string? os_family { get; set; }
+    public string? last_ping_at { get; set; }
+}
+
+sealed class SupabaseOwnerSessionRow
+{
+    public string? session_id { get; set; }
+    public long? poi_id { get; set; }
+    public DateTimeOffset created_at { get; set; }
+}
+
+sealed class SupabaseUserActivityReportRow
+{
+    public long id { get; set; }
+    public string? session_id { get; set; }
+    public long? poi_id { get; set; }
+    public string? action { get; set; }
+    public string? platform { get; set; }
+    public string? language { get; set; }
+    public string? device_id { get; set; }
+    public string? browser_family { get; set; }
+    public string? os_family { get; set; }
+    public string? ip_address { get; set; }
+    public string? screen_info { get; set; }
+    public DateTimeOffset created_at { get; set; }
+}
+
+sealed class SupabasePoiReportRow
+{
+    public long id { get; set; }
+    public double latitude { get; set; }
+    public double longitude { get; set; }
+    public double radius_meters { get; set; }
+    public JsonElement is_deleted { get; set; }
+    public long? owner_admin_id { get; set; }
+    public List<SupabasePoiTranslationRow> poi_translations { get; set; } = [];
+}
+
+sealed class SupabasePoiIdRow
+{
+    public long id { get; set; }
+    public long? owner_admin_id { get; set; }
+    public JsonElement is_deleted { get; set; }
+}
+
+sealed class SupabaseTtsQueueReportRow
+{
+    public string? id { get; set; }
+    public JsonElement poi_id { get; set; }
+    public string? text { get; set; }
+    public string? status { get; set; }
+    public string? created_at { get; set; }
+}
+

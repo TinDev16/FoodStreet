@@ -300,6 +300,22 @@ public sealed class PoiSyncService
     private IEnumerable<string> GetPreferredBaseUrls()
     {
         var list = new List<string>();
+
+        // 1. Prefer Localhost/Emulator first for development
+        var defaultPorts = new[] { 5187, 5000, 5001 };
+#if ANDROID
+        foreach (var port in defaultPorts)
+        {
+            list.Add($"http://10.0.2.2:{port}");
+            list.Add($"http://10.0.3.2:{port}");
+        }
+#endif
+        foreach (var port in defaultPorts)
+        {
+            list.Add($"http://localhost:{port}");
+        }
+
+        // 2. Cloud Development URL
         list.Add("https://foodstreet-ry06.onrender.com");
 
         var configured = GetConfiguredBaseUrls();
@@ -325,9 +341,6 @@ public sealed class PoiSyncService
         if (configuredUrls.Count > 0)
         {
             list.AddRange(configuredUrls);
-            return list
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .Distinct(StringComparer.OrdinalIgnoreCase);
         }
 
         var configuredRaw = Environment.GetEnvironmentVariable("FOODSTREET_ADMIN_BASE_URLS");
@@ -338,19 +351,6 @@ public sealed class PoiSyncService
             {
                 list.Add(NormalizeBaseUrl(item));
             }
-        }
-
-        var defaultPorts = new[] { 5187, 5000, 5001 };
-#if ANDROID
-        foreach (var port in defaultPorts)
-        {
-            list.Add($"http://10.0.2.2:{port}");
-            list.Add($"http://10.0.3.2:{port}");
-        }
-#endif
-        foreach (var port in defaultPorts)
-        {
-            list.Add($"http://localhost:{port}");
         }
 
         return list

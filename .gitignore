@@ -6,8 +6,12 @@ obj/
 **/obj/
 FoodStreetMobile/obj/
 .vs/
-App_Data/*.log
+*.log
 *.txt
-logcat.txt
+*.db3
+*.db
+!README.md
+!*.gitignore
 
-FoodStreetMobile/logcat.txt
+# User uploads
+FoodStreetPoiAdmin/wwwroot/uploads/*

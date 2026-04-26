@@ -14,6 +14,4 @@ WORKDIR /app
 # Copy code đã build
 COPY --from=build /app/out .
 
-COPY FoodStreetPoiAdmin/App_Data/poi-admin.db3 ./App_Data/poi-admin.db3
-
 CMD ["dotnet", "FoodStreetPoiAdmin.dll"]

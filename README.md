@@ -57,7 +57,7 @@ Mobile
 Backend & Admin
 - ASP.NET Core MVC (net10.0)
 - JWT Auth (Microsoft.AspNetCore.Authentication.JwtBearer)
-- SQLite (Microsoft.Data.Sqlite)
+- Supabase (Postgres) via PostgREST
 - Razor Pages / Controllers
   
 General
@@ -72,7 +72,7 @@ graph TD
     A --> C[Offline SQLite<br>Multi-lang]
     A --> D[Sync via WiFi<br>to Admin]
     E[FoodStreetPoiAdmin<br>ASP.NET Core] --> F[POI Management<br>Auth/Stats]
-    E --> G[SQLite DB<br>poi-admin.db3]
+    E --> G[Supabase Postgres<br>(PostgREST)]
     D --> E
 ```
 **Actual Structure:**
@@ -99,7 +99,8 @@ Mobile App: Offline-first, GPS tracking, geofencing, audio narration
 Admin Panel: POI CRUD, user management, stats dashboard
 Web Management: Content & system administration
 Database:
-- SQLite (local & server)
+- SQLite (mobile offline)
+- Supabase (server)
 - Sync via WiFi
 
 ## Prerequisites:
@@ -107,7 +108,6 @@ Database:
 - .NET SDK 8+ (`dotnet --version`)
 - Visual Studio 2022+
 - Android SDK (for mobile testing)
-- SQLite
 - Internet connection (for sync & map services)
 
 ## Getting Started
@@ -122,6 +122,11 @@ dotnet restore DoAn.sln
 ```
 
 2. Run Web Admin
+
+Required env vars (do not commit secrets):
+- `SUPABASE_URL` (example: `https://<project>.supabase.co`)
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `FOODSTREET_JWT_SECRET` (>= 32 chars)
 
 ```
 dotnet run --project FoodStreetPoiAdmin/FoodStreetPoiAdmin.csproj --urls "http://localhost:5000"
