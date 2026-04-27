@@ -189,10 +189,14 @@
             payload.latitude = state.currentLocation.latitude;
             payload.longitude = state.currentLocation.longitude;
         }
-        await fetch('/api/public/pois/track-activity', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+        if (action === 'offline') {
+            navigator.sendBeacon('/api/public/pois/track-activity', JSON.stringify(payload));
+        } else {
+            await fetch('/api/public/pois/track-activity', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        }
     } catch(e) {}
   };
 
@@ -409,7 +413,9 @@
     navigator.geolocation.watchPosition(update, () => {}, { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 });
   };
 
-  const initPingLoop = () => setInterval(() => trackActivity('ping'), 15000);
+  const initPingLoop = () => setInterval(() => {
+     if (document.visibilityState !== 'hidden') trackActivity('ping');
+  }, 15000);
 
   const init = async () => {
     const params = new URLSearchParams(window.location.search);
@@ -429,6 +435,13 @@
         setStatus(t("invalidPoiUrl"));
         hideInstallPrompt();
       }
+      
+      window.addEventListener('beforeunload', () => trackActivity('offline'));
+      document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'hidden') trackActivity('offline');
+          else trackActivity('ping');
+      });
+
     } catch (err) { console.error(err); setStatus(err?.message || String(err)); hideInstallPrompt(); }
   };
 

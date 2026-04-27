@@ -904,7 +904,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
     string onlineSql;
     if (!isOwner)
     {
-        onlineSql = "SELECT COUNT(DISTINCT session_id) FROM active_sessions WHERE datetime(last_ping_at) >= datetime('now', '-20 seconds')";
+        onlineSql = "SELECT COUNT(DISTINCT session_id) FROM active_sessions WHERE datetime(last_ping_at) >= datetime('now', '-45 seconds')";
         if (!string.IsNullOrEmpty(platform) && platform != "all") onlineSql += " AND platform = $platform";
     }
     else
@@ -915,7 +915,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
             FROM active_sessions s
             JOIN user_activity_events uae ON uae.session_id = s.session_id
             JOIN pois p ON p.id = uae.poi_id
-            WHERE datetime(s.last_ping_at) >= datetime('now', '-20 seconds')
+            WHERE datetime(s.last_ping_at) >= datetime('now', '-45 seconds')
               AND datetime(uae.created_at) >= datetime('now', '-10 minutes')
               AND p.owner_admin_id = $ownerId
             ";
@@ -1284,7 +1284,7 @@ app.MapGet("/api/admin/reports/user-activities", async (HttpContext context,
         while (await reader.ReadAsync()) allPois.Add((reader.GetInt64(0), reader.GetString(1), reader.GetDouble(2), reader.GetDouble(3), reader.GetDouble(4)));
     }
 
-    string visitorsSql = "SELECT session_id, platform, latitude, longitude, last_ping_at, device_id, browser_family, os_family FROM active_sessions WHERE datetime(last_ping_at) >= datetime('now', '-30 seconds')";
+    string visitorsSql = "SELECT session_id, platform, latitude, longitude, last_ping_at, device_id, browser_family, os_family FROM active_sessions WHERE datetime(last_ping_at) >= datetime('now', '-45 seconds')";
     if (!string.IsNullOrEmpty(platform) && platform != "all") visitorsSql += " AND platform = $platform";
     await using (var cmd = new SqliteCommand(visitorsSql, conn)) {
         if (!string.IsNullOrEmpty(platform) && platform != "all") cmd.Parameters.AddWithValue("$platform", platform);
@@ -1415,8 +1415,8 @@ app.MapGet("/api/admin/reports/user-activities", async (
         };
     }
 
-    // 1) Online now (last 20s based on UTC)
-    var onlineCutoffUtc = DateTimeOffset.UtcNow.AddSeconds(-20);
+    // 1) Online now (last 45s based on UTC)
+    var onlineCutoffUtc = DateTimeOffset.UtcNow.AddSeconds(-45);
     var onlineQuery = $"/rest/v1/active_sessions?select=session_id,last_ping_at,platform&last_ping_at=gte.{Esc(onlineCutoffUtc)}";
     if (!string.IsNullOrEmpty(platform) && platform != "all")
     {
@@ -1570,6 +1570,15 @@ app.MapGet("/api/admin/reports/user-activities", async (
     }
 
     var events = await FetchAllAsync<SupabaseUserActivityReportRow>(supabase, eventsQuery, ct);
+
+    // Fix created_at offset from Supabase if it was serialized as local time without Z
+    foreach (var e in events)
+    {
+        if (e.created_at != default && e.created_at.Offset != TimeSpan.Zero)
+        {
+            e.created_at = new DateTimeOffset(e.created_at.DateTime, TimeSpan.Zero);
+        }
+    }
 
     if (isOwner)
     {
@@ -1812,7 +1821,7 @@ app.MapGet("/api/admin/reports/user-activities", async (
 
     // 13) Advanced Online Visitors with proximity logic
     var onlineVisitors = new List<object>();
-    var visitorCutoffUtc = DateTimeOffset.UtcNow.AddSeconds(-30);
+    var visitorCutoffUtc = DateTimeOffset.UtcNow.AddSeconds(-45);
     var visitorsQuery = $"/rest/v1/active_sessions?select=session_id,platform,latitude,longitude,last_ping_at,device_id,browser_family,os_family&last_ping_at=gte.{Esc(visitorCutoffUtc)}";
     if (!string.IsNullOrEmpty(platform) && platform != "all")
     {
@@ -4998,6 +5007,12 @@ sealed class SupabaseDataService : IDataService
                     "/rest/v1/active_sessions?on_conflict=session_id",
                     sessionPayload,
                     headers: PreferUpsertReturnRepresentation,
+                    cancellationToken: cancellationToken);
+            }
+            else if (action == "offline")
+            {
+                await _supabase.DeleteAsync(
+                    $"/rest/v1/active_sessions?session_id=eq.{Uri.EscapeDataString(sessionId)}",
                     cancellationToken: cancellationToken);
             }
 

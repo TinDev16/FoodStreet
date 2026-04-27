@@ -12,26 +12,28 @@
   <link rel="stylesheet" href="/styles.css">
   <style>
     :root {
-      --card-bg: #ffffff;
-      --text-muted: #64748b;
-      --accent: #4f46e5;
+      --card-bg: rgba(255, 255, 255, 0.95);
+      --text-muted: #5b5348;
+      --accent: #f97316;
     }
 
     body {
-      background-color: #f8fafc;
-      font-family: 'Outfit', sans-serif;
+      background: linear-gradient(135deg, #fff9f0 0%, #fff5e6 100%);
+      font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+      color: #2d2a24;
       margin: 0;
       padding-bottom: 40px;
+      min-height: 100vh;
     }
 
     .list-header {
-      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
       color: white;
       padding: 40px 20px;
       text-align: center;
       border-bottom-left-radius: 30px;
       border-bottom-right-radius: 30px;
-      box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.2);
+      box-shadow: 0 10px 25px -5px rgba(249, 115, 22, 0.25);
       margin-bottom: 30px;
     }
 
@@ -84,18 +86,19 @@
       background: var(--card-bg);
       border-radius: 20px;
       overflow: hidden;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.02);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
       cursor: pointer;
       display: flex;
       flex-direction: column;
       text-decoration: none;
       color: inherit;
+      border: 1px solid rgba(255, 140, 0, 0.15);
     }
 
     .poi-item:hover {
       transform: translateY(-5px);
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 20px 30px -12px rgba(249, 115, 22, 0.15);
     }
 
     .poi-img-wrap {
@@ -134,7 +137,7 @@
       font-size: 1.25rem;
       font-weight: 600;
       margin: 0 0 8px 0;
-      color: #1e293b;
+      color: #2d2a24;
     }
 
     .poi-desc {
@@ -260,7 +263,7 @@
     }
 
     .btn-primary {
-      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      background: linear-gradient(105deg, #f97316, #ea580c);
       color: white;
       border: none;
       padding: 12px 24px;
@@ -269,7 +272,14 @@
       font-weight: 600;
       cursor: pointer;
       width: 100%;
-      transition: opacity 0.2s;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 8px rgba(249, 115, 22, 0.25);
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(105deg, #ea580c, #c2410c);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 18px rgba(249, 115, 22, 0.3);
     }
 
     .btn-primary:active {
@@ -289,9 +299,13 @@
 
     /* App Install Prompt Styles (similar to poi.css) */
     .app-install-prompt {
+      position: sticky;
+      top: 0;
+      z-index: 100;
       padding: 10px 15px;
-      background: #fff;
-      border-bottom: 1px solid #e2e8f0;
+      background: rgba(255, 249, 240, 0.9);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid #fed7aa;
     }
     .app-install-card {
       display: flex;
@@ -299,13 +313,18 @@
       gap: 15px;
       max-width: 600px;
       margin: 0 auto;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 20px;
+      padding: 12px 16px;
+      border: 1px solid #fed7aa;
     }
     .app-install-icon { font-size: 2rem; }
     .app-install-content { flex: 1; }
-    .app-install-content strong { display: block; font-size: 0.95rem; color: #1e293b; }
+    .app-install-content strong { display: block; font-size: 0.95rem; color: #f97316; }
     .app-install-content p { margin: 4px 0 8px 0; font-size: 0.8rem; color: var(--text-muted); }
     .app-install-actions button { border: none; padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; cursor: pointer; white-space: nowrap; font-weight: 600; }
-    .btn-outline { background: transparent; color: var(--text-muted); border: 1px solid #cbd5e1 !important; }
+    .btn-outline { background: white; color: #f97316; border: 1.5px solid #fed7aa !important; transition: all 0.2s; }
+    .btn-outline:hover { background: #fff7ed; border-color: #f97316 !important; }
   </style>
 </head>
 

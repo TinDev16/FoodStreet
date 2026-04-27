@@ -218,10 +218,14 @@
             action, platform: 'web', sessionId: sid, deviceId: did, language: state.lang,
             poiId: null, deviceType: 'web'
         };
-        await fetch('/api/public/pois/track-activity', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+        if (action === 'offline') {
+            navigator.sendBeacon('/api/public/pois/track-activity', JSON.stringify(payload));
+        } else {
+            await fetch('/api/public/pois/track-activity', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        }
     } catch(e) {}
   };
 
@@ -240,7 +244,15 @@
 
     // Track initial view and start ping loop
     trackActivity('view_list'); 
-    setInterval(() => trackActivity('ping'), 15000);
+    setInterval(() => {
+        if (document.visibilityState !== 'hidden') trackActivity('ping');
+    }, 15000);
+    
+    window.addEventListener('beforeunload', () => trackActivity('offline'));
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') trackActivity('offline');
+        else trackActivity('ping');
+    });
     
     initAppHandOff();
   };

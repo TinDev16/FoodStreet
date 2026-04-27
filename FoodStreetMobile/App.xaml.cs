@@ -31,7 +31,31 @@ public partial class App : Application
 
     protected override Window CreateWindow(IActivationState? activationState)
     {
-        return new Window(_appShell);
+        var window = new Window(_appShell);
+        
+        window.Created += (s, e) => {
+            // Optional: Start ping when created
+        };
+
+        window.Resumed += (s, e) => {
+            var languageService = Handler?.MauiContext?.Services.GetService<Services.AppLanguageService>();
+            var poiSyncService = Handler?.MauiContext?.Services.GetService<Services.PoiSyncService>();
+            if (poiSyncService != null && languageService != null)
+            {
+                _ = poiSyncService.TrackActivityAsync("ping", null, languageService.CurrentLanguage);
+            }
+        };
+
+        window.Stopped += (s, e) => { // Equiv to OnSleep
+            var languageService = Handler?.MauiContext?.Services.GetService<Services.AppLanguageService>();
+            var poiSyncService = Handler?.MauiContext?.Services.GetService<Services.PoiSyncService>();
+            if (poiSyncService != null && languageService != null)
+            {
+                _ = poiSyncService.TrackActivityAsync("offline", null, languageService.CurrentLanguage);
+            }
+        };
+
+        return window;
     }
 
     protected override void OnAppLinkRequestReceived(Uri uri)

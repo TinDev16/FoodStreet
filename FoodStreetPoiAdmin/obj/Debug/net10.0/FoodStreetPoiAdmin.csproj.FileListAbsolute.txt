@@ -51,5 +51,5 @@ E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\F
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\FoodStreetPoiAdmin.genruntimeconfig.cache
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\ref\FoodStreetPoiAdmin.dll
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\guzmfxddfb-{0}-qd8sl2x0iv-qd8sl2x0iv.gz
-E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\j0nhwn3r70-{0}-sbrja5jr9a-sbrja5jr9a.gz
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\u3pfwkd05z-{0}-ih78yz1vo7-ih78yz1vo7.gz
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\j0nhwn3r70-{0}-f3412j6rj5-f3412j6rj5.gz
