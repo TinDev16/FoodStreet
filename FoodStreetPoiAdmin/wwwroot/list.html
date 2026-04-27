@@ -201,12 +201,131 @@
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+
+    /* Master Lock Overlay Styles */
+    .master-lock-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 50;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      background: rgba(255, 255, 255, 0.4);
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding-top: 50px;
+    }
+
+    .master-lock-card {
+      background: var(--card-bg);
+      border-radius: 20px;
+      padding: 30px;
+      text-align: center;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+      max-width: 350px;
+      width: 90%;
+      border: 1px solid rgba(0,0,0,0.05);
+      animation: slideUp 0.3s ease-out;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .lock-icon {
+      font-size: 3rem;
+      margin-bottom: 15px;
+    }
+    
+    .lock-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: #1e293b;
+    }
+
+    .lock-desc {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    .lock-price {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 25px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      transition: opacity 0.2s;
+    }
+
+    .btn-primary:active {
+      opacity: 0.8;
+    }
+
+    .list-wrapper {
+      position: relative;
+      min-height: 300px;
+    }
+
+    .blur-content {
+      filter: blur(8px);
+      pointer-events: none;
+      user-select: none;
+    }
+
+    /* App Install Prompt Styles (similar to poi.css) */
+    .app-install-prompt {
+      padding: 10px 15px;
+      background: #fff;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .app-install-card {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .app-install-icon { font-size: 2rem; }
+    .app-install-content { flex: 1; }
+    .app-install-content strong { display: block; font-size: 0.95rem; color: #1e293b; }
+    .app-install-content p { margin: 4px 0 8px 0; font-size: 0.8rem; color: var(--text-muted); }
+    .app-install-actions button { border: none; padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; cursor: pointer; white-space: nowrap; font-weight: 600; }
+    .btn-outline { background: transparent; color: var(--text-muted); border: 1px solid #cbd5e1 !important; }
   </style>
 </head>
 
 <body>
   <div id="loadingOverlay">
     <div class="spinner"></div>
+  </div>
+
+  <div id="appInstallPrompt" class="app-install-prompt" hidden>
+    <div class="app-install-card">
+      <div class="app-install-icon">📱</div>
+      <div class="app-install-content">
+        <strong id="installPromptTitle">Trải nghiệm tốt hơn với App FoodStreet</strong>
+        <p id="installPromptDesc">Xem danh sách, bản đồ và nhận thông báo món ăn hấp dẫn</p>
+        <div class="app-install-actions">
+          <button id="openAppBtn" class="btn-primary" style="width: auto;">Mở App</button>
+          <button id="dismissInstallPromptBtn" class="btn-outline">Để sau</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <header class="list-header">
@@ -219,8 +338,22 @@
   </header>
 
   <main>
-    <div class="poi-list" id="poiList">
-      <!-- POIs will be injected here -->
+    <div class="list-wrapper" id="listWrapper">
+      <div class="poi-list" id="poiList">
+        <!-- POIs will be injected here -->
+      </div>
+      
+      <!-- Premium Master QR Lock Overlay -->
+      <div id="masterLockOverlay" class="master-lock-overlay" hidden>
+        <div class="master-lock-card">
+          <div class="lock-icon">🔒</div>
+          <div class="lock-title">Premium Access</div>
+          <div class="lock-desc">Xem toàn bộ địa điểm ăn uống nổi bật và thưởng thức không giới hạn.</div>
+          <div class="lock-price" id="masterLockPrice">0 đ</div>
+          <button id="masterUnlockBtn" class="btn-primary">Mở khóa ngay</button>
+          <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 15px;">Thanh toán mô phỏng, mở ngay lập tức</div>
+        </div>
+      </div>
     </div>
   </main>
 

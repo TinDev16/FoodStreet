@@ -830,6 +830,44 @@ app.MapPost("/api/public/tts/request", async (TtsRequest req, IDataService dataS
 });
 
 
+// Store unlocked Master QR sessions/users in memory for simulated payment
+var unlockedMasterSessions = new System.Collections.Concurrent.ConcurrentDictionary<string, bool>();
+
+app.MapGet("/api/public/master/info", (HttpContext context, IConfiguration config) =>
+{
+    var unlockFee = config.GetValue<long>("MasterQr:UnlockFee", 0);
+    var sessionId = context.Request.Query["sessionId"].ToString() ?? "";
+    var userId = context.Request.Query["userId"].ToString() ?? "";
+    
+    var isUnlocked = unlockFee <= 0 || 
+                     (!string.IsNullOrEmpty(sessionId) && unlockedMasterSessions.ContainsKey(sessionId)) ||
+                     (!string.IsNullOrEmpty(userId) && unlockedMasterSessions.ContainsKey(userId));
+
+    return Results.Ok(new
+    {
+        unlockFee,
+        isUnlocked
+    });
+});
+
+app.MapPost("/api/public/master/unlock", async (HttpContext context) =>
+{
+    var req = await context.Request.ReadFromJsonAsync<System.Text.Json.Nodes.JsonObject>();
+    var sessionId = req?["sessionId"]?.ToString() ?? "";
+    var userId = req?["userId"]?.ToString() ?? "";
+
+    if (!string.IsNullOrEmpty(sessionId))
+    {
+        unlockedMasterSessions.TryAdd(sessionId, true);
+    }
+    if (!string.IsNullOrEmpty(userId))
+    {
+        unlockedMasterSessions.TryAdd(userId, true);
+    }
+
+    return Results.Ok(new { success = true, isUnlocked = true });
+});
+
 #if false
 app.MapGet("/api/admin/reports/user-activities", async (HttpContext context, 
     string? platform, string? period, string? from, string? to, string? poiSort, string? fields, string? action) =>

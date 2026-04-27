@@ -30,8 +30,6 @@ E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\r
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\scopedcss\bundle\FoodStreetPoiAdmin.styles.css
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\k9mnuggnn9-{0}-7q20j1m7ro-7q20j1m7ro.gz
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\ypiyamc441-{0}-dkoa6w56gw-dkoa6w56gw.gz
-E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\j0nhwn3r70-{0}-sq0par9t1r-sq0par9t1r.gz
-E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\u3pfwkd05z-{0}-xopdmp3ur3-xopdmp3ur3.gz
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\bq0z4a3njl-{0}-frkelpvan7-frkelpvan7.gz
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\3sodcubq1x-{0}-ry5y9auqa9-ry5y9auqa9.gz
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\nnk9e9ukq2-{0}-uxudmsngq4-uxudmsngq4.gz
@@ -53,3 +51,5 @@ E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\F
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\FoodStreetPoiAdmin.genruntimeconfig.cache
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\ref\FoodStreetPoiAdmin.dll
 E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\guzmfxddfb-{0}-qd8sl2x0iv-qd8sl2x0iv.gz
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\j0nhwn3r70-{0}-sbrja5jr9a-sbrja5jr9a.gz
+E:\Study_project\C#\FoodStreet\FoodStreet\FoodStreetPoiAdmin\obj\Debug\net10.0\compressed\u3pfwkd05z-{0}-ih78yz1vo7-ih78yz1vo7.gz
