@@ -3798,7 +3798,7 @@ sealed class SupabaseTtsQueueRow
 
 public class TtsQueueWorker : BackgroundService
 {
-    private readonly SemaphoreSlim _semaphore = new(3);
+    private readonly SemaphoreSlim _semaphore = new(6);
     private static readonly IReadOnlyDictionary<string, string> PreferReturnRepresentation
         = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Prefer"] = "return=representation" };
 
@@ -3886,7 +3886,7 @@ public class TtsQueueWorker : BackgroundService
         try
         {
             // Simulate TTS generation
-            await Task.Delay(5000, token);
+            await Task.Delay(1000, token);
 
             await _supabase.PatchAsync(
                 $"/rest/v1/audio_tts_queue?id=eq.{Uri.EscapeDataString(job.Id)}",
