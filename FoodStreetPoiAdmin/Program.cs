@@ -1656,8 +1656,8 @@ app.MapGet("/api/admin/reports/user-activities", async (
             };
 
             var ranked = events
-                .Where(e => e.poi_id.HasValue && !string.Equals(e.action, "ping", StringComparison.OrdinalIgnoreCase))
-                .GroupBy(e => e.poi_id!.Value)
+                .Where(e => !string.Equals(e.action, "ping", StringComparison.OrdinalIgnoreCase))
+                .GroupBy(e => e.poi_id ?? 0)
                 .Select(g => new { PoiId = g.Key, Score = g.Sum(weight) })
                 .OrderBy(x => sortAsc ? x.Score : -x.Score)
                 .ThenBy(x => x.PoiId)
@@ -1668,8 +1668,8 @@ app.MapGet("/api/admin/reports/user-activities", async (
             {
                 topPois.Add(new
                 {
-                    poiId = r.PoiId,
-                    name = poiNameById.TryGetValue(r.PoiId, out var name) ? name : "Unknown POI",
+                    poiId = r.PoiId == 0 ? "Master" : r.PoiId.ToString(CultureInfo.InvariantCulture),
+                    name = r.PoiId == 0 ? "Master QR" : (poiNameById.TryGetValue(r.PoiId, out var name) ? name : "Unknown POI"),
                     count = r.Score
                 });
             }
@@ -1677,8 +1677,8 @@ app.MapGet("/api/admin/reports/user-activities", async (
         else
         {
             var ranked = events
-                .Where(e => e.poi_id.HasValue && string.Equals(e.action, actionFilterValue, StringComparison.OrdinalIgnoreCase))
-                .GroupBy(e => e.poi_id!.Value)
+                .Where(e => string.Equals(e.action, actionFilterValue, StringComparison.OrdinalIgnoreCase))
+                .GroupBy(e => e.poi_id ?? 0)
                 .Select(g => new { PoiId = g.Key, Score = g.LongCount() })
                 .OrderBy(x => sortAsc ? x.Score : -x.Score)
                 .ThenBy(x => x.PoiId)
@@ -1689,8 +1689,8 @@ app.MapGet("/api/admin/reports/user-activities", async (
             {
                 topPois.Add(new
                 {
-                    poiId = r.PoiId,
-                    name = poiNameById.TryGetValue(r.PoiId, out var name) ? name : "Unknown POI",
+                    poiId = r.PoiId == 0 ? "Master" : r.PoiId.ToString(CultureInfo.InvariantCulture),
+                    name = r.PoiId == 0 ? "Master QR" : (poiNameById.TryGetValue(r.PoiId, out var name) ? name : "Unknown POI"),
                     count = r.Score
                 });
             }
