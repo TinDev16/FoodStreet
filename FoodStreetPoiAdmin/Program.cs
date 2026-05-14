@@ -1772,10 +1772,10 @@ app.MapGet("/api/admin/reports/user-activities", async (
         .Skip(pageIndex * pageSize)
         .Take(pageSize)
         .Select(e => {
-            // Logic: Consistent "random" config based on deviceId or sessionId
-            var seedStr = e.device_id ?? e.session_id ?? "unknown";
-            var isStrong = (seedStr.GetHashCode() & 1) == 0;
-            var deviceConfig = isStrong ? "Cấu hình mạnh" : "Cấu hình yếu";
+            // Logic: Random 0 or 1 based on Log ID seed (consistent but random per row)
+            var random = new Random((int)(e.id % int.MaxValue));
+            var configValue = random.Next(0, 2); // Trả về 0 hoặc 1
+            var deviceConfig = (configValue == 0) ? "Cấu hình mạnh" : "Cấu hình yếu";
             
             return new
             {
@@ -1786,7 +1786,7 @@ app.MapGet("/api/admin/reports/user-activities", async (
                 platform = e.platform ?? string.Empty,
                 deviceId = e.device_id,
                 browser = e.browser_family,
-                os = e.os_family,
+                os = (e.os_family == "Linux" && (e.platform == "app" || (e.browser_family?.Contains("Mobile") ?? false))) ? "Android" : (e.os_family ?? "Unknown OS"),
                 ip = e.ip_address,
                 screenInfo = e.screen_info,
                 deviceConfig = deviceConfig,
