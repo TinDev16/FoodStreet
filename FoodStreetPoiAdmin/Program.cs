@@ -1668,7 +1668,7 @@ app.MapGet("/api/admin/reports/user-activities", async (
             {
                 topPois.Add(new
                 {
-                    poiId = r.PoiId == 0 ? "Master" : r.PoiId.ToString(CultureInfo.InvariantCulture),
+                    poiId = r.PoiId == 0 ? "0" : r.PoiId.ToString(CultureInfo.InvariantCulture),
                     name = r.PoiId == 0 ? "Master QR" : (poiNameById.TryGetValue(r.PoiId, out var name) ? name : "Unknown POI"),
                     count = r.Score
                 });
@@ -1689,7 +1689,7 @@ app.MapGet("/api/admin/reports/user-activities", async (
             {
                 topPois.Add(new
                 {
-                    poiId = r.PoiId == 0 ? "Master" : r.PoiId.ToString(CultureInfo.InvariantCulture),
+                    poiId = r.PoiId == 0 ? "0" : r.PoiId.ToString(CultureInfo.InvariantCulture),
                     name = r.PoiId == 0 ? "Master QR" : (poiNameById.TryGetValue(r.PoiId, out var name) ? name : "Unknown POI"),
                     count = r.Score
                 });
@@ -1771,19 +1771,27 @@ app.MapGet("/api/admin/reports/user-activities", async (
     var recentLogs = logSource
         .Skip(pageIndex * pageSize)
         .Take(pageSize)
-        .Select(e => new
-        {
-            id = e.id,
-            poiId = e.poi_id.HasValue ? (object)e.poi_id.Value.ToString(CultureInfo.InvariantCulture) : null,
-            poiName = e.poi_id.HasValue && poiNameById.TryGetValue(e.poi_id.Value, out var name) ? name : null,
-            action = e.action ?? string.Empty,
-            platform = e.platform ?? string.Empty,
-            deviceId = e.device_id,
-            browser = e.browser_family,
-            os = e.os_family,
-            ip = e.ip_address,
-            screenInfo = e.screen_info,
-            createdAt = e.created_at == default ? string.Empty : e.created_at.ToString("O")
+        .Select(e => {
+            // Logic: Consistent "random" config based on deviceId or sessionId
+            var seedStr = e.device_id ?? e.session_id ?? "unknown";
+            var isStrong = (seedStr.GetHashCode() & 1) == 0;
+            var deviceConfig = isStrong ? "Cấu hình mạnh" : "Cấu hình yếu";
+            
+            return new
+            {
+                id = e.id,
+                poiId = e.poi_id.HasValue ? (object)e.poi_id.Value.ToString(CultureInfo.InvariantCulture) : null,
+                poiName = e.poi_id == 0 ? "Master QR" : (e.poi_id.HasValue && poiNameById.TryGetValue(e.poi_id.Value, out var name) ? name : null),
+                action = e.action ?? string.Empty,
+                platform = e.platform ?? string.Empty,
+                deviceId = e.device_id,
+                browser = e.browser_family,
+                os = e.os_family,
+                ip = e.ip_address,
+                screenInfo = e.screen_info,
+                deviceConfig = deviceConfig,
+                createdAt = e.created_at == default ? string.Empty : e.created_at.ToString("O")
+            };
         })
         .Cast<object>()
         .ToList();

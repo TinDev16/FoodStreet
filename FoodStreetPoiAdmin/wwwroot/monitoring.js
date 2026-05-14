@@ -239,6 +239,7 @@ async function loadDashboard() {
     renderHeatmap(data.topPois || [], data.allPois || [], data.onlineVisitors || []);
     renderPoiRanking(data.topPois || [], selectedAction);
     renderDetailedLogs(data.recentLogs || []);
+    renderMasterQrConfigs(data.recentLogs || []);
 
     // Pagination UI
     const totalPages = Math.ceil(totalLogs / logPageSize);
@@ -386,12 +387,16 @@ function renderDetailedLogs(logs) {
     const platformIcon = log.platform === 'app' ? '<i class="fa-solid fa-mobile-screen"></i> App' : '<i class="fa-solid fa-globe"></i> Web';
 
     // Comprehensive Device Info
+    const configColor = log.deviceConfig === 'Cấu hình mạnh' ? '#10b981' : '#f59e0b';
+    const configBadge = `<div style="margin-top:4px; font-size:0.7rem; font-weight:700; color:${configColor};"><i class="fa-solid fa-microchip"></i> ${log.deviceConfig || 'N/A'}</div>`;
+
     const deviceHtml = `
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
                 <div>
                     <div style="font-weight:600; color:var(--accent-color); font-size:0.9rem;">${log.os || 'Unknown OS'}</div>
                     <div class="muted small">${log.browser || 'Browser'}</div>
                     <div class="muted" style="font-size:0.7rem; margin-top:4px;">ID: ${log.deviceId || 'N/A'}</div>
+                    ${configBadge}
                 </div>
                 <div style="border-left: 1px solid var(--border-color); padding-left:12px;">
                     <div class="small" style="font-weight:500;">${platformIcon}</div>
@@ -414,6 +419,52 @@ function renderDetailedLogs(logs) {
                 <td class="muted small">${log.ip || '-'}</td>
             </tr>
         `;
+  }).join('');
+}
+
+/**
+ * Renders the Master QR configuration check table.
+ * Displays device config (Strong/Weak) for Master QR scans.
+ */
+function renderMasterQrConfigs(logs) {
+  const container = document.getElementById('masterQrConfigRows');
+  if (!container) return;
+
+  // Filter for Master QR scans (poiId 0 or name "Master QR")
+  const qrLogs = logs.filter(l => (l.action === 'scan_qr' || l.action === 'qr') && (l.poiId == 0 || l.poiName === 'Master QR'));
+  if (qrLogs.length === 0) {
+    container.innerHTML = '<tr><td colspan="4" class="text-center muted" style="padding: 20px;">Đang chờ quét Master QR...</td></tr>';
+    return;
+  }
+
+  container.innerHTML = qrLogs.map(log => {
+    let timeStr = 'N/A';
+    try {
+        const time = new Date(log.createdAt);
+        const vnTime = new Date(time.getTime() + (7 * 3600 * 1000));
+        timeStr = vnTime.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    } catch (e) { }
+
+    const isStrong = log.deviceConfig === 'Cấu hình mạnh';
+    const configClass = isStrong ? 'at-poi' : 'between-pois';
+    
+    return `
+      <tr>
+        <td style="font-weight:600;">${timeStr}</td>
+        <td>
+            <div style="font-weight:500;">${log.os || 'Thiết bị'}</div>
+            <div class="muted small">${log.browser || ''}</div>
+        </td>
+        <td>
+            <div class="proximity-badge ${configClass}" style="display:inline-block; width:110px; text-align:center;">
+                <i class="fa-solid ${isStrong ? 'fa-bolt' : 'fa-gauge-low'}"></i> ${log.deviceConfig}
+            </div>
+        </td>
+        <td>
+            <span style="color: #10b981;"><i class="fa-solid fa-check-circle"></i> Đã kết nối</span>
+        </td>
+      </tr>
+    `;
   }).join('');
 }
 

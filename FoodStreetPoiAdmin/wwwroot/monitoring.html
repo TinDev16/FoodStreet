@@ -562,6 +562,32 @@
             <div id="hourlyChart" style="min-height: 250px;"></div>
           </section>
 
+          <!-- Master QR Config Section -->
+          <section class="chart-container" style="margin-top: 24px;">
+            <header class="card-header" style="border-bottom: 1px solid var(--border-color); margin-bottom: 16px;">
+              <div class="card-title" style="margin-bottom: 0;">
+                <i class="fa-solid fa-microchip"></i>
+                <h2 style="font-size: 1.25rem;">Kiểm tra Cấu hình Thiết bị (Master QR)</h2>
+              </div>
+              <div class="muted" style="font-size: 0.8rem; margin-top: 4px;">Tự động phân loại cấu hình khi khách quét mã QR Tổng hợp</div>
+            </header>
+            <div class="table-responsive">
+              <table class="ranking-table" id="masterQrConfigTable">
+                <thead>
+                  <tr>
+                    <th width="160">Thời gian</th>
+                    <th>Thiết bị</th>
+                    <th width="150">Cấu hình</th>
+                    <th width="120">Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody id="masterQrConfigRows">
+                  <tr><td colspan="4" class="text-center muted" style="padding: 20px;">Đang chờ quét Master QR...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
           <section class="chart-container" style="margin-top: 24px;">
             <header class="card-header" style="border-bottom: 1px solid var(--border-color); margin-bottom: 16px;">
               <div class="card-title" style="margin-bottom: 0;">

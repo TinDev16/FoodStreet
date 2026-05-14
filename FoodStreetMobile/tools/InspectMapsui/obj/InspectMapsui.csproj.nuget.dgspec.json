@@ -1,20 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetMobile\\tools\\InspectMapsui\\InspectMapsui.csproj": {}
+    "D:\\FoodStreet\\FoodStreetMobile\\tools\\InspectMapsui\\InspectMapsui.csproj": {}
   },
   "projects": {
-    "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetMobile\\tools\\InspectMapsui\\InspectMapsui.csproj": {
+    "D:\\FoodStreet\\FoodStreetMobile\\tools\\InspectMapsui\\InspectMapsui.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetMobile\\tools\\InspectMapsui\\InspectMapsui.csproj",
+        "projectUniqueName": "D:\\FoodStreet\\FoodStreetMobile\\tools\\InspectMapsui\\InspectMapsui.csproj",
         "projectName": "InspectMapsui",
-        "projectPath": "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetMobile\\tools\\InspectMapsui\\InspectMapsui.csproj",
-        "packagesPath": "C:\\Users\\lenovo\\.nuget\\packages\\",
-        "outputPath": "E:\\Study_project\\C#\\FoodStreet\\FoodStreet\\FoodStreetMobile\\tools\\InspectMapsui\\obj\\",
+        "projectPath": "D:\\FoodStreet\\FoodStreetMobile\\tools\\InspectMapsui\\InspectMapsui.csproj",
+        "packagesPath": "C:\\Users\\Lenovo\\.nuget\\packages\\",
+        "outputPath": "D:\\FoodStreet\\FoodStreetMobile\\tools\\InspectMapsui\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\lenovo\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "C:\\Users\\Lenovo\\AppData\\Roaming\\NuGet\\NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net8.0"
@@ -39,7 +39,7 @@
           "auditLevel": "low",
           "auditMode": "direct"
         },
-        "SdkAnalysisLevel": "10.0.100"
+        "SdkAnalysisLevel": "10.0.200"
       },
       "frameworks": {
         "net8.0": {
@@ -55,12 +55,30 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
+          "downloadDependencies": [
+            {
+              "name": "Microsoft.AspNetCore.App.Ref",
+              "version": "[8.0.26, 8.0.26]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Host.win-x64",
+              "version": "[8.0.26, 8.0.26]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Ref",
+              "version": "[8.0.26, 8.0.26]"
+            },
+            {
+              "name": "Microsoft.WindowsDesktop.App.Ref",
+              "version": "[8.0.26, 8.0.26]"
+            }
+          ],
           "frameworkReferences": {
             "Microsoft.NETCore.App": {
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.102/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.203/PortableRuntimeIdentifierGraph.json"
         }
       }
     }
